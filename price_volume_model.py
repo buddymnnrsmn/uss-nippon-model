@@ -606,9 +606,10 @@ class PriceVolumeModel:
                          Only applies to incremental projects (not BR2 which is committed)
     """
 
-    def __init__(self, scenario: ModelScenario, execution_factor: float = 1.0):
+    def __init__(self, scenario: ModelScenario, execution_factor: float = 1.0, custom_benchmarks: dict = None):
         self.scenario = scenario
         self.execution_factor = execution_factor
+        self.custom_benchmarks = custom_benchmarks or BENCHMARK_PRICES_2023
         self.years = list(range(2024, 2034))
         self.segments = get_segment_configs()
         self.projects = get_capital_projects()
@@ -620,7 +621,7 @@ class PriceVolumeModel:
 
     def get_benchmark_price(self, benchmark_type: str, year: int) -> float:
         """Calculate benchmark price for a given year"""
-        base_price = BENCHMARK_PRICES_2023.get(benchmark_type, 700)
+        base_price = self.custom_benchmarks.get(benchmark_type, 700)
         price_scenario = self.scenario.price_scenario
 
         # Get the factor for this benchmark
