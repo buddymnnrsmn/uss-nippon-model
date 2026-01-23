@@ -61,11 +61,11 @@ def render_sidebar():
     st.sidebar.header("Scenario Selection")
 
     scenario_options = {
-        "Base Case": ScenarioType.BASE_CASE,
-        "Conservative": ScenarioType.CONSERVATIVE,
-        "Wall Street Consensus": ScenarioType.WALL_STREET,
-        "Management": ScenarioType.MANAGEMENT,
-        "NSA Mandated CapEx": ScenarioType.NIPPON_COMMITMENTS,
+        "Base Case - Standalone": ScenarioType.BASE_CASE,
+        "Conservative - Downside": ScenarioType.CONSERVATIVE,
+        "Wall Street - Analyst Views": ScenarioType.WALL_STREET,
+        "Management - Dec 2023": ScenarioType.MANAGEMENT,
+        "Nippon Investment Case": ScenarioType.NIPPON_COMMITMENTS,
         "Custom": ScenarioType.CUSTOM
     }
 
@@ -84,11 +84,11 @@ def render_sidebar():
 
     # Show scenario description
     scenario_descriptions = {
-        "Base Case": "Mid-cycle pricing (95% factor), BR2 only, 10.9% WACC. Most likely standalone outcome.",
-        "Conservative": "Downside stress test. 85% prices, 12% WACC, volume contraction.",
-        "Wall Street Consensus": "Based on Barclays/Goldman fairness opinions. 12.5% WACC, flat prices.",
-        "Management": "December 2023 projections. Footprint reduction, $700/ton HRC.",
-        "NSA Mandated CapEx": "Full $14B investment program. All 6 projects, no plant closures through 2035.",
+        "Base Case - Standalone": "Mid-cycle steel prices (0.95x), BR2 expansion only, 10.9% WACC",
+        "Conservative - Downside": "Weak demand and pricing (0.85x), higher discount rate (12% WACC)",
+        "Wall Street - Analyst Views": "Barclays/Goldman DCF assumptions (0.92x prices, 12.5% WACC)",
+        "Management - Dec 2023": "Company projections with footprint rationalization (0.92x prices, flat growth)",
+        "Nippon Investment Case": "$14B capital program, all 6 projects, no plant closures through 2035",
         "Custom": "Manually adjust all parameters below."
     }
     st.sidebar.caption(scenario_descriptions.get(selected_scenario_name, ""))
