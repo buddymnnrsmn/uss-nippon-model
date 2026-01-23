@@ -299,8 +299,8 @@ def render_sidebar():
     if st.session_state.reset_section == "irp":
         st.session_state.us_10yr = preset.us_10yr * 100
         st.session_state.japan_10yr = preset.japan_10yr * 100
-        st.session_state.n_coe = preset.nippon_cost_of_equity * 100
-        st.session_state.n_cod = preset.nippon_cost_of_debt * 100
+        st.session_state.n_erp = preset.nippon_equity_risk_premium * 100
+        st.session_state.n_cs = preset.nippon_credit_spread * 100
         st.session_state.n_dr = preset.nippon_debt_ratio * 100
         st.session_state.n_tr = preset.nippon_tax_rate * 100
         st.session_state.reset_section = None
@@ -310,13 +310,13 @@ def render_sidebar():
                                  help="Current US government bond yield. Used to calculate interest rate differential with Japan.") / 100
     japan_10yr = st.sidebar.slider("Japan 10-Year JGB", 0.0, 2.0, st.session_state.get('japan_10yr', preset.japan_10yr * 100), 0.25, format="%.2f%%",
                                     key="japan_10yr",
-                                    help="Current Japanese Government Bond yield. Japan's low rates give Nippon a cost of capital advantage.") / 100
+                                    help="Japanese Government Bond yield. Nippon's cost of capital rises with this rate.") / 100
 
     with st.sidebar.expander("Nippon WACC Components", expanded=False):
-        nippon_coe = st.slider("Cost of Equity", 3.0, 8.0, st.session_state.get('n_coe', preset.nippon_cost_of_equity * 100), 0.5, format="%.1f%%", key="n_coe",
-                                help="Nippon's required return on equity in JPY. Lower than US due to Japan's lower risk-free rate.") / 100
-        nippon_cod = st.slider("Cost of Debt", 0.5, 3.0, st.session_state.get('n_cod', preset.nippon_cost_of_debt * 100), 0.25, format="%.2f%%", key="n_cod",
-                                help="Nippon's borrowing cost in JPY. Very low due to Japan's near-zero interest rate environment.") / 100
+        nippon_erp = st.slider("Equity Risk Premium", 3.0, 6.0, st.session_state.get('n_erp', preset.nippon_equity_risk_premium * 100), 0.25, format="%.2f%%", key="n_erp",
+                                help="Premium over JGB rate for equity. Cost of Equity = JGB + This Premium.") / 100
+        nippon_cs = st.slider("Credit Spread", 0.25, 2.0, st.session_state.get('n_cs', preset.nippon_credit_spread * 100), 0.25, format="%.2f%%", key="n_cs",
+                                help="Spread over JGB rate for debt. Cost of Debt = JGB + This Spread.") / 100
         nippon_debt_ratio = st.slider("Debt Ratio", 20.0, 50.0, st.session_state.get('n_dr', preset.nippon_debt_ratio * 100), 5.0, format="%.0f%%", key="n_dr",
                                        help="Nippon's debt as percentage of total capital. Affects weighted average.") / 100
         nippon_tax_rate = st.slider("Japan Tax Rate", 25.0, 35.0, st.session_state.get('n_tr', preset.nippon_tax_rate * 100), 1.0, format="%.0f%%", key="n_tr",
@@ -422,8 +422,8 @@ def render_sidebar():
         exit_multiple=exit_multiple,
         us_10yr=us_10yr,
         japan_10yr=japan_10yr,
-        nippon_cost_of_equity=nippon_coe,
-        nippon_cost_of_debt=nippon_cod,
+        nippon_equity_risk_premium=nippon_erp,
+        nippon_credit_spread=nippon_cs,
         nippon_debt_ratio=nippon_debt_ratio,
         nippon_tax_rate=nippon_tax_rate,
         include_projects=include_projects

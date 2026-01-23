@@ -176,8 +176,8 @@ class ModelScenario:
     # IRP parameters
     us_10yr: float
     japan_10yr: float
-    nippon_cost_of_equity: float
-    nippon_cost_of_debt: float
+    nippon_equity_risk_premium: float  # Added to JGB to get cost of equity
+    nippon_credit_spread: float  # Added to JGB to get cost of debt
     nippon_debt_ratio: float
     nippon_tax_rate: float
 
@@ -333,8 +333,8 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             exit_multiple=4.5,  # Lower multiple for limited growth
             us_10yr=0.0425,
             japan_10yr=0.0075,
-            nippon_cost_of_equity=0.055,
-            nippon_cost_of_debt=0.015,
+            nippon_equity_risk_premium=0.0475,  # 4.75% equity risk premium over JGB
+            nippon_credit_spread=0.0075,  # 0.75% credit spread over JGB
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
             include_projects=['BR2 Mini Mill']  # BR2 is committed/in-progress
@@ -351,8 +351,8 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             exit_multiple=4.5,
             us_10yr=0.045,
             japan_10yr=0.01,
-            nippon_cost_of_equity=0.06,
-            nippon_cost_of_debt=0.02,
+            nippon_equity_risk_premium=0.05,  # 5% equity risk premium over JGB
+            nippon_credit_spread=0.01,  # 1% credit spread over JGB
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
             include_projects=['BR2 Mini Mill']
@@ -369,8 +369,8 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             exit_multiple=4.75,  # 3.5-6.0x range, use midpoint
             us_10yr=0.0425,
             japan_10yr=0.0075,
-            nippon_cost_of_equity=0.055,
-            nippon_cost_of_debt=0.015,
+            nippon_equity_risk_premium=0.0475,  # 4.75% equity risk premium over JGB
+            nippon_credit_spread=0.0075,  # 0.75% credit spread over JGB
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
             include_projects=['BR2 Mini Mill']
@@ -398,8 +398,8 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             exit_multiple=5.0,
             us_10yr=0.0425,
             japan_10yr=0.0075,
-            nippon_cost_of_equity=0.055,
-            nippon_cost_of_debt=0.015,
+            nippon_equity_risk_premium=0.0475,  # 4.75% equity risk premium over JGB
+            nippon_credit_spread=0.0075,  # 0.75% credit spread over JGB
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
             include_projects=['BR2 Mini Mill']  # Only BR2 in base plan
@@ -436,8 +436,8 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             exit_multiple=5.0,  # Standard multiple
             us_10yr=0.0425,
             japan_10yr=0.0075,
-            nippon_cost_of_equity=0.055,
-            nippon_cost_of_debt=0.015,
+            nippon_equity_risk_premium=0.0475,  # 4.75% equity risk premium over JGB
+            nippon_credit_spread=0.0075,  # 0.75% credit spread over JGB
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
             include_projects=['BR2 Mini Mill', 'Gary Works BF', 'Mon Valley HSM',
@@ -802,15 +802,24 @@ class PriceVolumeModel:
         return pd.DataFrame(consolidated), segment_dfs
 
     def calculate_irp_wacc(self) -> Tuple[float, float]:
-        """Calculate JPY WACC and IRP-adjusted USD WACC"""
+        """Calculate JPY WACC and IRP-adjusted USD WACC
+
+        Now properly linked to JGB rate:
+        - Cost of Equity = JGB + Equity Risk Premium
+        - Cost of Debt = JGB + Credit Spread
+        """
         s = self.scenario
+
+        # Calculate Nippon's cost of capital components from JGB rate
+        nippon_cost_of_equity = s.japan_10yr + s.nippon_equity_risk_premium
+        nippon_cost_of_debt = s.japan_10yr + s.nippon_credit_spread
 
         # JPY WACC
         equity_weight = 1 - s.nippon_debt_ratio
         debt_weight = s.nippon_debt_ratio
         jpy_wacc = (
-            equity_weight * s.nippon_cost_of_equity +
-            debt_weight * s.nippon_cost_of_debt * (1 - s.nippon_tax_rate)
+            equity_weight * nippon_cost_of_equity +
+            debt_weight * nippon_cost_of_debt * (1 - s.nippon_tax_rate)
         )
 
         # IRP conversion to USD
