@@ -403,6 +403,38 @@ def render_sidebar():
         execution_factor = execution_pct / 100.0
         st.sidebar.caption(f"Applies {execution_factor:.0%} to non-BR2 project benefits")
 
+    # Breakup Fee Probabilities
+    st.sidebar.markdown("---")
+    st.sidebar.header("Breakup Fee Probabilities")
+    st.sidebar.caption("Adjust deal outcome probabilities for risk analysis")
+
+    with st.sidebar.expander("Deal Outcome Probabilities", expanded=False):
+        st.markdown("**Customize probability assumptions:**")
+
+        prob_deal_closes = st.slider(
+            "Probability: Deal Closes",
+            min_value=0.0, max_value=1.0, value=0.70, step=0.05,
+            format="%.0f%%",
+            help="Likelihood that deal closes successfully. Higher = less regulatory/political risk."
+        )
+
+        prob_nippon_walks = st.slider(
+            "Probability: Nippon Walks",
+            min_value=0.0, max_value=(1.0 - prob_deal_closes), value=min(0.20, 1.0 - prob_deal_closes), step=0.05,
+            format="%.0f%%",
+            help="Likelihood Nippon terminates (USS receives $565M fee). Regulatory block, financing failure, etc."
+        )
+
+        # USS walks is whatever's left
+        prob_uss_walks = 1.0 - prob_deal_closes - prob_nippon_walks
+
+        st.caption(f"**Probability: USS Walks** = {prob_uss_walks:.0%} (calculated)")
+        st.caption("USS terminates (USS pays $565M fee). Superior proposal, board changes mind, etc.")
+
+        if prob_uss_walks < 0:
+            st.error("⚠️ Probabilities must sum to 100%. Adjust sliders.")
+            prob_uss_walks = 0
+
     # Build the custom scenario
     price_scenario = SteelPriceScenario(
         name="Custom" if selected_scenario_type == ScenarioType.CUSTOM else preset.price_scenario.name,
@@ -621,6 +653,260 @@ def main():
         st.metric("Terminal Value Blend", "50/50 Gordon/Exit")
 
     # =========================================================================
+    # BREAKUP FEE ANALYSIS
+    # =========================================================================
+
+    st.markdown("---")
+    st.markdown("<h2 style='text-decoration: underline;'>Breakup Fee Analysis</h2>", unsafe_allow_html=True)
+
+    # Breakup fee constants
+    BREAKUP_FEE = 565  # $M
+    SHARES = 225  # M
+    FEE_PER_SHARE = BREAKUP_FEE / SHARES
+    OFFER_PRICE = 55.0
+
+    st.info(f"""
+    **Merger Agreement Terms (per 8-K filing):**
+    - Breakup Fee: ${BREAKUP_FEE:,.0f}M (${FEE_PER_SHARE:.2f} per share)
+    - Paid **by Nippon to USS** if deal fails due to regulatory block, financing failure, or Nippon walks
+    - Paid **by USS to Nippon** if USS accepts a superior proposal, board changes recommendation, or shareholders vote down the deal
+    """)
+
+    st.markdown("### Deal Outcome Scenarios")
+
+    bk_col1, bk_col2, bk_col3 = st.columns(3)
+
+    with bk_col1:
+        st.markdown("#### 1️⃣ Deal Closes")
+        st.metric("USS Shareholders Receive", f"${OFFER_PRICE:.2f}/share",
+                 help="Most likely outcome - deal closes successfully")
+        st.caption(f"**Probability: {prob_deal_closes:.0%}**")
+        st.caption("USS shareholders receive cash offer")
+
+    with bk_col2:
+        st.markdown("#### 2️⃣ Nippon Walks")
+        uss_gets_fee_value = val_uss['share_price'] + FEE_PER_SHARE
+        st.metric("USS Shareholders Get", f"${uss_gets_fee_value:.2f}/share",
+                 f"+${FEE_PER_SHARE:.2f} breakup fee",
+                 help="USS remains standalone but receives $565M breakup fee from Nippon")
+        st.caption(f"**Probability: {prob_nippon_walks:.0%}**")
+        st.caption("Regulatory block, financing failure, or Nippon backs out")
+
+    with bk_col3:
+        st.markdown("#### 3️⃣ USS Walks")
+        uss_pays_fee_value = val_uss['share_price'] - FEE_PER_SHARE
+        st.metric("USS Shareholders Get", f"${uss_pays_fee_value:.2f}/share",
+                 f"-${FEE_PER_SHARE:.2f} breakup fee",
+                 delta_color="inverse",
+                 help="USS finds superior bid but must pay Nippon $565M breakup fee")
+        st.caption(f"**Probability: {prob_uss_walks:.0%}**")
+        st.caption("USS accepts superior proposal or shareholders vote down deal")
+
+    # Expected value analysis
+    st.markdown("### Expected Value Analysis")
+    st.caption(f"Using probabilities: Deal Closes {prob_deal_closes:.0%} | Nippon Walks {prob_nippon_walks:.0%} | USS Walks {prob_uss_walks:.0%}")
+
+    # Calculate expected values using user-adjustable probabilities
+    expected_deal = (
+        prob_deal_closes * OFFER_PRICE +
+        prob_nippon_walks * uss_gets_fee_value +
+        prob_uss_walks * uss_pays_fee_value
+    )
+
+    expected_nodeal = val_uss['share_price'] + (prob_nippon_walks * FEE_PER_SHARE)
+
+    deal_premium = expected_deal - expected_nodeal
+
+    ev_col1, ev_col2, ev_col3 = st.columns(3)
+
+    with ev_col1:
+        st.metric("Expected Deal Value",
+                 f"${expected_deal:.2f}/share",
+                 help="Probability-weighted value across all deal outcomes")
+        st.caption(f"{prob_deal_closes:.0%} × ${OFFER_PRICE:.2f} + {prob_nippon_walks:.0%} × ${uss_gets_fee_value:.2f} + {prob_uss_walks:.0%} × ${uss_pays_fee_value:.2f}")
+
+    with ev_col2:
+        st.metric("Expected No-Deal Value",
+                 f"${expected_nodeal:.2f}/share",
+                 help="Standalone value plus expected breakup fee if Nippon walks")
+        st.caption(f"${val_uss['share_price']:.2f} standalone + {prob_nippon_walks:.0%} × ${FEE_PER_SHARE:.2f} fee")
+
+    with ev_col3:
+        st.metric("Deal Premium",
+                 f"${deal_premium:.2f}/share",
+                 f"{deal_premium/expected_nodeal*100:+.1f}%",
+                 help="How much better the deal is vs. remaining standalone")
+
+    # Recommendation
+    if deal_premium > 0:
+        st.success(f"✅ **Deal is economically favorable**: Expected deal value (${expected_deal:.2f}) exceeds no-deal value (${expected_nodeal:.2f}) by ${deal_premium:.2f} per share")
+    else:
+        st.warning(f"⚠️ **No-deal may be better**: No-deal value (${expected_nodeal:.2f}) exceeds expected deal value (${expected_deal:.2f}) by ${abs(deal_premium):.2f} per share")
+
+    # Key insights
+    st.markdown("### Key Insights")
+
+    insight_col1, insight_col2 = st.columns(2)
+
+    with insight_col1:
+        st.markdown("""
+        **Downside Protection:**
+        - If Nippon walks (regulatory/financing), USS gets breakup fee
+        - Adjusted standalone value: ${:.2f}/share
+        - Only ${:.2f} below the $55 offer
+        - Provides cushion against deal failure
+        """.format(uss_gets_fee_value, OFFER_PRICE - uss_gets_fee_value))
+
+    with insight_col2:
+        superior_bid_threshold = OFFER_PRICE + FEE_PER_SHARE
+        st.markdown("""
+        **Competing Bid Barrier:**
+        - Another bidder must offer >${:.2f}/share
+        - ($55 offer + ${:.2f} breakup fee USS would pay)
+        - This is {:.1f}% above standalone value
+        - Makes competing bids unlikely
+        """.format(superior_bid_threshold, FEE_PER_SHARE,
+                  (superior_bid_threshold/val_uss['share_price'] - 1)*100))
+
+    # =========================================================================
+    # BREAKUP FEE VISUALIZATIONS
+    # =========================================================================
+
+    st.markdown("### Deal Value Visualizations")
+
+    viz_col1, viz_col2 = st.columns(2)
+
+    with viz_col1:
+        # Probability sensitivity chart
+        st.markdown("#### Probability Sensitivity")
+
+        prob_range = np.arange(0.50, 1.01, 0.05)
+        sensitivity_data = []
+
+        for p_close in prob_range:
+            # Keep ratio of Nippon walks to USS walks constant (2:1)
+            remaining = 1.0 - p_close
+            p_nippon = remaining * 0.67
+            p_uss = remaining * 0.33
+
+            ev_deal = (
+                p_close * OFFER_PRICE +
+                p_nippon * uss_gets_fee_value +
+                p_uss * uss_pays_fee_value
+            )
+
+            ev_nodeal = val_uss['share_price'] + (p_nippon * FEE_PER_SHARE)
+
+            sensitivity_data.append({
+                'P(Deal Closes)': p_close,
+                'Expected Deal Value': ev_deal,
+                'Expected No-Deal Value': ev_nodeal
+            })
+
+        sens_df = pd.DataFrame(sensitivity_data)
+
+        fig_sens = go.Figure()
+
+        fig_sens.add_trace(go.Scatter(
+            x=sens_df['P(Deal Closes)'] * 100,
+            y=sens_df['Expected Deal Value'],
+            mode='lines+markers',
+            name='Expected Deal Value',
+            line=dict(color='#4CAF50', width=3),
+            marker=dict(size=8)
+        ))
+
+        fig_sens.add_trace(go.Scatter(
+            x=sens_df['P(Deal Closes)'] * 100,
+            y=sens_df['Expected No-Deal Value'],
+            mode='lines+markers',
+            name='Expected No-Deal Value',
+            line=dict(color='#FF9800', width=3, dash='dash'),
+            marker=dict(size=8)
+        ))
+
+        # Add current probability indicator
+        fig_sens.add_vline(x=prob_deal_closes * 100, line_dash="dot", line_color="red",
+                          annotation_text=f"Current: {prob_deal_closes:.0%}")
+
+        fig_sens.add_hline(y=OFFER_PRICE, line_dash="dash", line_color="green",
+                          annotation_text="$55 Offer", annotation_position="right")
+
+        fig_sens.update_layout(
+            xaxis_title='Probability Deal Closes (%)',
+            yaxis_title='Share Value ($)',
+            hovermode='x unified',
+            height=400
+        )
+
+        st.plotly_chart(fig_sens, use_container_width=True)
+        st.caption("How expected values change with deal completion probability")
+
+    with viz_col2:
+        # Scenario comparison with breakup fee
+        st.markdown("#### Expected Deal Value by Scenario")
+
+        # Calculate expected deal values for all scenarios
+        scenario_comparison_data = []
+
+        for scenario_type in [ScenarioType.CONSERVATIVE, ScenarioType.BASE_CASE,
+                            ScenarioType.WALL_STREET, ScenarioType.MANAGEMENT,
+                            ScenarioType.NIPPON_COMMITMENTS]:
+            scenario_preset = get_scenario_presets()[scenario_type]
+            temp_model = PriceVolumeModel(scenario_preset, execution_factor=execution_factor)
+            temp_analysis = temp_model.run_full_analysis()
+
+            standalone = temp_analysis['val_uss']['share_price']
+            gets_fee = standalone + FEE_PER_SHARE
+            pays_fee = standalone - FEE_PER_SHARE
+
+            ev_deal = (
+                prob_deal_closes * OFFER_PRICE +
+                prob_nippon_walks * gets_fee +
+                prob_uss_walks * pays_fee
+            )
+
+            scenario_comparison_data.append({
+                'Scenario': scenario_preset.name,
+                'USS Standalone': standalone,
+                'Expected Deal Value': ev_deal,
+                'vs $55 Offer': ev_deal - OFFER_PRICE
+            })
+
+        scenario_df = pd.DataFrame(scenario_comparison_data)
+
+        fig_scenario = go.Figure()
+
+        fig_scenario.add_trace(go.Bar(
+            x=scenario_df['Scenario'],
+            y=scenario_df['USS Standalone'],
+            name='USS Standalone',
+            marker_color='#2196F3',
+            opacity=0.7
+        ))
+
+        fig_scenario.add_trace(go.Bar(
+            x=scenario_df['Scenario'],
+            y=scenario_df['Expected Deal Value'],
+            name='Expected Deal Value',
+            marker_color='#4CAF50',
+            opacity=0.7
+        ))
+
+        fig_scenario.add_hline(y=OFFER_PRICE, line_dash="dash", line_color="green",
+                              annotation_text="$55 Offer")
+
+        fig_scenario.update_layout(
+            xaxis_title='Scenario',
+            yaxis_title='Share Value ($)',
+            barmode='group',
+            height=400
+        )
+
+        st.plotly_chart(fig_scenario, use_container_width=True)
+        st.caption("Breakup fee impact varies by scenario (standalone value changes)")
+
+    # =========================================================================
     # FINANCING IMPACT (only show when there are incremental projects)
     # =========================================================================
 
@@ -703,6 +989,21 @@ def main():
     # Run comparison across all preset scenarios (with execution factor applied to Nippon Commitments)
     comparison_df = compare_scenarios(execution_factor=execution_factor)
 
+    # Add breakup fee expected value calculations to comparison table
+    BREAKUP_FEE_SHARE = 2.51  # $565M / 225M shares
+    OFFER = 55.0
+
+    comparison_df['Expected Deal Value ($/sh)'] = comparison_df.apply(
+        lambda row: (
+            prob_deal_closes * OFFER +
+            prob_nippon_walks * (row['USS - No Sale ($/sh)'] + BREAKUP_FEE_SHARE) +
+            prob_uss_walks * (row['USS - No Sale ($/sh)'] - BREAKUP_FEE_SHARE)
+        ),
+        axis=1
+    )
+
+    comparison_df['Deal Premium ($/sh)'] = comparison_df['Expected Deal Value ($/sh)'] - comparison_df['USS - No Sale ($/sh)']
+
     # Highlight the current scenario
     comparison_df['Current'] = comparison_df['Scenario'] == scenario_name
 
@@ -745,14 +1046,26 @@ def main():
     **How to read this table:**
     - **USS - No Sale**: Share value if USS remains independent (discounted at USS's ~10.9% WACC)
     - **Value to Nippon**: Share value from Nippon's perspective (discounted at Nippon's ~7.5% IRP-adjusted WACC)
+    - **Expected Deal Value**: Probability-weighted value accounting for breakup fee scenarios
+    - **Deal Premium**: How much better the deal is vs. staying standalone
     - **10Y FCF**: Total free cash flow generated over the 10-year forecast period (2024-2033)
     - The difference between the two valuations reflects the "WACC advantage" Nippon gains from its lower cost of capital
     """)
-    display_df = comparison_df[['Scenario', 'USS - No Sale ($/sh)', 'Value to Nippon ($/sh)', '10Y FCF ($B)']].copy()
+    display_df = comparison_df[['Scenario', 'USS - No Sale ($/sh)', 'Value to Nippon ($/sh)',
+                                'Expected Deal Value ($/sh)', 'Deal Premium ($/sh)', '10Y FCF ($B)']].copy()
     display_df['USS - No Sale ($/sh)'] = display_df['USS - No Sale ($/sh)'].apply(lambda x: f"${x:.2f}")
     display_df['Value to Nippon ($/sh)'] = display_df['Value to Nippon ($/sh)'].apply(lambda x: f"${x:.2f}")
+    display_df['Expected Deal Value ($/sh)'] = display_df['Expected Deal Value ($/sh)'].apply(lambda x: f"${x:.2f}")
+    display_df['Deal Premium ($/sh)'] = display_df['Deal Premium ($/sh)'].apply(lambda x: f"${x:+.2f}")
     display_df['10Y FCF ($B)'] = display_df['10Y FCF ($B)'].apply(lambda x: f"${x:.1f}B")
     st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+    st.info(f"""
+    **Breakup Fee Impact on Scenario Comparison:**
+    Using current probabilities ({prob_deal_closes:.0%} deal closes, {prob_nippon_walks:.0%} Nippon walks, {prob_uss_walks:.0%} USS walks),
+    the Expected Deal Value accounts for all three possible outcomes. The Deal Premium shows how much better
+    (or worse) taking the deal is compared to remaining standalone in each scenario.
+    """)
 
     # =========================================================================
     # CAPITAL PROJECTS ANALYSIS

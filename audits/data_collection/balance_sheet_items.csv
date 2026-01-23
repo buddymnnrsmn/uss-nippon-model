@@ -1,0 +1,40 @@
+Item,Model_Value_Millions,Source_Value,Source_Document,Page_Number,Variance,Variance_Pct,Status,Notes
+Total_Debt,4222,3138,USS Financial Statements.xlsx,Balance Sheet 2023,-1084,-25.7%,FLAG,Model value appears to include pension + leases. Source shows pure debt: LT Debt $3093M + Current portion $45M = $3138M
+Cash_and_Equivalents,3013.9,755,USS Financial Statements.xlsx,Balance Sheet 2023,-2258.9,-75.0%,FLAG,Model may include investments. Source: Cash & Equivalents = $755M. Cash + ST Investments = $755M
+Pension_Liability,126,735,USS Financial Statements.xlsx,Balance Sheet 2023,609,483.3%,FLAG,Source shows Debt Equiv. of Unfunded Proj. Benefit Obligation: $735M. Total Pension & Other Post-Retire Benefits: $1101M
+Operating_Leases,117,1024,USS Financial Statements.xlsx,Balance Sheet 2023,907,775.2%,FLAG,Source shows Debt Equivalent Oper. Leases: $1024M
+Equity_Investments,761,502,USS Financial Statements.xlsx,Balance Sheet 2023,-259,-34.0%,FLAG,Source shows Long-term Investments: $502M (Equity Method Investments)
+Shares_Outstanding,225,255.36,USS Financial Statements.xlsx,Income Statement 2023,30.36,13.5%,REVIEW,Source: Weighted Avg. Diluted Shares Out. (actual): 255360000 = 255.36M. Model uses 225M.
+Total_Assets,,9167,USS Financial Statements.xlsx,Balance Sheet 2023,,,N/A,Reference: Total Assets $9167M
+Total_Equity,,2437,USS Financial Statements.xlsx,Balance Sheet 2023,,,N/A,Reference: Total Equity $2437M (Common $2436M + Minority $1M)
+
+# DEBT BREAKDOWN (Optional - for detailed analysis)
+# Debt_Component,Amount,Maturity,Interest_Rate,Source_Page,Notes
+# Senior_Notes_2025,,,,,"Fill if breakdown available"
+# Senior_Notes_2027,,,,,"Fill if breakdown available"
+# Senior_Notes_2029,,,,,"Fill if breakdown available"
+# Revolving_Credit_Facility,,,,,"Fill if breakdown available"
+# Other_Debt,,,,,"Fill if breakdown available"
+
+# PENSION DETAIL (Optional)
+# Pension_Item,Amount,Source_Page,Notes
+# Projected_Benefit_Obligation,,,,"From pension footnote"
+# Fair_Value_Plan_Assets,,,,"From pension footnote"
+# Unfunded_Status,,,,"PBO - Plan Assets (should match Pension_Liability above)"
+
+# INSTRUCTIONS:
+# 1. All values in $ millions
+# 2. Use 2023 year-end balance sheet (December 31, 2023)
+# 3. Source_Document: "USS 10-K 2023"
+# 4. Page_Number: Specific page for audit trail
+# 5. Variance: Source_Value - Model_Value
+# 6. Status: OK (< 1% variance), REVIEW (1-3%), FLAG (> 3%)
+# 7. For Shares_Outstanding, use weighted average DILUTED shares
+
+# CRITICAL ITEMS (Must reconcile exactly):
+# - Total_Debt (used in equity bridge)
+# - Cash_and_Equivalents (used in equity bridge)
+# - Shares_Outstanding (used in per-share calculation)
+
+# NOTE: Pension and Leases are adjustments to enterprise value
+# Small variances (< 10%) are acceptable for these items

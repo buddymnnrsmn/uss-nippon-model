@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+  <feed xmlns="http://www.w3.org/2005/Atom">
+    <author>
+      <email>webmaster@sec.gov</email>
+      <name>Webmaster</name>
+    </author>
+    <company-info>
+      <addresses>
+        <address type="mailing">
+          <city>PITTSBURGH</city>
+          <state>X1</state>
+          <street1>600 GRANT STREET</street1>
+          <zip>15219-2800</zip>
+        </address>
+        <address type="business">
+          <city>PITTSBURGH</city>
+          <phone>415 433 2967</phone>
+          <state>PA</state>
+          <street1>600 GRANT ST</street1>
+          <street2>ROOM 1500</street2>
+          <zip>15219-2800</zip>
+        </address>
+      </addresses>
+      <assigned-sic>3312</assigned-sic>
+      <assigned-sic-desc>STEEL WORKS, BLAST FURNACES  ROLLING MILLS (COKE OVENS)</assigned-sic-desc>
+      <assigned-sic-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;SIC=3312&amp;owner=exclude&amp;count=10</assigned-sic-href>
+      <cik>0001163302</cik>
+      <cik-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;CIK=0001163302&amp;owner=exclude&amp;count=10</cik-href>
+      <conformed-name>UNITED STATES STEEL CORP</conformed-name>
+      <fiscal-year-end>1231</fiscal-year-end>
+      <formerly-names count="1">
+        <names>
+          <date>2002-01-04</date>
+          <name>UNITED STATES STEEL LLC</name>
+        </names>
+      </formerly-names>
+      <state-location>PA</state-location>
+      <state-location-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;State=PA&amp;owner=exclude&amp;count=10</state-location-href>
+      <state-of-incorporation>DE</state-of-incorporation>
+    </company-info>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001104659-24-035006</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2024-03-15</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000110465924035006/0001104659-24-035006-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>24754921</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>18 MB</size>
+        <xbrl_href>https://www.sec.gov/cgi-bin/viewer?action=view&amp;cik=1163302&amp;accession_number=0001104659-24-035006&amp;xbrl_type=v</xbrl_href>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001104659-24-035006</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000110465924035006/0001104659-24-035006-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2024-03-15 &lt;b&gt;AccNo:&lt;/b&gt; 0001104659-24-035006 &lt;b&gt;Size:&lt;/b&gt; 18 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2024-03-15T16:15:09-04:00</updated>
+    </entry>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001104659-23-031198</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2023-03-10</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000110465923031198/0001104659-23-031198-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>23724143</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>41 MB</size>
+        <xbrl_href>https://www.sec.gov/cgi-bin/viewer?action=view&amp;cik=1163302&amp;accession_number=0001104659-23-031198&amp;xbrl_type=v</xbrl_href>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001104659-23-031198</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000110465923031198/0001104659-23-031198-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2023-03-10 &lt;b&gt;AccNo:&lt;/b&gt; 0001104659-23-031198 &lt;b&gt;Size:&lt;/b&gt; 41 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2023-03-10T16:31:07-05:00</updated>
+    </entry>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001104659-22-032922</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2022-03-11</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000110465922032922/0001104659-22-032922-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>22733669</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>24 MB</size>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001104659-22-032922</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000110465922032922/0001104659-22-032922-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2022-03-11 &lt;b&gt;AccNo:&lt;/b&gt; 0001104659-22-032922 &lt;b&gt;Size:&lt;/b&gt; 24 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2022-03-11T16:37:44-05:00</updated>
+    </entry>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001104659-21-035691</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2021-03-12</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000110465921035691/0001104659-21-035691-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>21738663</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>17 MB</size>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001104659-21-035691</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000110465921035691/0001104659-21-035691-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2021-03-12 &lt;b&gt;AccNo:&lt;/b&gt; 0001104659-21-035691 &lt;b&gt;Size:&lt;/b&gt; 17 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2021-03-12T17:27:06-05:00</updated>
+    </entry>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001047469-20-001470</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2020-03-13</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000104746920001470/0001047469-20-001470-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>20713038</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>8 MB</size>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001047469-20-001470</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000104746920001470/0001047469-20-001470-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2020-03-13 &lt;b&gt;AccNo:&lt;/b&gt; 0001047469-20-001470 &lt;b&gt;Size:&lt;/b&gt; 8 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2020-03-13T16:25:18-04:00</updated>
+    </entry>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001047469-19-001319</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2019-03-15</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000104746919001319/0001047469-19-001319-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>19685518</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>7 MB</size>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001047469-19-001319</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000104746919001319/0001047469-19-001319-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2019-03-15 &lt;b&gt;AccNo:&lt;/b&gt; 0001047469-19-001319 &lt;b&gt;Size:&lt;/b&gt; 7 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2019-03-15T16:37:19-04:00</updated>
+    </entry>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001047469-18-001458</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2018-03-09</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000104746918001458/0001047469-18-001458-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>18680659</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>6 MB</size>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001047469-18-001458</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000104746918001458/0001047469-18-001458-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2018-03-09 &lt;b&gt;AccNo:&lt;/b&gt; 0001047469-18-001458 &lt;b&gt;Size:&lt;/b&gt; 6 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2018-03-09T16:40:57-05:00</updated>
+    </entry>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001552781-17-000126</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2017-03-14</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000155278117000126/0001552781-17-000126-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>17687165</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>3 MB</size>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001552781-17-000126</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000155278117000126/0001552781-17-000126-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2017-03-14 &lt;b&gt;AccNo:&lt;/b&gt; 0001552781-17-000126 &lt;b&gt;Size:&lt;/b&gt; 3 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2017-03-14T10:34:56-04:00</updated>
+    </entry>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001552781-16-001414</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2016-03-17</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000155278116001414/0001552781-16-001414-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>161511847</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>3 MB</size>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001552781-16-001414</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000155278116001414/0001552781-16-001414-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2016-03-17 &lt;b&gt;AccNo:&lt;/b&gt; 0001552781-16-001414 &lt;b&gt;Size:&lt;/b&gt; 3 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2016-03-17T12:12:27-04:00</updated>
+    </entry>
+    <entry>
+      <category label="form type" scheme="https://www.sec.gov/" term="DEF 14A" />
+      <content type="text/xml">
+        <accession-number>0001552781-15-000316</accession-number>
+        <act>34</act>
+        <file-number>001-16811</file-number>
+        <file-number-href>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;filenum=001-16811&amp;owner=exclude&amp;count=10</file-number-href>
+        <filing-date>2015-03-13</filing-date>
+        <filing-href>https://www.sec.gov/Archives/edgar/data/1163302/000155278115000316/0001552781-15-000316-index.htm</filing-href>
+        <filing-type>DEF 14A</filing-type>
+        <film-number>15699406</film-number>
+        <form-name>Other definitive proxy statements</form-name>
+        <size>3 MB</size>
+      </content>
+      <id>urn:tag:sec.gov,2008:accession-number=0001552781-15-000316</id>
+      <link href="https://www.sec.gov/Archives/edgar/data/1163302/000155278115000316/0001552781-15-000316-index.htm" rel="alternate" type="text/html" />
+      <summary type="html"> &lt;b&gt;Filed:&lt;/b&gt; 2015-03-13 &lt;b&gt;AccNo:&lt;/b&gt; 0001552781-15-000316 &lt;b&gt;Size:&lt;/b&gt; 3 MB</summary>
+      <title>DEF 14A  - Other definitive proxy statements</title>
+      <updated>2015-03-13T16:05:40-04:00</updated>
+    </entry>
+    <id>https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;CIK=0001163302</id>
+    <link href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;CIK=0001163302&amp;type=DEF 14A&amp;dateb=20241231&amp;owner=exclude&amp;start=0&amp;count=10" rel="alternate" type="text/html" />
+    <link href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;CIK=0001163302&amp;type=DEF 14A&amp;dateb=20241231&amp;owner=exclude&amp;start=0&amp;count=10&amp;output=atom" rel="self" type="application/atom+xml" />
+    <link href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;CIK=0001163302&amp;type=DEF%2014A%25&amp;datea=&amp;dateb=20241231&amp;owner=exclude&amp;count=10&amp;output=atom&amp;start=10" rel="next" type="application/atom+xml" />
+    <title>UNITED STATES STEEL CORP  (0001163302)</title>
+    <updated>2026-01-21T10:27:42-05:00</updated>
+  </feed>
