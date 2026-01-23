@@ -134,8 +134,8 @@ def render_sidebar():
         # Reset IRP
         st.session_state.us_10yr = preset.us_10yr * 100
         st.session_state.japan_10yr = preset.japan_10yr * 100
-        st.session_state.n_coe = preset.nippon_cost_of_equity * 100
-        st.session_state.n_cod = preset.nippon_cost_of_debt * 100
+        st.session_state.n_erp = preset.nippon_equity_risk_premium * 100
+        st.session_state.n_cs = preset.nippon_credit_spread * 100
         st.session_state.n_dr = preset.nippon_debt_ratio * 100
         st.session_state.n_tr = preset.nippon_tax_rate * 100
         # Reset capital projects
@@ -1102,8 +1102,8 @@ def main():
                 exit_multiple=scenario.exit_multiple,
                 us_10yr=scenario.us_10yr,
                 japan_10yr=scenario.japan_10yr,
-                nippon_cost_of_equity=scenario.nippon_cost_of_equity,
-                nippon_cost_of_debt=scenario.nippon_cost_of_debt,
+                nippon_equity_risk_premium=scenario.nippon_equity_risk_premium,
+                nippon_credit_spread=scenario.nippon_credit_spread,
                 nippon_debt_ratio=scenario.nippon_debt_ratio,
                 nippon_tax_rate=scenario.nippon_tax_rate,
                 include_projects=scenario.include_projects
