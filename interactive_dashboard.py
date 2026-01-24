@@ -564,7 +564,7 @@ def main():
     - **PV Terminal (Exit Multiple)**: Terminal value using comparable company EV/EBITDA multiple
     - **Enterprise Value**: Blended average of Gordon Growth and Exit Multiple methods (50/50 weighting)
     - **Equity Bridge**: Adjustments for debt, cash, pension, and other items to convert EV to equity value
-    - **Share Price**: Equity value divided by 225M shares outstanding
+    - **Equity Value per Share**: Equity value divided by 225M shares outstanding
     """)
 
     col1, col2 = st.columns(2)
@@ -580,7 +580,7 @@ def main():
         | PV Terminal (Exit Multiple) | ${val_uss['pv_tv_exit']:,.0f}M |
         | **Enterprise Value** | **${val_uss['ev_blended']:,.0f}M** |
         | Equity Bridge | ${val_uss['equity_bridge']:,.0f}M |
-        | **Share Price** | **${val_uss['share_price']:.2f}** |
+        | **Equity Value/Share** | **${val_uss['share_price']:.2f}** |
         """)
 
     with col2:
@@ -594,7 +594,7 @@ def main():
         | PV Terminal (Exit Multiple) | ${val_nippon['pv_tv_exit']:,.0f}M |
         | **Enterprise Value** | **${val_nippon['ev_blended']:,.0f}M** |
         | Equity Bridge | ${val_nippon['equity_bridge']:,.0f}M |
-        | **Share Price** | **${val_nippon['share_price']:.2f}** |
+        | **Equity Value/Share** | **${val_nippon['share_price']:.2f}** |
         """)
 
     # Key valuation assumptions
@@ -727,7 +727,7 @@ def main():
     )
     fig.add_hline(y=55, line_dash="dash", line_color="green", annotation_text="$55 Offer")
     fig.add_hline(y=0, line_color="black", line_width=1)
-    fig.update_layout(showlegend=False, yaxis_title=f"Share Price ($) [{wacc_label}]")
+    fig.update_layout(showlegend=False, yaxis_title=f"Equity Value ($/sh) [{wacc_label}]")
     st.plotly_chart(fig, use_container_width=True)
 
     # Summary table (below chart)
@@ -1096,7 +1096,7 @@ def main():
 
     fig_ff.update_layout(
         title=f"Valuation Football Field ({ff_perspective})",
-        xaxis_title="Share Price ($)",
+        xaxis_title="Equity Value per Share ($)",
         yaxis_title="",
         height=400,
         xaxis=dict(range=[0, max(ff_df['High'].max() * 1.1, 120)]),
@@ -1165,7 +1165,7 @@ def main():
 
     fig.update_layout(
         title="Value Bridge: USS - No Sale → Nippon Offer",
-        yaxis_title="Share Price ($)",
+        yaxis_title="Equity Value ($/sh)",
         showlegend=False,
         height=400
     )
@@ -1368,7 +1368,7 @@ def main():
         )
         fig.add_hline(y=55, line_dash="dash", line_color="green", annotation_text="$55 Offer")
         fig.add_hline(y=0, line_color="black", line_width=1)
-        fig.update_layout(yaxis_title='Share Price ($)')
+        fig.update_layout(yaxis_title='Equity Value ($/sh)')
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
@@ -1421,7 +1421,7 @@ def main():
         val = model.calculate_dcf(consolidated, w)
         wacc_sensitivity_data.append({
             'WACC': w * 100,
-            'Share Price': val['share_price']
+            'Equity Value': val['share_price']
         })
 
     wacc_sens_df = pd.DataFrame(wacc_sensitivity_data)
@@ -1429,8 +1429,8 @@ def main():
     fig = px.line(
         wacc_sens_df,
         x='WACC',
-        y='Share Price',
-        title='Share Price vs WACC',
+        y='Equity Value',
+        title='Equity Value per Share vs WACC',
         markers=True
     )
 
@@ -1444,7 +1444,7 @@ def main():
 
     fig.update_layout(
         xaxis_title='WACC (%)',
-        yaxis_title='Share Price ($)',
+        yaxis_title='Equity Value ($/sh)',
         height=400
     )
 
@@ -1623,7 +1623,7 @@ def main():
         st.markdown(f"""
 | Metric | USS Standalone | Value to Nippon |
 |--------|----------------|-----------------|
-| Share Price | ${val_uss['share_price']:.2f} | ${val_nippon['share_price']:.2f} |
+| Equity Value/Share | ${val_uss['share_price']:.2f} | ${val_nippon['share_price']:.2f} |
 | Enterprise Value | ${val_uss['ev_blended']:,.0f}M | ${val_nippon['ev_blended']:,.0f}M |
 | 10Y FCF | ${consolidated['FCF'].sum():,.0f}M | ${consolidated['FCF'].sum():,.0f}M |
 | vs $55 Offer | ${val_uss['share_price'] - 55:+.2f} | ${val_nippon['share_price'] - 55:+.2f} |
