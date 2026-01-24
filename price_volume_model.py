@@ -1073,12 +1073,14 @@ class PriceVolumeModel:
 # =============================================================================
 
 def compare_scenarios(scenario_types: List[ScenarioType] = None,
-                      execution_factor: float = 1.0) -> pd.DataFrame:
+                      execution_factor: float = 1.0,
+                      custom_benchmarks: dict = None) -> pd.DataFrame:
     """Run and compare multiple scenarios
 
     Args:
         scenario_types: List of scenarios to compare (default: all except CUSTOM)
         execution_factor: Execution factor to apply to Nippon Commitments scenario (0.5-1.0)
+        custom_benchmarks: Optional custom benchmark prices dict (default: use BENCHMARK_PRICES_2023)
     """
 
     if scenario_types is None:
@@ -1092,7 +1094,7 @@ def compare_scenarios(scenario_types: List[ScenarioType] = None,
         if st in presets:
             # Apply execution factor only to Nippon Commitments scenario
             ef = execution_factor if st == ScenarioType.NIPPON_COMMITMENTS else 1.0
-            model = PriceVolumeModel(presets[st], execution_factor=ef)
+            model = PriceVolumeModel(presets[st], execution_factor=ef, custom_benchmarks=custom_benchmarks)
             analysis = model.run_full_analysis()
 
             # Calculate implied EV/EBITDA multiple

@@ -646,11 +646,15 @@ def main():
         st.metric("Implied 2033x", f"{implied_exit_mult:.1f}x")
 
     # Comparison table
+    # Calculate multiples with zero-check
+    uss_implied_mult = f"{val_uss['ev_blended']/ebitda_2024:.1f}x" if ebitda_2024 > 0 else "N/A"
+    nippon_implied_mult = f"{val_nippon['ev_blended']/ebitda_2024:.1f}x" if ebitda_2024 > 0 else "N/A"
+
     st.markdown(f"""
     | Perspective | Enterprise Value | 2024 EBITDA | **Implied 2024x** | Terminal EBITDA | Exit Multiple |
     |-------------|------------------|-------------|-------------------|-----------------|---------------|
-    | USS - No Sale | ${val_uss['ev_blended']:,.0f}M | ${ebitda_2024:,.0f}M | **{val_uss['ev_blended']/ebitda_2024:.1f}x** | ${terminal_ebitda:,.0f}M | {scenario.exit_multiple:.1f}x |
-    | Value to Nippon | ${val_nippon['ev_blended']:,.0f}M | ${ebitda_2024:,.0f}M | **{val_nippon['ev_blended']/ebitda_2024:.1f}x** | ${terminal_ebitda:,.0f}M | {scenario.exit_multiple:.1f}x |
+    | USS - No Sale | ${val_uss['ev_blended']:,.0f}M | ${ebitda_2024:,.0f}M | **{uss_implied_mult}** | ${terminal_ebitda:,.0f}M | {scenario.exit_multiple:.1f}x |
+    | Value to Nippon | ${val_nippon['ev_blended']:,.0f}M | ${ebitda_2024:,.0f}M | **{nippon_implied_mult}** | ${terminal_ebitda:,.0f}M | {scenario.exit_multiple:.1f}x |
 
     *Steel sector typically trades at 4-6x EV/EBITDA. Higher implied multiples reflect growth expectations or lower discount rates.*
     """)
@@ -736,7 +740,7 @@ def main():
     st.markdown("<h2 style='text-decoration: underline;'>Scenario Comparison</h2>", unsafe_allow_html=True)
 
     # Run comparison across all preset scenarios (with execution factor applied to Nippon Commitments)
-    comparison_df = compare_scenarios(execution_factor=execution_factor)
+    comparison_df = compare_scenarios(execution_factor=execution_factor, custom_benchmarks=custom_benchmarks)
 
     # Highlight the current scenario
     comparison_df['Current'] = comparison_df['Scenario'] == scenario_name
