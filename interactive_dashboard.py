@@ -471,7 +471,11 @@ def main():
 
     st.markdown("---")
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+
+    # Calculate implied EV/EBITDA multiple
+    ebitda_2024 = consolidated.loc[consolidated['Year'] == 2024, 'Total_EBITDA'].values[0]
+    implied_ev_ebitda = val_uss['ev_blended'] / ebitda_2024 if ebitda_2024 > 0 else 0
 
     with col1:
         st.metric(
@@ -511,6 +515,13 @@ def main():
             f"{len(scenario.include_projects)} projects"
         )
 
+    with col6:
+        st.metric(
+            "Implied EV/EBITDA",
+            f"{implied_ev_ebitda:.1f}x",
+            f"Exit: {scenario.exit_multiple:.1f}x"
+        )
+
     # =========================================================================
     # EXECUTIVE SUMMARY
     # =========================================================================
@@ -526,6 +537,7 @@ def main():
         - $55 offer fair under conservative assumptions
         - Nippon's IRP-adjusted view: ~$75/share base case
         - WACC arbitrage: ~3.3% advantage
+        - PE alternative: max ~$40/share (cannot compete)
         """)
     with col2:
         st.markdown("""
@@ -609,6 +621,39 @@ def main():
         st.metric("Shares Outstanding", shares_display)
     with val_col4:
         st.metric("Terminal Value Blend", "50/50 Gordon/Exit")
+
+    # EV/EBITDA Multiple Analysis
+    st.markdown("### EV/EBITDA Multiple Analysis")
+    st.markdown("""
+    **Implied vs Exit Multiples:**
+    - **Implied Multiple**: Current EV divided by 2024 EBITDA (what you're paying today)
+    - **Exit Multiple**: EV/EBITDA assumed for terminal value (future steady-state multiple)
+    - Higher implied multiple suggests growth expectations baked into valuation
+    """)
+
+    terminal_ebitda = val_uss['terminal_ebitda']
+    ebitda_growth = ((terminal_ebitda / ebitda_2024) ** (1/9) - 1) * 100 if ebitda_2024 > 0 else 0
+
+    mult_col1, mult_col2, mult_col3, mult_col4 = st.columns(4)
+    with mult_col1:
+        st.metric("2024 EBITDA", f"${ebitda_2024:,.0f}M")
+    with mult_col2:
+        st.metric("2033 EBITDA", f"${terminal_ebitda:,.0f}M")
+    with mult_col3:
+        st.metric("EBITDA CAGR", f"{ebitda_growth:.1f}%")
+    with mult_col4:
+        implied_exit_mult = val_uss['ev_blended'] / terminal_ebitda if terminal_ebitda > 0 else 0
+        st.metric("Implied 2033x", f"{implied_exit_mult:.1f}x")
+
+    # Comparison table
+    st.markdown(f"""
+    | Perspective | Enterprise Value | 2024 EBITDA | **Implied 2024x** | Terminal EBITDA | Exit Multiple |
+    |-------------|------------------|-------------|-------------------|-----------------|---------------|
+    | USS - No Sale | ${val_uss['ev_blended']:,.0f}M | ${ebitda_2024:,.0f}M | **{val_uss['ev_blended']/ebitda_2024:.1f}x** | ${terminal_ebitda:,.0f}M | {scenario.exit_multiple:.1f}x |
+    | Value to Nippon | ${val_nippon['ev_blended']:,.0f}M | ${ebitda_2024:,.0f}M | **{val_nippon['ev_blended']/ebitda_2024:.1f}x** | ${terminal_ebitda:,.0f}M | {scenario.exit_multiple:.1f}x |
+
+    *Steel sector typically trades at 4-6x EV/EBITDA. Higher implied multiples reflect growth expectations or lower discount rates.*
+    """)
 
     # =========================================================================
     # FINANCING IMPACT (only show when there are incremental projects)
@@ -735,12 +780,14 @@ def main():
     **How to read this table:**
     - **USS - No Sale**: Share value if USS remains independent (discounted at USS's ~10.9% WACC)
     - **Value to Nippon**: Share value from Nippon's perspective (discounted at Nippon's ~7.5% IRP-adjusted WACC)
+    - **Implied EV/EBITDA**: Enterprise Value divided by 2024 EBITDA (current-year implied multiple)
     - **10Y FCF**: Total free cash flow generated over the 10-year forecast period (2024-2033)
     - The difference between the two valuations reflects the "WACC advantage" Nippon gains from its lower cost of capital
     """)
-    display_df = comparison_df[['Scenario', 'USS - No Sale ($/sh)', 'Value to Nippon ($/sh)', '10Y FCF ($B)']].copy()
+    display_df = comparison_df[['Scenario', 'USS - No Sale ($/sh)', 'Value to Nippon ($/sh)', 'Implied EV/EBITDA', '10Y FCF ($B)']].copy()
     display_df['USS - No Sale ($/sh)'] = display_df['USS - No Sale ($/sh)'].apply(lambda x: f"${x:.2f}")
     display_df['Value to Nippon ($/sh)'] = display_df['Value to Nippon ($/sh)'].apply(lambda x: f"${x:.2f}")
+    display_df['Implied EV/EBITDA'] = display_df['Implied EV/EBITDA'].apply(lambda x: f"{x:.1f}x")
     display_df['10Y FCF ($B)'] = display_df['10Y FCF ($B)'].apply(lambda x: f"${x:.1f}B")
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
@@ -894,6 +941,125 @@ def main():
     st.dataframe(pd.DataFrame(npv_data), use_container_width=True, hide_index=True)
 
     # =========================================================================
+    # PE LBO vs STRATEGIC BUYER COMPARISON
+    # =========================================================================
+
+    st.markdown("---")
+    st.markdown("<h2 style='text-decoration: underline;'>PE LBO vs. Strategic Buyer Comparison</h2>", unsafe_allow_html=True)
+
+    st.markdown("""
+    **Why This Matters:**
+    A private equity LBO provides the key counterfactual - what would a financial buyer pay? This analysis demonstrates
+    that PE firms cannot compete at $55/share, proving Nippon's strategic offer is superior to any alternative.
+    """)
+
+    # Comparison table
+    lbo_col1, lbo_col2, lbo_col3 = st.columns(3)
+
+    with lbo_col1:
+        st.markdown("### PE Buyer (LBO)")
+        st.markdown("""
+        **Maximum Price:** ~$40/share
+
+        **Structure:**
+        - 5.0x Debt/EBITDA leverage
+        - 30% equity, 70% debt
+        - ~$10B total debt
+        - $920M annual interest
+
+        **Returns (at $55):**
+        - IRR: -7.5% to 7.3%
+        - vs. 20% target: **FAIL** ✗
+
+        **Key Constraints:**
+        - Cannot fund $14B CapEx
+        - Covenant restrictions
+        - Bankruptcy risk in downturn
+        - 5-7 year forced exit
+        """)
+
+    with lbo_col2:
+        st.markdown("### USS Standalone")
+        st.markdown(f"""
+        **Fair Value:** ${val_uss['share_price']:.2f}/share
+
+        **Structure:**
+        - Existing capital structure
+        - Moderate leverage (1.9x)
+        - $5.2B liquidity
+
+        **Constraints:**
+        - Cannot fund NSA CapEx alone
+        - Would need dilutive financing
+        - Limited strategic options
+        - Cyclical volatility
+
+        **WACC:** {scenario.uss_wacc*100:.1f}%
+        """)
+
+    with lbo_col3:
+        st.markdown("### Nippon Steel (Strategic)")
+        st.markdown(f"""
+        **Offer Price:** $55.00/share
+        **Intrinsic Value:** ${val_nippon['share_price']:.2f}/share
+
+        **Structure:**
+        - All-equity acquisition
+        - Zero acquisition debt
+        - Investment grade balance sheet
+
+        **Advantages:**
+        - Can fund full $14B CapEx ✓
+        - No covenant restrictions
+        - Zero bankruptcy risk
+        - Permanent capital
+        - Strategic synergies
+
+        **WACC:** {usd_wacc*100:.2f}% (IRP-adjusted)
+        **Value Created:** ${val_nippon['share_price'] - 55:.2f}/share
+        """)
+
+    # Key insight boxes
+    st.markdown("### Key Insights")
+    insight_col1, insight_col2, insight_col3 = st.columns(3)
+
+    with insight_col1:
+        pe_gap = 55 - 40
+        st.metric(
+            "PE Gap to $55 Offer",
+            f"-${pe_gap:.0f}/share",
+            f"-{pe_gap/55*100:.0f}% discount needed",
+            delta_color="inverse"
+        )
+
+    with insight_col2:
+        uss_premium = 55 - val_uss['share_price']
+        st.metric(
+            "Premium vs. USS Standalone",
+            f"+${uss_premium:.2f}/share",
+            f"+{uss_premium/val_uss['share_price']*100:.0f}%",
+            delta_color="normal"
+        )
+
+    with insight_col3:
+        nippon_upside = val_nippon['share_price'] - 55
+        st.metric(
+            "Nippon Value Creation",
+            f"${nippon_upside:.2f}/share",
+            f"{nippon_upside/55*100:.0f}% upside captured",
+            delta_color="normal"
+        )
+
+    st.info("""
+    **Conclusion:** The $55 offer sits in the "fair zone" between:
+    - **Floor**: PE maximum price (~$40, cannot compete)
+    - **Mid**: USS standalone value (~${:.0f}, fair to shareholders)
+    - **Ceiling**: Nippon intrinsic value (~${:.0f}, strategic value creation)
+
+    No financial buyer can match this offer while Nippon still captures significant value.
+    """.format(val_uss['share_price'], val_nippon['share_price']))
+
+    # =========================================================================
     # VALUATION FOOTBALL FIELD
     # =========================================================================
 
@@ -904,8 +1070,11 @@ def main():
     **How to read this chart:**
     - Each horizontal bar represents a valuation methodology or scenario
     - Bar length shows the valuation range (low to high) under different assumptions
-    - Green dashed line = $55 Nippon offer price
+    - **Green dashed line** = $55 Nippon offer price
+    - **Red dotted line** = $40 PE maximum price (20% IRR threshold)
     - Toggle between USS standalone view and Nippon's acquirer view
+
+    **Key Insight:** The $55 offer sits above PE alternatives and USS standalone value, yet below Nippon's full intrinsic value.
     """)
 
     # Toggle for perspective
@@ -1033,7 +1202,15 @@ def main():
         'Description': 'Barclays ($39-48) & Goldman ($42-52) DCF ranges from Dec 2023 proxy filing'
     })
 
-    # 6. Current scenario point estimate
+    # 6. PE LBO Alternative (maximum price to achieve 20% IRR)
+    football_field_data.append({
+        'Method': 'PE LBO Maximum Price',
+        'Low': 35.0,
+        'High': 42.0,
+        'Description': 'Max price PE firms could pay at 5.0x leverage to achieve 20% IRR target. Cannot compete at $55 offer.'
+    })
+
+    # 7. Current scenario point estimate
     if ff_perspective == "Value to Nippon":
         current_value = val_nippon['share_price']
     else:
@@ -1058,7 +1235,7 @@ def main():
     fig_ff = go.Figure()
 
     # Add horizontal bars for each methodology
-    colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3']
+    colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692']
     for i, row in ff_df.iterrows():
         idx = list(ff_df.index).index(i)
         fig_ff.add_trace(go.Bar(
@@ -1088,7 +1265,11 @@ def main():
 
     # Add $55 offer line
     fig_ff.add_vline(x=55, line_dash="dash", line_color="green", line_width=3,
-                     annotation_text="$55 Offer", annotation_position="top")
+                     annotation_text="$55 Nippon Offer", annotation_position="top")
+
+    # Add PE maximum price line
+    fig_ff.add_vline(x=40, line_dash="dot", line_color="red", line_width=2,
+                     annotation_text="$40 PE Max (20% IRR)", annotation_position="bottom")
 
     # Add current value line
     fig_ff.add_vline(x=current_value, line_dash="dot", line_color="blue", line_width=2,

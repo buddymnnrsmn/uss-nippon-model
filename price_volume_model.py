@@ -1095,6 +1095,10 @@ def compare_scenarios(scenario_types: List[ScenarioType] = None,
             model = PriceVolumeModel(presets[st], execution_factor=ef)
             analysis = model.run_full_analysis()
 
+            # Calculate implied EV/EBITDA multiple
+            ebitda_2024 = analysis['consolidated'].loc[analysis['consolidated']['Year'] == 2024, 'Total_EBITDA'].values[0]
+            implied_ev_ebitda = analysis['val_uss']['ev_blended'] / ebitda_2024 if ebitda_2024 > 0 else 0
+
             results.append({
                 'Scenario': analysis['scenario'].name,
                 'USS - No Sale ($/sh)': analysis['val_uss']['share_price'],
@@ -1102,6 +1106,7 @@ def compare_scenarios(scenario_types: List[ScenarioType] = None,
                 'vs $55 Offer': analysis['val_nippon']['share_price'] - 55,
                 'WACC Advantage': analysis['wacc_advantage'] * 100,
                 '10Y FCF ($B)': analysis['consolidated']['FCF'].sum() / 1000,
+                'Implied EV/EBITDA': implied_ev_ebitda,
                 'Avg EBITDA Margin': analysis['consolidated']['EBITDA_Margin'].mean() * 100,
                 '2033 Revenue ($B)': analysis['consolidated']['Revenue'].iloc[-1] / 1000
             })
