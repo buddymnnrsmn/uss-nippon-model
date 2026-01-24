@@ -894,6 +894,244 @@ def main():
     st.dataframe(pd.DataFrame(npv_data), use_container_width=True, hide_index=True)
 
     # =========================================================================
+    # VALUATION FOOTBALL FIELD
+    # =========================================================================
+
+    st.markdown("---")
+    st.markdown("<h2 style='text-decoration: underline;'>Valuation Football Field</h2>", unsafe_allow_html=True)
+
+    st.markdown("""
+    **How to read this chart:**
+    - Each horizontal bar represents a valuation methodology or scenario
+    - Bar length shows the valuation range (low to high) under different assumptions
+    - Green dashed line = $55 Nippon offer price
+    - Toggle between USS standalone view and Nippon's acquirer view
+    """)
+
+    # Toggle for perspective
+    ff_col1, ff_col2 = st.columns([1, 3])
+    with ff_col1:
+        ff_perspective = st.radio(
+            "Perspective",
+            options=["Value to Nippon", "USS Standalone"],
+            horizontal=True,
+            key="ff_perspective",
+            help="Value to Nippon uses ~7.5% WACC; USS Standalone uses ~10.9% WACC"
+        )
+
+    # Build football field data
+    football_field_data = []
+
+    # 1. Scenario-based ranges (use scenario comparison data)
+    presets = get_scenario_presets()
+    scenario_values = []
+    for st_type, preset in presets.items():
+        ef = execution_factor if st_type == ScenarioType.NIPPON_COMMITMENTS else 1.0
+        temp_model = PriceVolumeModel(preset, execution_factor=ef, custom_benchmarks=custom_benchmarks)
+        temp_analysis = temp_model.run_full_analysis()
+        if ff_perspective == "Value to Nippon":
+            scenario_values.append(temp_analysis['val_nippon']['share_price'])
+        else:
+            scenario_values.append(temp_analysis['val_uss']['share_price'])
+
+    football_field_data.append({
+        'Method': 'DCF Scenarios',
+        'Low': min(scenario_values),
+        'High': max(scenario_values),
+        'Description': 'Low: Conservative (weak prices, 12% WACC) → High: Nippon Commitments ($14B CapEx, full synergies)'
+    })
+
+    # 2. Steel Price Sensitivity (85% to 115% of benchmarks - realistic range)
+    price_sens_values = []
+    for pf in [0.85, 0.95, 1.00, 1.05, 1.15]:
+        test_price_scenario = SteelPriceScenario(
+            name="Test", description="Test",
+            hrc_us_factor=pf, crc_us_factor=pf, coated_us_factor=pf,
+            hrc_eu_factor=pf, octg_factor=pf,
+            annual_price_growth=scenario.price_scenario.annual_price_growth
+        )
+        test_scenario = ModelScenario(
+            name="Test", scenario_type=ScenarioType.CUSTOM, description="Test",
+            price_scenario=test_price_scenario,
+            volume_scenario=scenario.volume_scenario,
+            uss_wacc=scenario.uss_wacc,
+            terminal_growth=scenario.terminal_growth,
+            exit_multiple=scenario.exit_multiple,
+            us_10yr=scenario.us_10yr,
+            japan_10yr=scenario.japan_10yr,
+            nippon_equity_risk_premium=scenario.nippon_equity_risk_premium,
+            nippon_credit_spread=scenario.nippon_credit_spread,
+            nippon_debt_ratio=scenario.nippon_debt_ratio,
+            nippon_tax_rate=scenario.nippon_tax_rate,
+            include_projects=scenario.include_projects
+        )
+        temp_model = PriceVolumeModel(test_scenario, custom_benchmarks=custom_benchmarks)
+        temp_analysis = temp_model.run_full_analysis()
+        if ff_perspective == "Value to Nippon":
+            price_sens_values.append(temp_analysis['val_nippon']['share_price'])
+        else:
+            price_sens_values.append(temp_analysis['val_uss']['share_price'])
+
+    football_field_data.append({
+        'Method': 'Steel Price Sensitivity',
+        'Low': min(price_sens_values),
+        'High': max(price_sens_values),
+        'Description': 'HRC $580-780/ton range (±15% from $680 benchmark). Steel prices are #1 value driver'
+    })
+
+    # 3. WACC Sensitivity
+    wacc_sens_values = []
+    for w in [0.08, 0.10, 0.12, 0.14]:
+        test_val = model.calculate_dcf(consolidated, w)
+        wacc_sens_values.append(test_val['share_price'])
+
+    football_field_data.append({
+        'Method': 'WACC Sensitivity',
+        'Low': min(wacc_sens_values),
+        'High': max(wacc_sens_values),
+        'Description': '8% (investment grade) to 14% (distressed). USS trades ~10.9%, Nippon IRP-adjusted ~7.5%'
+    })
+
+    # 4. Exit Multiple Sensitivity
+    exit_sens_values = []
+    for em in [3.5, 4.5, 5.5, 6.5]:
+        # Manually calculate with different exit multiple
+        temp_scenario = ModelScenario(
+            name="Test", scenario_type=ScenarioType.CUSTOM, description="Test",
+            price_scenario=scenario.price_scenario,
+            volume_scenario=scenario.volume_scenario,
+            uss_wacc=scenario.uss_wacc,
+            terminal_growth=scenario.terminal_growth,
+            exit_multiple=em,
+            us_10yr=scenario.us_10yr,
+            japan_10yr=scenario.japan_10yr,
+            nippon_equity_risk_premium=scenario.nippon_equity_risk_premium,
+            nippon_credit_spread=scenario.nippon_credit_spread,
+            nippon_debt_ratio=scenario.nippon_debt_ratio,
+            nippon_tax_rate=scenario.nippon_tax_rate,
+            include_projects=scenario.include_projects
+        )
+        temp_model = PriceVolumeModel(temp_scenario, custom_benchmarks=custom_benchmarks)
+        temp_analysis = temp_model.run_full_analysis()
+        if ff_perspective == "Value to Nippon":
+            exit_sens_values.append(temp_analysis['val_nippon']['share_price'])
+        else:
+            exit_sens_values.append(temp_analysis['val_uss']['share_price'])
+
+    football_field_data.append({
+        'Method': 'Exit Multiple',
+        'Low': min(exit_sens_values),
+        'High': max(exit_sens_values),
+        'Description': '3.5x (trough) to 6.5x (peak) EV/EBITDA. Steel sector historical range 4-6x'
+    })
+
+    # 5. Wall Street Analyst Range (from fairness opinions)
+    football_field_data.append({
+        'Method': 'Analyst Fairness Opinions',
+        'Low': 39.0,
+        'High': 52.0,
+        'Description': 'Barclays ($39-48) & Goldman ($42-52) DCF ranges from Dec 2023 proxy filing'
+    })
+
+    # 6. Current scenario point estimate
+    if ff_perspective == "Value to Nippon":
+        current_value = val_nippon['share_price']
+    else:
+        current_value = val_uss['share_price']
+
+    # Build current scenario description with key assumptions
+    current_desc = f'Your selection: {scenario.price_scenario.hrc_us_factor:.0%} prices, {scenario.uss_wacc*100:.1f}% WACC, {len(scenario.include_projects)} projects'
+    football_field_data.append({
+        'Method': f'Current Scenario',
+        'Low': current_value - 2,
+        'High': current_value + 2,
+        'Description': current_desc
+    })
+
+    # Create the football field chart
+    ff_df = pd.DataFrame(football_field_data)
+
+    # Sort by midpoint for better visualization
+    ff_df['Midpoint'] = (ff_df['Low'] + ff_df['High']) / 2
+    ff_df = ff_df.sort_values('Midpoint', ascending=True)
+
+    fig_ff = go.Figure()
+
+    # Add horizontal bars for each methodology
+    colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3']
+    for i, row in ff_df.iterrows():
+        idx = list(ff_df.index).index(i)
+        fig_ff.add_trace(go.Bar(
+            y=[row['Method']],
+            x=[row['High'] - row['Low']],
+            base=[row['Low']],
+            orientation='h',
+            name=row['Method'],
+            marker_color=colors[idx % len(colors)],
+            hovertemplate=f"<b>{row['Method']}</b><br>" +
+                         f"Range: ${row['Low']:.2f} - ${row['High']:.2f}<br>" +
+                         f"{row['Description']}<extra></extra>",
+            showlegend=False
+        ))
+
+        # Add midpoint marker
+        midpoint = (row['Low'] + row['High']) / 2
+        fig_ff.add_trace(go.Scatter(
+            x=[midpoint],
+            y=[row['Method']],
+            mode='markers',
+            marker=dict(color='white', size=10, symbol='diamond',
+                       line=dict(color='black', width=2)),
+            hoverinfo='skip',
+            showlegend=False
+        ))
+
+    # Add $55 offer line
+    fig_ff.add_vline(x=55, line_dash="dash", line_color="green", line_width=3,
+                     annotation_text="$55 Offer", annotation_position="top")
+
+    # Add current value line
+    fig_ff.add_vline(x=current_value, line_dash="dot", line_color="blue", line_width=2,
+                     annotation_text=f"Current: ${current_value:.1f}", annotation_position="bottom")
+
+    fig_ff.update_layout(
+        title=f"Valuation Football Field ({ff_perspective})",
+        xaxis_title="Share Price ($)",
+        yaxis_title="",
+        height=400,
+        xaxis=dict(range=[0, max(ff_df['High'].max() * 1.1, 120)]),
+        bargap=0.3
+    )
+
+    st.plotly_chart(fig_ff, use_container_width=True)
+
+    # Summary table below chart
+    with st.expander("View Detailed Ranges", expanded=False):
+        display_ff_df = ff_df[['Method', 'Low', 'High', 'Description']].copy()
+        display_ff_df['Low'] = display_ff_df['Low'].apply(lambda x: f"${x:.2f}")
+        display_ff_df['High'] = display_ff_df['High'].apply(lambda x: f"${x:.2f}")
+        display_ff_df['Range'] = display_ff_df.apply(
+            lambda r: f"{r['Low']} - {r['High']}", axis=1
+        )
+        st.dataframe(
+            display_ff_df[['Method', 'Range', 'Description']],
+            use_container_width=True,
+            hide_index=True
+        )
+
+    # Key insights
+    ff_insight_col1, ff_insight_col2, ff_insight_col3 = st.columns(3)
+    with ff_insight_col1:
+        overall_low = ff_df['Low'].min()
+        st.metric("Overall Low", f"${overall_low:.2f}")
+    with ff_insight_col2:
+        overall_high = ff_df['High'].max()
+        st.metric("Overall High", f"${overall_high:.2f}")
+    with ff_insight_col3:
+        pct_above_offer = len([v for v in scenario_values if v > 55]) / len(scenario_values) * 100
+        st.metric("Scenarios Above $55", f"{pct_above_offer:.0f}%")
+
+    # =========================================================================
     # VALUE BRIDGE
     # =========================================================================
 
@@ -1308,22 +1546,87 @@ def main():
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     with st.expander("Scenario Details"):
+        st.markdown(f"### {scenario.name}")
+        st.markdown(f"*{scenario.description}*")
+
+        # Organize into columns
+        detail_col1, detail_col2 = st.columns(2)
+
+        with detail_col1:
+            st.markdown("#### Steel Price Assumptions")
+            st.markdown(f"""
+| Parameter | Value | Implied Price |
+|-----------|-------|---------------|
+| US HRC Factor | {scenario.price_scenario.hrc_us_factor:.0%} | ${custom_benchmarks['hrc_us'] * scenario.price_scenario.hrc_us_factor:.0f}/ton |
+| US CRC Factor | {scenario.price_scenario.crc_us_factor:.0%} | ${custom_benchmarks['crc_us'] * scenario.price_scenario.crc_us_factor:.0f}/ton |
+| Coated Factor | {scenario.price_scenario.coated_us_factor:.0%} | ${custom_benchmarks['coated_us'] * scenario.price_scenario.coated_us_factor:.0f}/ton |
+| EU HRC Factor | {scenario.price_scenario.hrc_eu_factor:.0%} | ${custom_benchmarks['hrc_eu'] * scenario.price_scenario.hrc_eu_factor:.0f}/ton |
+| OCTG Factor | {scenario.price_scenario.octg_factor:.0%} | ${custom_benchmarks['octg'] * scenario.price_scenario.octg_factor:,.0f}/ton |
+| Annual Escalation | {scenario.price_scenario.annual_price_growth:.1%} | Compounded over 10Y |
+            """)
+
+            st.markdown("#### Volume Assumptions")
+            st.markdown(f"""
+| Segment | Volume Factor | Growth Adj |
+|---------|---------------|------------|
+| Flat-Rolled | {scenario.volume_scenario.flat_rolled_volume_factor:.0%} | {scenario.volume_scenario.flat_rolled_growth_adj:+.1%}/yr |
+| Mini Mill | {scenario.volume_scenario.mini_mill_volume_factor:.0%} | {scenario.volume_scenario.mini_mill_growth_adj:+.1%}/yr |
+| USSE | {scenario.volume_scenario.usse_volume_factor:.0%} | {scenario.volume_scenario.usse_growth_adj:+.1%}/yr |
+| Tubular | {scenario.volume_scenario.tubular_volume_factor:.0%} | {scenario.volume_scenario.tubular_growth_adj:+.1%}/yr |
+            """)
+
+        with detail_col2:
+            st.markdown("#### Valuation Parameters")
+            st.markdown(f"""
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| USS WACC | {scenario.uss_wacc*100:.1f}% | Standalone cost of capital |
+| Terminal Growth | {scenario.terminal_growth*100:.2f}% | Perpetuity growth rate |
+| Exit Multiple | {scenario.exit_multiple:.1f}x | EV/EBITDA at terminal year |
+| Shares Outstanding | 225M | Undiluted basis |
+            """)
+
+            st.markdown("#### Interest Rate Parity")
+            st.markdown(f"""
+| Parameter | Value |
+|-----------|-------|
+| US 10-Year Treasury | {scenario.us_10yr*100:.2f}% |
+| Japan 10-Year JGB | {scenario.japan_10yr*100:.2f}% |
+| Rate Differential | {(scenario.us_10yr - scenario.japan_10yr)*100:.2f}% |
+| Nippon JPY WACC | {jpy_wacc*100:.2f}% |
+| Nippon USD WACC (IRP) | {usd_wacc*100:.2f}% |
+| WACC Advantage | {(scenario.uss_wacc - usd_wacc)*100:.2f}% |
+            """)
+
+        st.markdown("#### Capital Projects")
+        if scenario.include_projects:
+            projects_info = get_capital_projects()
+            project_rows = []
+            for proj_name in scenario.include_projects:
+                if proj_name in projects_info:
+                    proj = projects_info[proj_name]
+                    total_capex = sum(proj.capex_schedule.values())
+                    final_ebitda = proj.ebitda_schedule.get(2033, 0)
+                    project_rows.append(f"| {proj_name} | {proj.segment} | ${total_capex:,.0f}M | ${final_ebitda:,.0f}M |")
+
+            st.markdown(f"""
+| Project | Segment | Total CapEx | 2033 EBITDA |
+|---------|---------|-------------|-------------|
+{chr(10).join(project_rows)}
+            """)
+            if execution_factor < 1.0:
+                st.markdown(f"*Execution factor: {execution_factor:.0%} applied to incremental projects (excludes BR2)*")
+        else:
+            st.markdown("*No capital projects selected*")
+
+        st.markdown("#### Valuation Output")
         st.markdown(f"""
-        **Scenario:** {scenario.name}
-
-        **Price Scenario:** {scenario.price_scenario.name}
-        - {scenario.price_scenario.description}
-        - US HRC Factor: {scenario.price_scenario.hrc_us_factor:.0%}
-        - EU HRC Factor: {scenario.price_scenario.hrc_eu_factor:.0%}
-        - OCTG Factor: {scenario.price_scenario.octg_factor:.0%}
-        - Annual Price Growth: {scenario.price_scenario.annual_price_growth:.1%}
-
-        **Volume Scenario:** {scenario.volume_scenario.name}
-        - {scenario.volume_scenario.description}
-
-        **Capital Projects Included:** {', '.join(scenario.include_projects) if scenario.include_projects else 'None'}
-
-        **Execution Factor:** {execution_factor:.0%}
+| Metric | USS Standalone | Value to Nippon |
+|--------|----------------|-----------------|
+| Share Price | ${val_uss['share_price']:.2f} | ${val_nippon['share_price']:.2f} |
+| Enterprise Value | ${val_uss['ev_blended']:,.0f}M | ${val_nippon['ev_blended']:,.0f}M |
+| 10Y FCF | ${consolidated['FCF'].sum():,.0f}M | ${consolidated['FCF'].sum():,.0f}M |
+| vs $55 Offer | ${val_uss['share_price'] - 55:+.2f} | ${val_nippon['share_price'] - 55:+.2f} |
         """)
 
     # =========================================================================
