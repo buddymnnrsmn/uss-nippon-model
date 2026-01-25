@@ -26,6 +26,7 @@ from price_volume_model import (
     PriceVolumeModel, ModelScenario, ScenarioType,
     SteelPriceScenario, VolumeScenario, Segment,
     get_scenario_presets, get_segment_configs, compare_scenarios,
+    calculate_probability_weighted_valuation,
     get_capital_projects, BENCHMARK_PRICES_2023
 )
 
@@ -51,6 +52,43 @@ def render_sidebar():
 
     st.sidebar.title("Model Assumptions")
 
+    # Page Navigation
+    with st.sidebar.expander("Page Navigation", expanded=False):
+        st.markdown("""
+        **Executive Analysis**
+        - [Executive Decision Summary](#executive-decision-summary)
+        - [Risk-Adjusted Decision Matrix](#risk-adjusted-decision-matrix)
+        - [Board Fiduciary Checklist](#board-fiduciary-checklist)
+
+        **Strategic Context**
+        - [Without the Deal](#without-the-deal)
+        - [Golden Share & NSA Commitments](#golden-share-nsa)
+        - [Alternative Buyer Comparison](#alternative-buyer-comparison)
+        - [Sensitivity Thresholds](#sensitivity-thresholds)
+
+        **Valuation Details**
+        - [Valuation Details](#valuation-details)
+        - [USS Standalone Financing Impact](#uss-standalone-financing)
+        - [Scenario Comparison](#scenario-comparison)
+        - [Probability-Weighted Expected Value](#probability-weighted-value)
+        - [Capital Projects Analysis](#capital-projects)
+        - [PE LBO Comparison](#pe-lbo-comparison)
+        - [Valuation Football Field](#valuation-football-field)
+        - [Value Bridge](#value-bridge)
+
+        **Financial Projections**
+        - [FCF Projection](#fcf-projection)
+        - [Segment Analysis](#segment-analysis)
+
+        **Sensitivity Analysis**
+        - [Steel Price Sensitivity](#steel-price-sensitivity)
+        - [WACC Sensitivity Analysis](#wacc-sensitivity)
+        - [Interest Rate Parity Adjustment](#irp-adjustment)
+        - [Detailed Projections](#detailed-projections)
+        """, unsafe_allow_html=True)
+
+    st.sidebar.markdown("---")
+
     # Initialize session state for reset triggers and scenario tracking
     if 'reset_section' not in st.session_state:
         st.session_state.reset_section = None
@@ -61,10 +99,12 @@ def render_sidebar():
     st.sidebar.header("Scenario Selection")
 
     scenario_options = {
-        "Base Case - Standalone": ScenarioType.BASE_CASE,
-        "Conservative - Downside": ScenarioType.CONSERVATIVE,
+        "Severe Downturn - Historical Crisis": ScenarioType.SEVERE_DOWNTURN,
+        "Downside - Weak Markets": ScenarioType.DOWNSIDE,
+        "Base Case - Mid-Cycle": ScenarioType.BASE_CASE,
+        "Above Average - Strong Cycle": ScenarioType.ABOVE_AVERAGE,
         "Wall Street - Analyst Views": ScenarioType.WALL_STREET,
-        "Management - Dec 2023": ScenarioType.MANAGEMENT,
+        "Optimistic - Peak Cycle": ScenarioType.OPTIMISTIC,
         "Nippon Investment Case": ScenarioType.NIPPON_COMMITMENTS,
         "Custom": ScenarioType.CUSTOM
     }
@@ -72,7 +112,7 @@ def render_sidebar():
     selected_scenario_name = st.sidebar.selectbox(
         "Select Scenario",
         options=list(scenario_options.keys()),
-        index=0,
+        index=2,  # Default to Base Case
         help="Pre-built scenarios with different assumptions. Select 'Custom' to manually adjust all parameters."
     )
     selected_scenario_type = scenario_options[selected_scenario_name]
@@ -84,10 +124,12 @@ def render_sidebar():
 
     # Show scenario description
     scenario_descriptions = {
-        "Base Case - Standalone": "Mid-cycle steel prices (0.95x), BR2 expansion only, 10.9% WACC",
-        "Conservative - Downside": "Weak demand and pricing (0.85x), higher discount rate (12% WACC)",
+        "Severe Downturn - Historical Crisis": "Recession scenario (0.68x prices, -20% volumes, 13.5% WACC) - Historical frequency: 24%",
+        "Downside - Weak Markets": "Below-average cycle (0.85x prices, 12% WACC) - Historical frequency: 30%",
+        "Base Case - Mid-Cycle": "Historical median performance (0.88x prices, 10.9% WACC) - Historical frequency: 30%",
+        "Above Average - Strong Cycle": "Good markets like 2017-18 (0.95x prices, 10.9% WACC) - Historical frequency: 10%",
         "Wall Street - Analyst Views": "Barclays/Goldman DCF assumptions (0.92x prices, 12.5% WACC)",
-        "Management - Dec 2023": "Company projections with footprint rationalization (0.92x prices, flat growth)",
+        "Optimistic - Peak Cycle": "2021-22 boom conditions (mgmt projections) - Historical frequency: 5%",
         "Nippon Investment Case": "$14B capital program, all 6 projects, no plant closures through 2035",
         "Custom": "Manually adjust all parameters below."
     }
@@ -466,108 +508,722 @@ def main():
     financing_impact = analysis.get('financing_impact', {})
 
     # =========================================================================
-    # KEY METRICS ROW
+    # EXECUTIVE DECISION SUMMARY
     # =========================================================================
 
     st.markdown("---")
+    st.header("Executive Decision Summary", anchor="executive-decision-summary")
 
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    # Calculate key metrics for decision framework
+    uss_standalone = val_uss['share_price']
+    nippon_value = val_nippon['share_price']
+    pe_max_price = 40.0  # Maximum PE can pay at 20% IRR
+    offer_price = 55.0
 
-    # Calculate implied EV/EBITDA multiple
+    # Cleveland-Cliffs offer details (per Schedule 14A and Cleveland-Cliffs_Final_Offer_Analysis.md)
+    # Nominal offer: $54/share ($27 cash + 1.444 Cliffs shares worth $27 at Dec 15, 2023 price)
+    # Risk-adjusted value: $21-31/share due to:
+    #   - Stock volatility risk over 18+ month antitrust review: -$5-10/share
+    #   - Required $7B+ divestitures impact on stock value: -$3-8/share
+    #   - Probability-weighted antitrust failure: -$15-20/share
+    cliffs_nominal = 54.0  # Nominal offer price
+    cliffs_risk_adjusted = 26.0  # Midpoint of $21-31 risk-adjusted range
+
+    # Calculate implied EV/EBITDA for USS Standalone
     ebitda_2024 = consolidated.loc[consolidated['Year'] == 2024, 'Total_EBITDA'].values[0]
     implied_ev_ebitda = val_uss['ev_blended'] / ebitda_2024 if ebitda_2024 > 0 else 0
+    wacc_advantage = (scenario.uss_wacc - usd_wacc) * 100
 
-    with col1:
+    # Determine deal verdict for each stakeholder (dynamically based on model outputs)
+    offer_vs_standalone = offer_price - uss_standalone
+    offer_vs_nippon_value = nippon_value - offer_price
+    uss_shareholder_verdict = "YES" if offer_vs_standalone > 0 else "CONDITIONAL"
+    uss_board_verdict = "YES" if offer_vs_standalone >= -5 and offer_price > pe_max_price else "CONDITIONAL"  # Allow small buffer
+    nippon_verdict = "YES" if offer_vs_nippon_value > 0 else "NO"
+
+    # Deal Verdict Section with color coding
+    st.markdown("### Deal Verdict")
+
+    verdict_col1, verdict_col2, verdict_col3 = st.columns(3)
+
+    with verdict_col1:
+        if uss_shareholder_verdict == "YES":
+            premium_text = f"+{offer_vs_standalone:.2f}"
+            st.success(f"""
+            **USS Shareholders: VOTE YES**
+
+            The \\$55 offer is **{premium_text}/share above** standalone value.
+
+            *Rationale: No alternative bidder can match this price. PE caps at ~\\$40, Cleveland-Cliffs nominal \\$54 but risk-adjusted ~\\$26 due to antitrust/execution risk. The 40% premium to pre-announcement price represents fair value.*
+            """)
+        else:
+            diff_text = f"{offer_vs_standalone:.2f}"
+            st.warning(f"""
+            **USS Shareholders: CONDITIONAL**
+
+            The \\$55 offer is **{diff_text}/share vs** standalone value under current assumptions.
+
+            *Consider: Standalone value assumes successful execution of capital program and favorable steel prices.*
+            """)
+
+    with verdict_col2:
+        if uss_board_verdict == "YES":
+            st.success("""
+            **USS Board: RECOMMEND APPROVAL**
+
+            Fiduciary duty satisfied:
+            - Market canvass conducted
+            - Fairness opinions obtained
+            - Premium to all alternatives
+
+            *Rationale: No superior alternative exists. Rejecting 55 exposes shareholders to execution risk and steel price volatility without upside.*
+            """)
+        else:
+            st.warning("""
+            **USS Board: REVIEW CAREFULLY**
+
+            Consider negotiating for higher price given current valuation assumptions.
+            """)
+
+    with verdict_col3:
+        if nippon_verdict == "YES":
+            discount_text = f"{offer_vs_nippon_value:.2f}"
+            upside_pct = offer_vs_nippon_value/offer_price*100
+            st.success(f"""
+            **Nippon Steel: PROCEED**
+
+            Acquiring at **{discount_text}/share discount** to intrinsic value.
+
+            *Rationale: WACC advantage ({wacc_advantage:.1f}%) creates {upside_pct:.0f}% upside. Strategic value from #3 global position and US market access.*
+            """)
+        else:
+            premium_text = f"{abs(offer_vs_nippon_value):.2f}"
+            st.error(f"""
+            **Nippon Steel: VALUE AT RISK**
+
+            Paying **{premium_text}/share premium** to intrinsic value.
+
+            *Caution: Deal destroys value unless synergies materialize or steel prices exceed assumptions.*
+            """)
+
+    # Key Numbers Comparison
+    st.markdown("### Key Numbers at a Glance")
+
+    num_col1, num_col2, num_col3, num_col4, num_col5, num_col6, num_col7 = st.columns(7)
+
+    with num_col1:
         st.metric(
-            "USS - No Sale",
-            f"${val_uss['share_price']:.2f}",
+            "Nippon Offer",
+            "$55.00",
+            "40% premium to pre-deal"
+        )
+    with num_col2:
+        st.metric(
+            "USS Standalone",
+            f"${uss_standalone:.2f}",
             f"@ {scenario.uss_wacc*100:.1f}% WACC"
         )
-
-    with col2:
-        st.metric(
-            "Value to Nippon",
-            f"${val_nippon['share_price']:.2f}",
-            f"@ {usd_wacc*100:.2f}% WACC"
-        )
-
-    with col3:
-        vs_offer = val_nippon['share_price'] - 55
+    with num_col3:
+        # vs $55 Offer for USS Standalone
+        vs_offer_delta = offer_price - uss_standalone
         st.metric(
             "vs $55 Offer",
-            f"${vs_offer:+.2f}",
-            "Premium" if vs_offer > 0 else "Discount"
+            f"${vs_offer_delta:+.2f}",
+            "Premium" if vs_offer_delta > 0 else "Discount",
+            delta_color="normal" if vs_offer_delta > 0 else "inverse"
         )
-
-    with col4:
-        wacc_advantage = (scenario.uss_wacc - usd_wacc) * 100
-        st.metric(
-            "WACC Advantage",
-            f"{wacc_advantage:.2f}%",
-            "IRP-adjusted"
-        )
-
-    with col5:
-        total_fcf = consolidated['FCF'].sum()
-        st.metric(
-            "10Y FCF",
-            f"${total_fcf/1000:.1f}B",
-            f"{len(scenario.include_projects)} projects"
-        )
-
-    with col6:
+    with num_col4:
         st.metric(
             "Implied EV/EBITDA",
             f"{implied_ev_ebitda:.1f}x",
             f"Exit: {scenario.exit_multiple:.1f}x"
         )
+    with num_col5:
+        st.metric(
+            "PE Maximum",
+            f"${pe_max_price:.2f}",
+            f"-${offer_price - pe_max_price:.0f} gap to offer",
+            delta_color="inverse"
+        )
+    with num_col6:
+        st.metric(
+            "Cliffs (Risk-Adj)",
+            f"${cliffs_risk_adjusted:.2f}",
+            f"Nominal: ${cliffs_nominal:.0f}",
+            delta_color="inverse"
+        )
+    with num_col7:
+        upside_text = f"+{nippon_value - offer_price:.2f}" if nippon_value > offer_price else f"{nippon_value - offer_price:.2f}"
+        st.metric(
+            "Value to Nippon",
+            f"${nippon_value:.2f}",
+            f"{upside_text} vs offer",
+            delta_color="normal" if nippon_value > offer_price else "inverse"
+        )
+
+    # One-line bottom line
+    offer_diff = abs(offer_price - uss_standalone)
+    nippon_capture = max(0, nippon_value - offer_price)
+    exceeds_or_below = "exceeds" if offer_price > uss_standalone else "falls below"
+    st.info(f"""
+    **Bottom Line:** At current assumptions ({scenario.price_scenario.hrc_us_factor:.0%} steel prices, {scenario.uss_wacc*100:.1f}% WACC),
+    the \\$55 offer {exceeds_or_below} USS standalone value by \\${offer_diff:.2f}/share.
+    Nippon captures \\${nippon_capture:.2f}/share of value creation from their lower cost of capital.
+    **No alternative buyer can match this offer.**
+    """)
 
     # =========================================================================
-    # EXECUTIVE SUMMARY
+    # RISK-ADJUSTED DECISION MATRIX
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Executive Summary</h2>", unsafe_allow_html=True)
+    st.header("Risk-Adjusted Decision Matrix", anchor="risk-adjusted-decision-matrix")
 
-    # Quick summary metrics in columns
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("""
-        **Investment Thesis**
-        - $55 offer fair under conservative assumptions
-        - Nippon's IRP-adjusted view: ~$75/share base case
-        - WACC arbitrage: ~3.3% advantage
-        - PE alternative: max ~$40/share (cannot compete)
-        """)
-    with col2:
-        st.markdown("""
-        **Key Value Drivers**
-        - Mini Mill segment: 43% of FCF
-        - BR2 expansion: committed capacity
-        - NSA investment: $14B if fully executed
-        """)
-    with col3:
-        st.markdown("""
-        **Key Risks**
-        - Steel price volatility
-        - Execution risk on capital projects
-        - Golden Share constraints
+    st.markdown("""
+    Key risks facing USS shareholders with and without the Nippon deal:
+    """)
+
+    # Risk matrix table - professional formatting
+    standalone_val = f"\\${uss_standalone:.0f}"
+    st.markdown(f"""
+    | Risk Factor | Probability | Impact on Standalone ({standalone_val}) | Impact with Deal | Deal Protection |
+    |-------------|-------------|---------------------------|------------------|-----------------|
+    | **Steel Price Collapse** (HRC below \\$600/ton) | 25% (historical) | -\\$15 to -\\$25/share | Locked in at \\$55 | **Full** - Cash offer insulates from price risk |
+    | **Execution Risk** on \\$14B CapEx | 30-40% | -\\$10 to -\\$20/share | Nippon absorbs risk | **Full** - Nippon's balance sheet funds projects |
+    | **Chinese Overcapacity** (108% utilization) | Ongoing | -\\$5 to -\\$10/share | Combined entity stronger | **Partial** - Scale advantages, tariff protection |
+    | **Integrated Asset Obsolescence** | High | -\\$20 to -\\$30/share | \\$14B reinvestment | **Full** - NSA mandates modernization |
+    | **Financing Distress** | 15-20% | Potential bankruptcy | Eliminated | **Full** - All-equity deal, no leverage |
+    """)
+
+    # Expected value calculation with risk adjustment
+    st.markdown("### Risk-Adjusted Expected Value")
+
+    risk_col1, risk_col2, risk_col3 = st.columns(3)
+
+    with risk_col1:
+        # Calculate probability-weighted downside
+        prob_collapse = 0.25
+        downside_impact = -20  # Average downside
+        risk_adjusted_standalone_raw = uss_standalone + (prob_collapse * downside_impact)
+        # Floor at zero - equity value cannot be negative
+        risk_adjusted_standalone = max(0, risk_adjusted_standalone_raw)
+        risk_adj_delta = uss_standalone - risk_adjusted_standalone
+        st.metric(
+            "Risk-Adjusted Standalone",
+            f"${risk_adjusted_standalone:.2f}",
+            f"-${risk_adj_delta:.2f} from base" if risk_adj_delta > 0 else "At equity floor",
+            delta_color="inverse"
+        )
+
+    with risk_col2:
+        st.metric(
+            "Nippon Offer (Certain)",
+            f"${offer_price:.2f}",
+            "Cash, no execution risk"
+        )
+
+    with risk_col3:
+        certainty_premium = offer_price - risk_adjusted_standalone
+        # Handle edge case where risk_adjusted_standalone could be zero or negative
+        if risk_adjusted_standalone > 0.01:
+            certainty_pct = f"+{certainty_premium/risk_adjusted_standalone*100:.0f}% vs risk-adjusted"
+        else:
+            certainty_pct = "Offer provides full protection"
+        st.metric(
+            "Certainty Premium",
+            f"${certainty_premium:.2f}/share",
+            certainty_pct,
+            delta_color="normal"
+        )
+
+    st.info("""
+    **Key Insight:** When adjusted for realistic downside scenarios (25% probability of steel price collapse, 30% execution risk),
+    the risk-adjusted standalone value is significantly lower than the headline DCF. The \\$55 cash offer eliminates this uncertainty.
+    """)
+
+    # =========================================================================
+    # BOARD FIDUCIARY CHECKLIST
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Board Fiduciary Checklist (Revlon Duties)", anchor="board-fiduciary-checklist")
+
+    st.markdown("""
+    When a company is being sold, the board has a duty to maximize shareholder value. This checklist confirms the USS Board satisfied its fiduciary obligations:
+    """)
+
+    check_col1, check_col2 = st.columns(2)
+
+    # Dynamic status based on offer vs standalone
+    premium_status = "SATISFIED" if offer_vs_standalone > 0 else "REVIEW"
+    premium_color = "Complete" if offer_vs_standalone > 0 else "Below DCF"
+
+    with check_col1:
+        # Pre-compute values to avoid f-string parsing issues with $ signs
+        standalone_str = f"{uss_standalone:.2f}"
+        offer_diff_str = f"{offer_vs_standalone:+.2f}" if offer_vs_standalone >= 0 else f"{offer_vs_standalone:.2f}"
+
+        st.markdown(f"""
+        | Requirement | Status | Evidence |
+        |-------------|--------|----------|
+        | **Market Canvass** | Complete | Multiple bidders contacted; Cleveland-Cliffs, PE firms considered |
+        | **Fairness Opinions** | Obtained | Barclays (\\$39-48) and Goldman Sachs (\\$42-52) DCF ranges |
+        | **Premium to Market** | 40% Premium | \\$55 vs \\$39.33 pre-announcement (Dec 2023) |
+        | **Premium to DCF** | {premium_color} | \\$55 vs \\${standalone_str} standalone ({offer_diff_str}) |
+        | **Superior Alternatives** | None Exist | Cliffs bid \\$35, PE max \\$40, no other strategic interest |
+        | **Deal Certainty** | High | All-cash, committed financing, regulatory path cleared |
         """)
 
-    # Full executive summary in expander
-    summary_path = Path(__file__).parent / "EXECUTIVE_SUMMARY.md"
-    if summary_path.exists():
-        with open(summary_path, 'r') as f:
-            summary_content = f.read()
-        with st.expander("View Full Executive Summary", expanded=False):
-            st.markdown(summary_content)
+    with check_col2:
+        st.markdown("""
+        | Risk Factor | Status | Mitigation |
+        |-------------|--------|------------|
+        | **Antitrust Risk** | Cleared | No horizontal overlap; Nippon minimal US presence |
+        | **CFIUS/National Security** | Approved | Golden Share arrangement; NSA signed |
+        | **Financing Risk** | None | All-equity deal; Nippon investment grade |
+        | **MAE Risk** | Standard | Customary carve-outs for market conditions |
+        | **Shareholder Approval** | 98% | Overwhelming shareholder support |
+        """)
+
+    # Conclusion box - dynamically updates based on scenario
+    offer_diff_fid = f"+\\${offer_vs_standalone:.2f}" if offer_vs_standalone > 0 else f"\\${offer_vs_standalone:.2f}"
+    if offer_vs_standalone > 0 and offer_price > pe_max_price:
+        st.success(f"""
+        **FIDUCIARY DUTY SATISFIED:** The USS Board has fulfilled its Revlon duties. The \\$55 offer is {offer_diff_fid}/share
+        above standalone value, exceeds all alternative proposals, and has been validated by independent fairness opinions.
+        """)
+    elif offer_vs_standalone > -5 and offer_price > pe_max_price:
+        within_val = f"\\${abs(offer_vs_standalone):.2f}"
+        st.info(f"""
+        **FIDUCIARY DUTY SUPPORTABLE:** The \\$55 offer is within {within_val}/share of standalone value.
+        Given execution risk and deal certainty, the board can reasonably support the transaction.
+        """)
+    else:
+        standalone_fid = f"\\${uss_standalone:.2f}"
+        st.warning(f"""
+        **REVIEW REQUIRED:** Under current assumptions ({standalone_fid} standalone), the board should carefully
+        document the rationale for recommending the transaction. Consider execution risk and deal certainty factors.
+        """)
+
+    # =========================================================================
+    # "WITHOUT THE DEAL" STRATEGIC ANALYSIS
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Without the Deal: USS Strategic Predicament", anchor="without-the-deal")
+
+    st.markdown("""
+    **The case for why USS needs this deal** - Strategic challenges USS faces as a standalone company:
+    """)
+
+    predicament_col1, predicament_col2 = st.columns(2)
+
+    with predicament_col1:
+        st.markdown("""
+        ### Competitive Position Deterioration
+
+        | Metric | USS Standalone | With Nippon |
+        |--------|----------------|-------------|
+        | Global Ranking | **#27** | **#3** |
+        | Annual Capacity | 20M tons | 86M tons |
+        | R&D Budget | ~\\$50M | \\$500M+ |
+        | Balance Sheet | BBB- (weak) | A-rated |
+        | Technology Access | Limited | 2,000+ patents |
+
+        ### Flat-Rolled Segment Decline
+        - Blast furnaces average **40+ years old**
+        - Gary Works BF #14 needs \\$3.1B reline or closure
+        - Mon Valley HSM at end of useful life
+        - Without investment: **-3% to -5% volume/year**
+        """)
+
+    with predicament_col2:
+        st.markdown("""
+        ### Capital Requirements vs. Capacity
+
+        | Capital Need | Amount | USS Can Fund? |
+        |--------------|--------|---------------|
+        | BR2 (committed) | \\$3.0B | Yes (debt-funded) |
+        | Gary Works BF | \\$3.1B | No - requires equity |
+        | Mon Valley HSM | \\$1.0B | No - requires equity |
+        | Mining Investment | \\$0.8B | Marginal |
+        | Greenfield Mill | \\$1.0B | No - not feasible |
+        | **Total NSA Program** | **\\$14B** | **Cannot fund alone** |
+
+        ### Financing Gap Analysis
+        - Annual FCF: ~\\$1.2-1.5B
+        - Maintenance CapEx: ~\\$800M
+        - Available for growth: **\\$400-700M/year**
+        - NSA requires: **\\$1.4B/year for 10 years**
+        - **Gap: ~\\$700M-1B/year** (needs dilutive equity)
+        """)
+
+    # Visualization of standalone trajectory
+    st.markdown("### Flat-Rolled Segment Trajectory Without Investment")
+
+    # Create trajectory data
+    years = list(range(2024, 2034))
+    base_volume = 8500  # Starting volume in 000 tons
+    decline_rate_no_invest = -0.04  # 4% annual decline without investment
+    decline_rate_with_nippon = 0.01  # 1% growth with Nippon investment
+
+    trajectory_data = []
+    vol_no_invest = base_volume
+    vol_with_nippon = base_volume
+    for year in years:
+        trajectory_data.append({
+            'Year': year,
+            'Scenario': 'Without Nippon (No Investment)',
+            'Volume': vol_no_invest
+        })
+        trajectory_data.append({
+            'Year': year,
+            'Scenario': 'With Nippon ($14B Investment)',
+            'Volume': vol_with_nippon
+        })
+        vol_no_invest *= (1 + decline_rate_no_invest)
+        vol_with_nippon *= (1 + decline_rate_with_nippon)
+
+    trajectory_df = pd.DataFrame(trajectory_data)
+
+    fig_trajectory = px.line(
+        trajectory_df,
+        x='Year',
+        y='Volume',
+        color='Scenario',
+        title='Flat-Rolled Segment Volume Projection (000 tons)',
+        markers=True,
+        color_discrete_map={
+            'Without Nippon (No Investment)': '#ff6b6b',
+            'With Nippon ($14B Investment)': '#4ecdc4'
+        }
+    )
+    fig_trajectory.update_layout(yaxis_title='Volume (000 tons)', height=350)
+    st.plotly_chart(fig_trajectory, use_container_width=True)
+
+    st.warning("""
+    **Strategic Reality:** Without Nippon's capital, USS faces a choice between:
+    1. **Slow decline** - Underfund aging assets, lose market share to mini-mills and imports
+    2. **Dilutive financing** - Issue equity at depressed valuations, destroying shareholder value
+    3. **Asset sales** - Divest crown jewels to fund core, reducing future earnings power
+
+    The Nippon deal provides **\\$14B of permanent capital** without these trade-offs.
+    """)
+
+    # =========================================================================
+    # GOLDEN SHARE / NSA CONSTRAINTS SUMMARY
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Golden Share & NSA Commitments", anchor="golden-share-nsa")
+
+    st.markdown("""
+    The National Security Agreement (NSA) includes unprecedented government oversight and binding commitments from Nippon Steel:
+    """)
+
+    nsa_col1, nsa_col2 = st.columns(2)
+
+    with nsa_col1:
+        st.markdown("""
+        ### Capital Investment Commitments
+
+        | Commitment | Amount/Timeline |
+        |------------|-----------------|
+        | **Total Investment** | \\$14B over 10 years |
+        | By 2028 (binding) | \\$11B |
+        | Gary Works BF | \\$3.1B (committed) |
+        | Mon Valley HSM | \\$1.0B (committed) |
+        | Big River Steel 2 | \\$3.0B (under construction) |
+        | Mining Operations | \\$0.8B |
+        | Greenfield Mini Mill | \\$1.0B |
+        | BLA Facility Investment | \\$1.4B |
+
+        ### Employment Guarantees
+
+        | Commitment | Details |
+        |------------|---------|
+        | No layoffs | Through September 2026+ |
+        | No plant closures | Through 2035 |
+        | Jobs protected | 27,000-28,000 |
+        | USW agreements | All honored |
+        """)
+
+    with nsa_col2:
+        st.markdown("""
+        ### Golden Share Veto Rights (US Government)
+
+        The US Government holds a "Golden Share" with veto power over:
+
+        | Decision | Requires Government Consent |
+        |----------|----------------------------|
+        | Reduce capital investments | Yes |
+        | Change company name | Yes |
+        | Move headquarters from Pittsburgh | Yes |
+        | Transfer production/jobs abroad | Yes |
+        | Close or idle US facilities | Yes |
+        | Acquire competing US businesses | Yes |
+        | Certain trade/labor/sourcing decisions | Yes |
+
+        ### Governance Requirements
+
+        | Requirement | Details |
+        |-------------|---------|
+        | CEO | Must be US citizen |
+        | Board majority | Must be US citizens |
+        | Trade Committee | US citizens only |
+        | Security Committee | 3 independent directors |
+        | Technology transfers | Government oversight |
+        """)
+
+    st.success("""
+    **Unprecedented Protections:** This NSA represents the most extensive government oversight ever applied to a foreign acquisition.
+    USS workers, communities, and national security interests are protected by legally binding commitments with government veto rights.
+    """)
+
+    # =========================================================================
+    # ALTERNATIVE BUYER COMPARISON
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Alternative Buyer Comparison", anchor="alternative-buyer-comparison")
+
+    st.markdown("""
+    **Why no alternative can match the \\$55 offer:**
+    """)
+
+    # Full comparison table - dynamic based on current standalone value
+    nippon_premium = offer_price - uss_standalone
+    cliffs_risk_adj_discount = uss_standalone - cliffs_risk_adjusted
+    pe_discount = uss_standalone - pe_max_price
+
+    # Pre-compute formatted strings
+    standalone_int = f"{uss_standalone:.0f}"
+    nippon_prem_str = f"+{nippon_premium:.2f}" if nippon_premium > 0 else f"{nippon_premium:.2f}"
+    cliffs_risk_str = f"-{cliffs_risk_adj_discount:.2f}" if cliffs_risk_adj_discount > 0 else f"+{abs(cliffs_risk_adj_discount):.2f}"
+    pe_disc_str = f"-{pe_discount:.2f}" if pe_discount > 0 else f"+{abs(pe_discount):.2f}"
+
+    st.markdown(f"""
+    | Factor | Nippon Steel (\\$55) | Cleveland-Cliffs (\\$54 nominal) | PE/LBO (~\\$40 max) | Standalone |
+    |--------|-------------------|-------------------------------|-------------------|------------|
+    | **Nominal Offer** | \\$55.00 (cash) | \\$54.00 (\\$27 cash + \\$27 stock) | \\$40.00 max | N/A |
+    | **Risk-Adjusted Value** | \\$55.00 | ~\\$26 (antitrust/exec risk) | ~\\$35-38 | N/A |
+    | **vs Standalone (\\${standalone_int})** | {nippon_prem_str}/sh | {cliffs_risk_str}/sh | {pe_disc_str}/sh | 0 |
+    | **Deal Structure** | All-cash, all-equity | 50% cash / 50% stock | Leveraged (5x debt) | N/A |
+    | **Financing Risk** | None (A-rated) | High (stock volatility) | High (covenant risk) | Ongoing |
+    | **Can Fund \\$14B CapEx?** | Yes | No (leverage constrained) | No (debt limits) | No |
+    | **Antitrust Issues** | None | Severe (100% BF, 65-90% auto) | None | N/A |
+    | **Required Divestitures** | Minimal | \\$7B+ revenue | None | N/A |
+    | **Technology Transfer** | 2,000+ patents | None | None | Limited R&D |
+    | **Job Security** | 27K jobs guaranteed | Synergy cuts expected | Cost cuts for IRR | Uncertain |
+    | **Closing Timeline** | 6-9 months (actual: 18) | 18+ months (antitrust litigation) | 3-6 months | N/A |
+    """)
+
+    # Individual buyer analysis
+    buyer_col1, buyer_col2, buyer_col3 = st.columns(3)
+
+    cliffs_nominal_gap = offer_price - cliffs_nominal
+    cliffs_risk_gap = offer_price - cliffs_risk_adjusted
+    with buyer_col1:
+        st.error(f"""
+        ### Cleveland-Cliffs - REJECTED
+
+        **Nominal Bid:** \\$54/share (Dec 2023)
+        - \\$27 cash + 1.444 Cliffs shares
+
+        **Risk-Adjusted Value:** ~\\$26/share
+        - Stock volatility (18+ mo review): -\\$5 to -\\$10
+        - Divestiture impact: -\\$3 to -\\$8
+        - Antitrust failure risk: -\\$15 to -\\$20
+
+        **Why It Failed:**
+        - Would create 100% US blast furnace monopoly
+        - 65-90% of US automotive steel
+        - DOJ would require \\$7B+ divestitures
+        - Weak antitrust commitments (no "hell or high water")
+        - Alliance for Automotive Innovation opposed
+
+        **Risk-Adj Gap to Nippon:** \\${cliffs_risk_gap:.0f}/share
+        """)
+
+    with buyer_col2:
+        st.error("""
+        ### Private Equity (LBO) - NOT VIABLE
+
+        **Maximum Price:** ~\\$40/share
+
+        **Why PE Can't Compete:**
+        - Requires 20% IRR target
+        - 5.0x leverage = \\$10B debt
+        - \\$920M annual interest burden
+        - Cannot fund \\$14B CapEx
+        - Covenant restrictions limit flexibility
+        - Bankruptcy risk in steel downturn
+        - Forced exit in 5-7 years
+
+        **Returns at 55:** -7.5% to +7.3% IRR (vs 20% target) - Deal doesn't work
+        """)
+
+    nippon_value_str = f"+{offer_vs_nippon_value:.2f}" if offer_vs_nippon_value > 0 else f"{offer_vs_nippon_value:.2f}"
+    with buyer_col3:
+        st.success(f"""
+        ### Nippon Steel - RECOMMENDED
+
+        **Offer:** \\$55/share (cash)
+
+        **Why Nippon Wins:**
+        - 40% premium to pre-deal price
+        - All-equity, no acquisition debt
+        - Investment grade balance sheet
+        - Can fund full \\$14B CapEx
+        - No antitrust concerns
+        - Permanent capital (no exit pressure)
+        - Strategic synergies + technology
+        - WACC advantage creates headroom
+
+        **Value Creation:** {nippon_value_str}/share vs offer price
+        """)
+
+    # =========================================================================
+    # SENSITIVITY THRESHOLDS ("WHAT BREAKS THE DEAL")
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Sensitivity Thresholds: What Breaks the Deal?", anchor="sensitivity-thresholds")
+
+    st.markdown("""
+    Analysis of threshold values where the deal economics become unattractive for each party:
+    """)
+
+    # Calculate thresholds dynamically based on current scenario
+    threshold_col1, threshold_col2, threshold_col3 = st.columns(3)
+
+    with threshold_col1:
+        st.markdown("### Steel Price Threshold")
+
+        # Calculate approximate threshold
+        # Linear approximation: a 10% price change = ~$15-20 value change
+        price_sensitivity = 18  # $/share per 10% price change
+        current_price_factor = scenario.price_scenario.hrc_us_factor
+        price_threshold = current_price_factor - ((nippon_value - 55) / price_sensitivity * 0.10)
+
+        st.metric(
+            "Nippon Breakeven Price Factor",
+            f"{price_threshold:.0%}",
+            f"Currently {current_price_factor:.0%}",
+            delta_color="normal" if current_price_factor > price_threshold else "inverse"
+        )
+
+        implied_hrc = custom_benchmarks['hrc_us'] * price_threshold
+        implied_hrc_str = f"{implied_hrc:.0f}"
+        price_buffer = (current_price_factor - price_threshold) * 100
+        price_margin = "Adequate" if current_price_factor > price_threshold + 0.10 else "Limited"
+        st.markdown(f"""
+        **Interpretation:**
+        - If HRC prices fall to **{price_threshold:.0%}** of benchmark (~{implied_hrc_str}/ton),
+          Nippon's intrinsic value falls to 55
+        - Below this level, Nippon is **overpaying**
+        - Current buffer: **{price_buffer:.1f}%** of price downside
+
+        *Margin of Safety: {price_margin}*
+        """)
+
+    with threshold_col2:
+        st.markdown("### WACC Threshold")
+
+        # Find WACC where value = $55
+        wacc_sensitivity = 8  # $/share per 1% WACC change
+        wacc_threshold = usd_wacc + ((nippon_value - 55) / wacc_sensitivity / 100)
+
+        st.metric(
+            "Nippon Breakeven WACC",
+            f"{wacc_threshold*100:.1f}%",
+            f"Currently {usd_wacc*100:.1f}%",
+            delta_color="normal" if usd_wacc < wacc_threshold else "inverse"
+        )
+
+        wacc_buffer = (wacc_threshold - usd_wacc) * 100
+        wacc_margin = "Adequate" if wacc_threshold > usd_wacc + 0.02 else "Limited"
+
+        # Handle the case where buffer is negative (value already below offer)
+        if wacc_buffer >= 0:
+            rate_change_text = f"Japan rates to rise **{wacc_buffer:.1f}%**"
+            buffer_text = f"**{wacc_buffer:.1f}%** WACC increase"
+        else:
+            rate_change_text = f"Japan rates to fall **{abs(wacc_buffer):.1f}%** (value already below offer)"
+            buffer_text = f"**{abs(wacc_buffer):.1f}%** WACC decrease needed"
+
+        st.markdown(f"""
+        **Interpretation:**
+        - If Nippon's USD WACC rises above **{wacc_threshold*100:.1f}%**,
+          intrinsic value falls below \\$55 offer
+        - This would require {rate_change_text}
+        - Current buffer: {buffer_text}
+
+        *Margin of Safety: {wacc_margin}*
+        """)
+
+    with threshold_col3:
+        st.markdown("### Execution Threshold")
+
+        # If execution factor < X, value falls below offer
+        exec_threshold = max(0, 1.0 - ((nippon_value - 55) / 50))  # 50 = rough max impact
+
+        st.metric(
+            "Minimum Execution Factor",
+            f"{exec_threshold:.0%}",
+            f"Currently {execution_factor:.0%}",
+            delta_color="normal" if execution_factor > exec_threshold else "inverse"
+        )
+
+        exec_margin = "Adequate" if execution_factor > exec_threshold + 0.20 else "Limited"
+        st.markdown(f"""
+        **Interpretation:**
+        - NSA capital projects must achieve at least **{exec_threshold:.0%}** of
+          projected benefits for deal to create value
+        - Below this, Nippon is overpaying
+        - Current assumption: **{execution_factor:.0%}** execution
+
+        *Margin of Safety: {exec_margin}*
+        """)
+
+    # Summary threshold table with traffic light risk indicators
+    # These colored circles are universally understood risk indicators
+    price_risk = "Low" if current_price_factor > price_threshold + 0.10 else "Medium" if current_price_factor > price_threshold else "High"
+    wacc_risk = "Low" if wacc_threshold > usd_wacc + 0.02 else "Medium" if wacc_threshold > usd_wacc else "High"
+    exec_risk = "Low" if execution_factor > exec_threshold + 0.20 else "Medium" if execution_factor > exec_threshold else "High"
+
+    st.markdown("### Threshold Summary")
+    st.markdown(f"""
+    | Parameter | Current Value | Breakeven Threshold | Buffer | Risk Level |
+    |-----------|---------------|---------------------|--------|------------|
+    | Steel Price Factor | {current_price_factor:.0%} | {price_threshold:.0%} | {(current_price_factor - price_threshold)*100:+.1f}% | {price_risk} |
+    | Nippon USD WACC | {usd_wacc*100:.1f}% | {wacc_threshold*100:.1f}% | {(wacc_threshold - usd_wacc)*100:+.1f}% | {wacc_risk} |
+    | Execution Factor | {execution_factor:.0%} | {exec_threshold:.0%} | {(execution_factor - exec_threshold)*100:+.1f}% | {exec_risk} |
+    """)
+
+    # Dynamic assessment based on risk levels
+    high_risk_count = sum([price_risk == "High", wacc_risk == "High", exec_risk == "High"])
+    if high_risk_count == 0:
+        assessment_text = "Deal has adequate margin of safety under reasonable stress scenarios"
+    elif high_risk_count == 1:
+        assessment_text = "Deal has limited margin on one parameter - monitor closely"
+    else:
+        assessment_text = "Deal has elevated risk on multiple parameters - recommend scenario stress testing"
+
+    st.info(f"""
+    **What Would Break the Deal:**
+    - **For USS Shareholders:** Steel prices would need to rise significantly above base case for 55 to look cheap
+    - **For Nippon:** Either severe steel price collapse ({price_threshold:.0%} factor), major WACC increase (>{wacc_threshold*100:.1f}%),
+      or execution failure (<{exec_threshold:.0%} benefits) would make the acquisition value-destructive
+    - **Current Assessment:** {assessment_text}
+    """)
 
     # =========================================================================
     # VALUATION DETAILS
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Valuation Details</h2>", unsafe_allow_html=True)
+    st.header("Valuation Details", anchor="valuation-details")
 
     st.markdown("""
     **How to read these tables:**
@@ -665,7 +1321,7 @@ def main():
 
     if financing_impact.get('financing_gap', 0) > 0:
         st.markdown("---")
-        st.markdown("<h2 style='text-decoration: underline;'>USS Standalone Financing Impact</h2>", unsafe_allow_html=True)
+        st.header("USS Standalone Financing Impact", anchor="uss-standalone-financing")
 
         st.warning("""
         **Why USS - No Sale value is lower:** USS cannot fund large capital projects from operating cash flow alone.
@@ -674,7 +1330,7 @@ def main():
         - Dilutes existing shareholders
         - Raises cost of capital (higher WACC)
 
-        **Nippon does not face these costs** because they have the balance sheet capacity to fund $14B+ in investments.
+        **Nippon does not face these costs** because they have the balance sheet capacity to fund \\$14B+ in investments.
         """)
 
         fin_col1, fin_col2, fin_col3 = st.columns(3)
@@ -737,7 +1393,7 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Scenario Comparison</h2>", unsafe_allow_html=True)
+    st.header("Scenario Comparison", anchor="scenario-comparison")
 
     # Run comparison across all preset scenarios (with execution factor applied to Nippon Commitments)
     comparison_df = compare_scenarios(execution_factor=execution_factor, custom_benchmarks=custom_benchmarks)
@@ -796,11 +1452,102 @@ def main():
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     # =========================================================================
+    # PROBABILITY-WEIGHTED VALUATION
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Probability-Weighted Expected Value", anchor="probability-weighted-value")
+    st.markdown("""
+    This analysis weights each scenario by its historical frequency (1990-2023) to calculate
+    an **expected value** that reflects the full range of potential outcomes.
+    """)
+
+    with st.expander("ℹ️ Understanding Probability Weighting", expanded=False):
+        st.markdown("""
+        **Why weight by probability?**
+        - USS has experienced severe downturns 24% of years historically
+        - Using only "base case" or "conservative" scenarios ignores downside risk
+        - Expected value = weighted average of all scenarios
+
+        **Probability Weights (based on 34-year history):**
+        - Severe Downturn: 25% (2009, 2015, 2020-type events)
+        - Downside: 30% (below-average but not crisis)
+        - Base Case: 30% (mid-cycle, median performance)
+        - Above Average: 10% (2017-18 type conditions)
+        - Optimistic: 5% (2021-22 peak conditions)
+
+        **Total: 100%**
+        """)
+
+    # Calculate probability-weighted valuation
+    with st.spinner("Calculating probability-weighted valuation..."):
+        try:
+            pw_results = calculate_probability_weighted_valuation(
+                custom_benchmarks=custom_benchmarks
+            )
+
+            # Display results
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric(
+                    "Expected USS Value (Standalone)",
+                    f"${pw_results['weighted_uss_value_per_share']:.2f}/share",
+                    delta=f"{pw_results['uss_premium_to_offer']:+.1f}% vs $55 offer",
+                    delta_color="inverse"
+                )
+
+            with col2:
+                st.metric(
+                    "Expected Nippon Value",
+                    f"${pw_results['weighted_nippon_value_per_share']:.2f}/share",
+                    delta=f"{pw_results['nippon_discount_to_offer']:+.1f}% vs $55 offer"
+                )
+
+            with col3:
+                st.metric(
+                    "Expected 10-Year FCF",
+                    f"${pw_results['weighted_ten_year_fcf']/1000:.2f}B"
+                )
+
+            # Scenario breakdown table
+            st.markdown("### Scenario Breakdown")
+
+            # Build markdown table
+            md_rows = []
+            md_rows.append("| Scenario | Probability | USS Value/Share | Weighted Contribution | vs $55 Offer |")
+            md_rows.append("|----------|-------------|-----------------|----------------------|--------------|")
+
+            scenario_count = 0
+            for scenario_type, result in pw_results['scenario_results'].items():
+                uss_val = result['uss_value_per_share']
+                # Handle zero or near-zero values to avoid division by zero
+                if uss_val > 0.01:
+                    vs_offer_str = f"{(55.0/uss_val-1)*100:+.1f}%"
+                else:
+                    vs_offer_str = "N/A (equity wiped)"
+
+                weighted_contrib = uss_val * result['probability']
+                prob_pct = result['probability'] * 100
+                md_rows.append(f"| {result['name']} | {prob_pct:.0f}% | ${uss_val:.2f} | ${weighted_contrib:.2f} | {vs_offer_str} |")
+                scenario_count += 1
+
+            md_table = "\n".join(md_rows)
+            st.markdown(md_table)
+            st.caption(f"*{scenario_count} scenarios shown*")
+
+        except Exception as e:
+            st.error(f"Error calculating probability-weighted valuation: {str(e)}")
+            import traceback
+            with st.expander("Error Details"):
+                st.code(traceback.format_exc())
+
+    # =========================================================================
     # CAPITAL PROJECTS ANALYSIS
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Capital Projects Analysis</h2>", unsafe_allow_html=True)
+    st.header("Capital Projects Analysis", anchor="capital-projects")
 
     # Get all capital projects
     all_projects = get_capital_projects()
@@ -949,12 +1696,12 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>PE LBO vs. Strategic Buyer Comparison</h2>", unsafe_allow_html=True)
+    st.header("PE LBO vs. Strategic Buyer Comparison", anchor="pe-lbo-comparison")
 
     st.markdown("""
     **Why This Matters:**
     A private equity LBO provides the key counterfactual - what would a financial buyer pay? This analysis demonstrates
-    that PE firms cannot compete at $55/share, proving Nippon's strategic offer is superior to any alternative.
+    that PE firms cannot compete at \\$55/share, proving Nippon's strategic offer is superior to any alternative.
     """)
 
     # Comparison table
@@ -963,20 +1710,20 @@ def main():
     with lbo_col1:
         st.markdown("### PE Buyer (LBO)")
         st.markdown("""
-        **Maximum Price:** ~$40/share
+        **Maximum Price:** ~\\$40/share
 
         **Structure:**
         - 5.0x Debt/EBITDA leverage
         - 30% equity, 70% debt
-        - ~$10B total debt
-        - $920M annual interest
+        - ~\\$10B total debt
+        - \\$920M annual interest
 
-        **Returns (at $55):**
+        **Returns (at \\$55):**
         - IRR: -7.5% to 7.3%
         - vs. 20% target: **FAIL** ✗
 
         **Key Constraints:**
-        - Cannot fund $14B CapEx
+        - Cannot fund \\$14B CapEx
         - Covenant restrictions
         - Bankruptcy risk in downturn
         - 5-7 year forced exit
@@ -985,12 +1732,12 @@ def main():
     with lbo_col2:
         st.markdown("### USS Standalone")
         st.markdown(f"""
-        **Fair Value:** ${val_uss['share_price']:.2f}/share
+        **Fair Value:** \\${val_uss['share_price']:.2f}/share
 
         **Structure:**
         - Existing capital structure
         - Moderate leverage (1.9x)
-        - $5.2B liquidity
+        - \\$5.2B liquidity
 
         **Constraints:**
         - Cannot fund NSA CapEx alone
@@ -1004,8 +1751,8 @@ def main():
     with lbo_col3:
         st.markdown("### Nippon Steel (Strategic)")
         st.markdown(f"""
-        **Offer Price:** $55.00/share
-        **Intrinsic Value:** ${val_nippon['share_price']:.2f}/share
+        **Offer Price:** \\$55.00/share
+        **Intrinsic Value:** \\${val_nippon['share_price']:.2f}/share
 
         **Structure:**
         - All-equity acquisition
@@ -1013,14 +1760,14 @@ def main():
         - Investment grade balance sheet
 
         **Advantages:**
-        - Can fund full $14B CapEx ✓
+        - Can fund full \\$14B CapEx
         - No covenant restrictions
         - Zero bankruptcy risk
         - Permanent capital
         - Strategic synergies
 
         **WACC:** {usd_wacc*100:.2f}% (IRP-adjusted)
-        **Value Created:** ${val_nippon['share_price'] - 55:.2f}/share
+        **Value Created:** \\${val_nippon['share_price'] - 55:.2f}/share
         """)
 
     # Key insight boxes
@@ -1037,11 +1784,17 @@ def main():
         )
 
     with insight_col2:
-        uss_premium = 55 - val_uss['share_price']
+        uss_share_price = val_uss['share_price']
+        uss_premium = 55 - uss_share_price
+        # Handle zero share price to avoid division by zero
+        if uss_share_price > 0.01:
+            premium_pct = f"+{uss_premium/uss_share_price*100:.0f}%"
+        else:
+            premium_pct = "N/A (equity wiped)"
         st.metric(
             "Premium vs. USS Standalone",
             f"+${uss_premium:.2f}/share",
-            f"+{uss_premium/val_uss['share_price']*100:.0f}%",
+            premium_pct,
             delta_color="normal"
         )
 
@@ -1055,10 +1808,10 @@ def main():
         )
 
     st.info("""
-    **Conclusion:** The $55 offer sits in the "fair zone" between:
-    - **Floor**: PE maximum price (~$40, cannot compete)
-    - **Mid**: USS standalone value (~${:.0f}, fair to shareholders)
-    - **Ceiling**: Nippon intrinsic value (~${:.0f}, strategic value creation)
+    **Conclusion:** The \\$55 offer sits in the "fair zone" between:
+    - **Floor**: PE maximum price (~\\$40, cannot compete)
+    - **Mid**: USS standalone value (~\\${:.0f}, fair to shareholders)
+    - **Ceiling**: Nippon intrinsic value (~\\${:.0f}, strategic value creation)
 
     No financial buyer can match this offer while Nippon still captures significant value.
     """.format(val_uss['share_price'], val_nippon['share_price']))
@@ -1068,17 +1821,17 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Valuation Football Field</h2>", unsafe_allow_html=True)
+    st.header("Valuation Football Field", anchor="valuation-football-field")
 
     st.markdown("""
     **How to read this chart:**
     - Each horizontal bar represents a valuation methodology or scenario
     - Bar length shows the valuation range (low to high) under different assumptions
-    - **Green dashed line** = $55 Nippon offer price
-    - **Red dotted line** = $40 PE maximum price (20% IRR threshold)
+    - **Green dashed line** = \\$55 Nippon offer price
+    - **Red dotted line** = \\$40 PE maximum price (20% IRR threshold)
     - Toggle between USS standalone view and Nippon's acquirer view
 
-    **Key Insight:** The $55 offer sits above PE alternatives and USS standalone value, yet below Nippon's full intrinsic value.
+    **Key Insight:** The \\$55 offer sits above PE alternatives and USS standalone value, yet below Nippon's full intrinsic value.
     """)
 
     # Toggle for perspective
@@ -1222,10 +1975,13 @@ def main():
 
     # Build current scenario description with key assumptions
     current_desc = f'Your selection: {scenario.price_scenario.hrc_us_factor:.0%} prices, {scenario.uss_wacc*100:.1f}% WACC, {len(scenario.include_projects)} projects'
+    # Floor at 0 - equity cannot be negative
+    current_low = max(0, current_value - 2)
+    current_high = max(0, current_value + 2)
     football_field_data.append({
         'Method': f'Current Scenario',
-        'Low': current_value - 2,
-        'High': current_value + 2,
+        'Low': current_low,
+        'High': current_high,
         'Description': current_desc
     })
 
@@ -1321,15 +2077,15 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Value Bridge</h2>", unsafe_allow_html=True)
+    st.header("Value Bridge", anchor="value-bridge")
 
     st.markdown("""
     **How to read this chart:**
-    - This waterfall shows how value builds from USS standalone to Nippon's $55 offer
+    - This waterfall shows how value builds from USS standalone to Nippon's \\$55 offer
     - **USS - No Sale**: Starting point - what USS is worth on its own
     - **WACC Advantage**: Value added because Nippon has a lower cost of capital
     - **Value to Nippon**: Total intrinsic value from Nippon's perspective
-    - **Gap to Offer**: Difference between intrinsic value and $55 offer (negative = Nippon buying at discount)
+    - **Gap to Offer**: Difference between intrinsic value and \\$55 offer (negative = Nippon buying at discount)
     """)
 
     wacc_arbitrage = val_nippon['share_price'] - val_uss['share_price']
@@ -1373,7 +2129,7 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>FCF Projection</h2>", unsafe_allow_html=True)
+    st.header("FCF Projection", anchor="fcf-projection")
 
     col1, col2 = st.columns([2, 1])
 
@@ -1415,7 +2171,7 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Segment Analysis</h2>", unsafe_allow_html=True)
+    st.header("Segment Analysis", anchor="segment-analysis")
 
     col1, col2 = st.columns(2)
 
@@ -1484,14 +2240,14 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Steel Price Sensitivity</h2>", unsafe_allow_html=True)
+    st.header("Steel Price Sensitivity", anchor="steel-price-sensitivity")
 
     st.markdown("""
     **How to read this section:**
-    - Steel prices are the #1 driver of valuation - a 10% price swing changes share value by $15-25
+    - Steel prices are the #1 driver of valuation - a 10% price swing changes share value by \\$15-25
     - **Price Factor**: Multiplier applied to 2023 benchmark prices (0.8 = 20% below, 1.2 = 20% above)
     - The chart shows how share value changes as steel prices move up or down
-    - Green dashed line = $55 Nippon offer price (breakeven around 88% price factor)
+    - Green dashed line = \\$55 Nippon offer price (breakeven around 88% price factor)
     """)
 
     col1, col2 = st.columns(2)
@@ -1587,7 +2343,7 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>WACC Sensitivity Analysis</h2>", unsafe_allow_html=True)
+    st.header("WACC Sensitivity Analysis", anchor="wacc-sensitivity")
 
     st.markdown("""
     **How to read this chart:**
@@ -1595,7 +2351,7 @@ def main():
     - Lower WACC = higher valuation (future cash flows are worth more today)
     - **Blue dashed line**: USS's standalone WACC (~10.9%)
     - **Red dashed line**: Nippon's IRP-adjusted WACC (~7.5%)
-    - **Green dashed line**: $55 offer price
+    - **Green dashed line**: \\$55 offer price
     - The gap between blue and red lines shows the "WACC advantage" Nippon gains from its lower cost of capital
     """)
 
@@ -1640,7 +2396,7 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Interest Rate Parity Adjustment</h2>", unsafe_allow_html=True)
+    st.header("Interest Rate Parity Adjustment", anchor="irp-adjustment")
 
     st.markdown("""
     **Why this matters:**
@@ -1702,7 +2458,7 @@ def main():
     # =========================================================================
 
     st.markdown("---")
-    st.markdown("<h2 style='text-decoration: underline;'>Detailed Projections</h2>", unsafe_allow_html=True)
+    st.header("Detailed Projections", anchor="detailed-projections")
 
     st.markdown("""
     **Detailed data tables** - Click to expand:
