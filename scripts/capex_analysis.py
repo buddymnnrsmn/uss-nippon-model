@@ -58,8 +58,12 @@ def analyze_capex():
 
         print(f"\n10-Year CapEx Breakdown:")
         print(f"  Total CapEx:           ${total_capex:,.0f}M")
-        print(f"  Maintenance CapEx:     ${maintenance_capex:,.0f}M ({maintenance_capex/total_capex*100:.1f}%)")
-        print(f"  Project CapEx:         ${project_capex:,.0f}M ({project_capex/total_capex*100:.1f}%)")
+        if total_capex > 0:
+            print(f"  Maintenance CapEx:     ${maintenance_capex:,.0f}M ({maintenance_capex/total_capex*100:.1f}%)")
+            print(f"  Project CapEx:         ${project_capex:,.0f}M ({project_capex/total_capex*100:.1f}%)")
+        else:
+            print(f"  Maintenance CapEx:     ${maintenance_capex:,.0f}M (N/A)")
+            print(f"  Project CapEx:         ${project_capex:,.0f}M (N/A)")
 
         # Show annual CapEx by year
         print(f"\nAnnual CapEx by Year:")

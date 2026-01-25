@@ -108,7 +108,11 @@ def analyze_breakup_fee():
     print(f"  Expected Value:         ${standalone_expected:.2f}/share")
 
     spread = expected_value - standalone_expected
-    print(f"\nDeal Premium:             ${spread:.2f}/share ({spread/standalone_expected*100:+.1f}%)")
+    if abs(standalone_expected) > 0.01:
+        premium_pct = f"{spread/standalone_expected*100:+.1f}%"
+    else:
+        premium_pct = "N/A (standalone near zero)"
+    print(f"\nDeal Premium:             ${spread:.2f}/share ({premium_pct})")
 
     if spread > 0:
         print(f"\nRecommendation: ACCEPT DEAL (${expected_value:.2f} > ${standalone_expected:.2f})")

@@ -65,13 +65,17 @@ The dashboard will open in your browser at `http://localhost:8501`
 
 ### Scenarios Modeled
 
-| Scenario | Description | USS Value |
-|----------|-------------|-----------|
-| Base Case | Mid-cycle pricing, BR2 only | $50/share |
-| Conservative | Downside stress test | $25/share |
-| Wall Street | Barclays/Goldman consensus | $34/share |
-| Management | December 2023 projections | $38/share |
-| Nippon Commitments | Full $14B investment program | $69/share |
+| Scenario | Steel Prices | WACC | Key Assumptions | Probability | USS Value |
+|----------|-------------|------|-----------------|-------------|-----------|
+| **Severe Downturn** | 0.68x | 13.5% | Recession: 2009/2015/2020 conditions | 25% | $5/share |
+| **Downside** | 0.85x | 12.0% | Weak markets, import pressure | 30% | $25/share |
+| **Base Case** | 0.88x | 10.9% | Mid-cycle, historical median | 30% | $16/share |
+| **Above Average** | 0.95x | 10.9% | Strong cycle like 2017-18 | 10% | $50/share |
+| **Optimistic** | 0.92x | 10.9% | Peak cycle: 2021-22 conditions | 5% | $38/share |
+| Wall Street | 0.92x | 12.5% | Barclays/Goldman assumptions | - | $34/share |
+| Nippon Case | 0.95x | 10.5% | $14B CapEx, all 6 projects | - | $69/share |
+
+**Probability-Weighted Expected Value: $23.91/share** (vs $55 Nippon offer = +130% premium)
 
 ### Valuation Methodology
 - 10-year explicit DCF forecast (2024-2033)

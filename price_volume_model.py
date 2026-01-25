@@ -33,12 +33,17 @@ class Segment(Enum):
 
 
 class ScenarioType(Enum):
+    SEVERE_DOWNTURN = "Severe Downturn"
+    DOWNSIDE = "Downside"
     BASE_CASE = "Base Case"
-    CONSERVATIVE = "Conservative"
+    ABOVE_AVERAGE = "Above Average"
     WALL_STREET = "Wall Street Consensus"
-    MANAGEMENT = "Management"
+    OPTIMISTIC = "Optimistic"
     NIPPON_COMMITMENTS = "NSA Mandated CapEx"
     CUSTOM = "Custom"
+    # Legacy names for backward compatibility
+    CONSERVATIVE = "Downside"  # Alias for DOWNSIDE
+    MANAGEMENT = "Optimistic"  # Alias for OPTIMISTIC
 
 
 # Steel price benchmarks ($/ton) - 2023 actuals
@@ -184,6 +189,9 @@ class ModelScenario:
     # Capital projects to include
     include_projects: List[str] = field(default_factory=list)
 
+    # Probability weight for probability-weighted valuation (0.0-1.0)
+    probability_weight: float = 0.0
+
     # Financing assumptions for USS standalone (used when calculating "USS - No Sale" value)
     financing: FinancingAssumptions = field(default_factory=FinancingAssumptions)
 
@@ -302,107 +310,265 @@ def get_nippon_price_scenario() -> SteelPriceScenario:
     )
 
 
+def get_severe_downturn_price_scenario() -> SteelPriceScenario:
+    """Severe downturn: Historical recession levels (2009, 2015, 2020)"""
+    return SteelPriceScenario(
+        name="Severe Downturn Pricing",
+        description="Historical recession levels (2009, 2015, 2020)",
+        hrc_us_factor=0.68,      # -32% from benchmark
+        crc_us_factor=0.68,
+        coated_us_factor=0.70,
+        hrc_eu_factor=0.65,      # EU hit harder
+        octg_factor=0.50,        # Oil crash correlation
+        annual_price_growth=-0.02  # -2% deflation
+    )
+
+
+def get_severe_downturn_volume_scenario() -> VolumeScenario:
+    """Severe downturn: Demand collapse -15% to -25% across segments"""
+    return VolumeScenario(
+        name="Severe Downturn Volumes",
+        description="Demand collapse: -15% to -25% across segments",
+        flat_rolled_volume_factor=0.80,  # -20% volume
+        mini_mill_volume_factor=0.85,    # -15% (more resilient)
+        usse_volume_factor=0.75,         # -25% (EU exposure)
+        tubular_volume_factor=0.70,      # -30% (oil correlation)
+        flat_rolled_growth_adj=-0.03,    # -3% annual decline
+        mini_mill_growth_adj=-0.02,
+        usse_growth_adj=-0.04,
+        tubular_growth_adj=-0.05
+    )
+
+
+def get_true_base_case_price_scenario() -> SteelPriceScenario:
+    """Mid-cycle pricing: Historical median steel prices"""
+    return SteelPriceScenario(
+        name="Mid-Cycle Pricing",
+        description="Historical median steel prices",
+        hrc_us_factor=0.88,      # Closer to historical average
+        crc_us_factor=0.88,
+        coated_us_factor=0.90,
+        hrc_eu_factor=0.85,
+        octg_factor=0.80,
+        annual_price_growth=0.01  # 1% inflation
+    )
+
+
+def get_true_base_case_volume_scenario() -> VolumeScenario:
+    """Mid-cycle volumes: Historical average utilization"""
+    return VolumeScenario(
+        name="Mid-Cycle Volumes",
+        description="Historical average utilization",
+        flat_rolled_volume_factor=0.92,  # Modest decline from 2023
+        mini_mill_volume_factor=0.98,
+        usse_volume_factor=0.90,
+        tubular_volume_factor=0.95,
+        flat_rolled_growth_adj=-0.005,
+        mini_mill_growth_adj=0.005,
+        usse_growth_adj=-0.005,
+        tubular_growth_adj=0.00
+    )
+
+
 def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
     """Return all pre-built scenario configurations
 
-    Key scenarios calibrated to actual data:
-    - Management: December 2023 projections used by Barclays/Goldman (HRC $700-750)
-    - Nippon Commitments: $14B NSA investment program with $2.5B incremental EBITDA
+    Scenarios calibrated to historical data (1990-2023):
+    - Severe Downturn: 0-25th percentile (historical frequency: 24%)
+    - Downside: 25-40th percentile (historical frequency: 30%)
+    - Base Case: 50th percentile - median (historical frequency: 30%)
+    - Above Average: 75-90th percentile (historical frequency: 10%)
+    - Optimistic: 90th+ percentile (historical frequency: 5%)
+    - Wall Street: Analyst consensus (reference only, no probability weight)
+    - Nippon Commitments: $14B NSA investment program (reference only)
     """
 
     return {
+        ScenarioType.SEVERE_DOWNTURN: ModelScenario(
+            name="Severe Downturn (Historical Crisis)",
+            scenario_type=ScenarioType.SEVERE_DOWNTURN,
+            description="Recession scenario: 2009/2015/2020 conditions",
+            price_scenario=get_severe_downturn_price_scenario(),
+            volume_scenario=get_severe_downturn_volume_scenario(),
+            uss_wacc=0.135,           # 13.5% (distress premium)
+            terminal_growth=0.005,    # 0.5% (mature/declining)
+            exit_multiple=3.5,        # Low exit multiple
+            us_10yr=0.0425,
+            japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0575,  # Higher risk in downturn
+            nippon_credit_spread=0.0125,
+            nippon_debt_ratio=0.35,
+            nippon_tax_rate=0.30,
+            include_projects=[],      # No capex in severe downturn
+            probability_weight=0.25   # 25% probability
+        ),
+
+        ScenarioType.DOWNSIDE: ModelScenario(
+            name="Downside (Weak Markets)",
+            scenario_type=ScenarioType.DOWNSIDE,
+            description="Below-average cycle: soft demand, import pressure",
+            price_scenario=get_conservative_price_scenario(),
+            volume_scenario=get_conservative_volume_scenario(),
+            uss_wacc=0.12,
+            terminal_growth=0.01,
+            exit_multiple=4.0,
+            us_10yr=0.045,
+            japan_10yr=0.01,
+            nippon_equity_risk_premium=0.05,
+            nippon_credit_spread=0.01,
+            nippon_debt_ratio=0.35,
+            nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.30   # 30% probability
+        ),
+
         ScenarioType.BASE_CASE: ModelScenario(
-            name="Base Case",
+            name="Base Case (Mid-Cycle)",
             scenario_type=ScenarioType.BASE_CASE,
-            description="Mid-cycle pricing, modest growth, limited investment capacity",
-            price_scenario=get_base_price_scenario(),
+            description="Historical median: normalized steel markets",
+            price_scenario=get_true_base_case_price_scenario(),
+            volume_scenario=get_true_base_case_volume_scenario(),
+            uss_wacc=0.109,
+            terminal_growth=0.01,
+            exit_multiple=4.5,
+            us_10yr=0.0425,
+            japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0475,
+            nippon_credit_spread=0.0075,
+            nippon_debt_ratio=0.35,
+            nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.30   # 30% probability
+        ),
+
+        ScenarioType.ABOVE_AVERAGE: ModelScenario(
+            name="Above Average (Strong Cycle)",
+            scenario_type=ScenarioType.ABOVE_AVERAGE,
+            description="Strong markets: 2017-2018 conditions",
+            price_scenario=get_base_price_scenario(),  # Old base = 0.95x
             volume_scenario=VolumeScenario(
-                name="Base Case Volumes",
-                description="Modest growth, constrained by limited FCF for investment",
-                flat_rolled_volume_factor=0.98,  # Slight decline
+                name="Above Average Volumes",
+                description="Modest growth, good market conditions",
+                flat_rolled_volume_factor=0.98,
                 mini_mill_volume_factor=1.0,
                 usse_volume_factor=0.98,
                 tubular_volume_factor=1.0,
-                flat_rolled_growth_adj=-0.01,  # Gradual decline
-                mini_mill_growth_adj=0.01,  # Modest share gains
+                flat_rolled_growth_adj=-0.01,
+                mini_mill_growth_adj=0.01,
                 usse_growth_adj=-0.005,
                 tubular_growth_adj=0.005
             ),
             uss_wacc=0.109,
-            terminal_growth=0.01,  # Mature industry, minimal growth
-            exit_multiple=4.5,  # Lower multiple for limited growth
+            terminal_growth=0.01,
+            exit_multiple=5.0,
             us_10yr=0.0425,
             japan_10yr=0.0075,
-            nippon_equity_risk_premium=0.0475,  # 4.75% equity risk premium over JGB
-            nippon_credit_spread=0.0075,  # 0.75% credit spread over JGB
+            nippon_equity_risk_premium=0.0475,
+            nippon_credit_spread=0.0075,
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
-            include_projects=['BR2 Mini Mill']  # BR2 is committed/in-progress
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.10   # 10% probability
         ),
 
+        # Keep CONSERVATIVE as alias for backward compatibility
         ScenarioType.CONSERVATIVE: ModelScenario(
-            name="Conservative",
-            scenario_type=ScenarioType.CONSERVATIVE,
-            description="Downside protection - weak steel markets, higher WACC",
+            name="Downside (Weak Markets)",
+            scenario_type=ScenarioType.DOWNSIDE,
+            description="Below-average cycle: soft demand, import pressure",
             price_scenario=get_conservative_price_scenario(),
             volume_scenario=get_conservative_volume_scenario(),
             uss_wacc=0.12,
-            terminal_growth=0.01,  # 1% terminal growth
-            exit_multiple=4.5,
+            terminal_growth=0.01,
+            exit_multiple=4.0,
             us_10yr=0.045,
             japan_10yr=0.01,
-            nippon_equity_risk_premium=0.05,  # 5% equity risk premium over JGB
-            nippon_credit_spread=0.01,  # 1% credit spread over JGB
+            nippon_equity_risk_premium=0.05,
+            nippon_credit_spread=0.01,
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
-            include_projects=['BR2 Mini Mill']
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.30
         ),
 
         ScenarioType.WALL_STREET: ModelScenario(
             name="Wall Street Consensus",
             scenario_type=ScenarioType.WALL_STREET,
             description="Barclays/Goldman DCF: 11.5-13.5% WACC, $39-52/share range",
-            price_scenario=get_management_price_scenario(),  # Same pricing as mgmt
+            price_scenario=get_management_price_scenario(),
             volume_scenario=get_base_volume_scenario(),
-            uss_wacc=0.125,  # Midpoint of 11.5-13.5%
-            terminal_growth=0.01,  # 1% terminal growth
-            exit_multiple=4.75,  # 3.5-6.0x range, use midpoint
+            uss_wacc=0.125,
+            terminal_growth=0.01,
+            exit_multiple=4.75,
             us_10yr=0.0425,
             japan_10yr=0.0075,
-            nippon_equity_risk_premium=0.0475,  # 4.75% equity risk premium over JGB
-            nippon_credit_spread=0.0075,  # 0.75% credit spread over JGB
+            nippon_equity_risk_premium=0.0475,
+            nippon_credit_spread=0.0075,
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
-            include_projects=['BR2 Mini Mill']
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.0  # Reference only, no probability weight
         ),
 
-        ScenarioType.MANAGEMENT: ModelScenario(
-            name="Management",
-            scenario_type=ScenarioType.MANAGEMENT,
-            description="Dec 2023 projections: EBITDA $2.4-3.1B, FCF $1.6-1.9B/yr, HRC $700",
+        ScenarioType.OPTIMISTIC: ModelScenario(
+            name="Optimistic (Peak Cycle)",
+            scenario_type=ScenarioType.OPTIMISTIC,
+            description="2021-2022 conditions: peak pricing and margins",
             price_scenario=get_management_price_scenario(),
             volume_scenario=VolumeScenario(
-                name="Management Base Plan",
-                description="Footprint reduction: $17.7B peak revenue, declining to $13.1B in 2029+",
-                flat_rolled_volume_factor=0.95,  # Declining integrated capacity
+                name="Peak Cycle Volumes",
+                description="Strong demand across all segments",
+                flat_rolled_volume_factor=0.95,
                 mini_mill_volume_factor=1.0,
                 usse_volume_factor=0.95,
                 tubular_volume_factor=1.0,
-                flat_rolled_growth_adj=-0.02,  # Structural decline as BFs close
-                mini_mill_growth_adj=0.02,  # Mini mills gain share
+                flat_rolled_growth_adj=-0.02,
+                mini_mill_growth_adj=0.02,
                 usse_growth_adj=-0.01,
                 tubular_growth_adj=0.0
             ),
-            uss_wacc=0.109,  # Company WACC
-            terminal_growth=0.01,  # 1% terminal growth
-            exit_multiple=5.0,
+            uss_wacc=0.109,
+            terminal_growth=0.015,
+            exit_multiple=5.5,
             us_10yr=0.0425,
             japan_10yr=0.0075,
-            nippon_equity_risk_premium=0.0475,  # 4.75% equity risk premium over JGB
-            nippon_credit_spread=0.0075,  # 0.75% credit spread over JGB
+            nippon_equity_risk_premium=0.0475,
+            nippon_credit_spread=0.0075,
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
-            include_projects=['BR2 Mini Mill']  # Only BR2 in base plan
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.05  # 5% probability
+        ),
+
+        # Keep MANAGEMENT as alias for backward compatibility
+        ScenarioType.MANAGEMENT: ModelScenario(
+            name="Optimistic (Peak Cycle)",
+            scenario_type=ScenarioType.OPTIMISTIC,
+            description="2021-2022 conditions: peak pricing and margins",
+            price_scenario=get_management_price_scenario(),
+            volume_scenario=VolumeScenario(
+                name="Peak Cycle Volumes",
+                description="Strong demand across all segments",
+                flat_rolled_volume_factor=0.95,
+                mini_mill_volume_factor=1.0,
+                usse_volume_factor=0.95,
+                tubular_volume_factor=1.0,
+                flat_rolled_growth_adj=-0.02,
+                mini_mill_growth_adj=0.02,
+                usse_growth_adj=-0.01,
+                tubular_growth_adj=0.0
+            ),
+            uss_wacc=0.109,
+            terminal_growth=0.015,
+            exit_multiple=5.5,
+            us_10yr=0.0425,
+            japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0475,
+            nippon_credit_spread=0.0075,
+            nippon_debt_ratio=0.35,
+            nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.05
         ),
 
         ScenarioType.NIPPON_COMMITMENTS: ModelScenario(
@@ -412,36 +578,37 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             price_scenario=SteelPriceScenario(
                 name="Nippon Investment Case",
                 description="Stable mid-cycle pricing with capacity discipline",
-                hrc_us_factor=0.95,  # Same as base case
+                hrc_us_factor=0.95,
                 crc_us_factor=0.95,
                 coated_us_factor=0.95,
                 hrc_eu_factor=0.92,
                 octg_factor=0.95,
-                annual_price_growth=0.01  # Modest 1% from capacity discipline
+                annual_price_growth=0.01
             ),
             volume_scenario=VolumeScenario(
                 name="NSA Investment Case",
                 description="$2.5B incremental EBITDA target, no plant closures through 2035",
-                flat_rolled_volume_factor=1.0,  # No plant closures per NSA
-                mini_mill_volume_factor=1.05,  # New capacity from BRS2 + Greenfield
+                flat_rolled_volume_factor=1.0,
+                mini_mill_volume_factor=1.05,
                 usse_volume_factor=1.0,
                 tubular_volume_factor=1.0,
-                flat_rolled_growth_adj=0.0,  # Maintain vs decline
-                mini_mill_growth_adj=0.02,  # BRS2 ramp-up
+                flat_rolled_growth_adj=0.0,
+                mini_mill_growth_adj=0.02,
                 usse_growth_adj=0.0,
                 tubular_growth_adj=0.005
             ),
-            uss_wacc=0.105,  # Modest WACC benefit from Nippon backing
-            terminal_growth=0.015,  # Slightly better than base
-            exit_multiple=5.0,  # Standard multiple
+            uss_wacc=0.105,
+            terminal_growth=0.015,
+            exit_multiple=5.0,
             us_10yr=0.0425,
             japan_10yr=0.0075,
-            nippon_equity_risk_premium=0.0475,  # 4.75% equity risk premium over JGB
-            nippon_credit_spread=0.0075,  # 0.75% credit spread over JGB
+            nippon_equity_risk_premium=0.0475,
+            nippon_credit_spread=0.0075,
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
             include_projects=['BR2 Mini Mill', 'Gary Works BF', 'Mon Valley HSM',
-                            'Greenfield Mini Mill', 'Mining Investment', 'Fairfield Works']
+                            'Greenfield Mini Mill', 'Mining Investment', 'Fairfield Works'],
+            probability_weight=0.0  # Reference only, no probability weight
         ),
     }
 
@@ -1003,7 +1170,12 @@ class PriceVolumeModel:
             shares = 225.0
 
         equity_bridge = -total_debt - pension - leases + cash + investments
-        share_price = (ev_blended + equity_bridge) / shares
+
+        # Calculate equity value and apply floor at zero
+        # Shareholders have limited liability - they can lose their entire investment but no more
+        equity_value = ev_blended + equity_bridge
+        equity_value_floored = max(0, equity_value)
+        share_price = equity_value_floored / shares
 
         return {
             'wacc': effective_wacc,
@@ -1116,6 +1288,102 @@ def compare_scenarios(scenario_types: List[ScenarioType] = None,
     return pd.DataFrame(results)
 
 
+def calculate_probability_weighted_valuation(
+    scenarios: Dict[ScenarioType, ModelScenario] = None,
+    exclude_scenarios: List[ScenarioType] = None,
+    custom_benchmarks: dict = None
+) -> Dict[str, any]:
+    """
+    Calculate probability-weighted expected value across scenarios
+
+    Args:
+        scenarios: Dict of scenarios to evaluate (default: all presets)
+        exclude_scenarios: Scenarios to exclude (default: CUSTOM, WALL_STREET, NIPPON_COMMITMENTS)
+        custom_benchmarks: Optional custom benchmark prices dict
+
+    Returns:
+        Dict with weighted metrics and scenario breakdown
+    """
+    if scenarios is None:
+        scenarios = get_scenario_presets()
+
+    if exclude_scenarios is None:
+        exclude_scenarios = [
+            ScenarioType.CUSTOM,
+            ScenarioType.WALL_STREET,
+            ScenarioType.NIPPON_COMMITMENTS
+        ]
+
+    # Filter to scenarios with probability weights
+    weighted_scenarios = {
+        name: scenario for name, scenario in scenarios.items()
+        if name not in exclude_scenarios and scenario.probability_weight > 0
+    }
+
+    if not weighted_scenarios:
+        raise ValueError("No scenarios with probability weights found")
+
+    # Validate probabilities sum to 1.0
+    total_prob = sum(s.probability_weight for s in weighted_scenarios.values())
+    if not (0.99 <= total_prob <= 1.01):
+        raise ValueError(f"Probabilities must sum to 1.0, got {total_prob:.3f}")
+
+    # Run each scenario
+    results = {}
+    for scenario_type, scenario in weighted_scenarios.items():
+        model = PriceVolumeModel(scenario, custom_benchmarks=custom_benchmarks)
+        analysis = model.run_full_analysis()
+        results[scenario_type] = {
+            'name': scenario.name,
+            'uss_value_per_share': analysis['val_uss']['share_price'],
+            'nippon_value_per_share': analysis['val_nippon']['share_price'],
+            'ten_year_fcf': analysis['consolidated']['FCF'].sum(),
+            'terminal_ebitda': analysis['consolidated']['Total_EBITDA'].iloc[-1],
+            'avg_ebitda': analysis['consolidated']['Total_EBITDA'].mean(),
+            'probability': scenario.probability_weight
+        }
+
+    # Calculate weighted averages
+    weighted_uss_value = sum(
+        r['uss_value_per_share'] * r['probability']
+        for r in results.values()
+    )
+    weighted_nippon_value = sum(
+        r['nippon_value_per_share'] * r['probability']
+        for r in results.values()
+    )
+    weighted_fcf = sum(
+        r['ten_year_fcf'] * r['probability']
+        for r in results.values()
+    )
+    weighted_avg_ebitda = sum(
+        r['avg_ebitda'] * r['probability']
+        for r in results.values()
+    )
+
+    offer_price = 55.0
+
+    # Calculate premium/discount percentages with protection against division by zero
+    if weighted_uss_value > 0.01:
+        uss_premium_to_offer = (offer_price / weighted_uss_value - 1) * 100
+    else:
+        uss_premium_to_offer = float('inf')  # Offer is infinitely better than zero equity
+
+    nippon_discount_to_offer = (weighted_nippon_value / offer_price - 1) * 100  # offer_price is always 55
+
+    return {
+        'weighted_uss_value_per_share': weighted_uss_value,
+        'weighted_nippon_value_per_share': weighted_nippon_value,
+        'weighted_ten_year_fcf': weighted_fcf,
+        'weighted_avg_ebitda': weighted_avg_ebitda,
+        'scenario_results': results,
+        'offer_price': offer_price,
+        'uss_premium_to_offer': uss_premium_to_offer,
+        'nippon_discount_to_offer': nippon_discount_to_offer,
+        'total_probability': total_prob
+    }
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -1146,9 +1414,14 @@ if __name__ == "__main__":
     print(f"  - {base.volume_scenario.description}")
 
     print("\nSEGMENT FCF CONTRIBUTION:")
+    total_fcf = analysis['consolidated']['FCF'].sum()
     for seg_name, df in analysis['segment_dfs'].items():
         fcf = df['FCF'].sum()
-        print(f"  {seg_name}: ${fcf:,.0f}M ({fcf/analysis['consolidated']['FCF'].sum()*100:.1f}%)")
+        if abs(total_fcf) > 0.01:
+            pct_str = f"({fcf/total_fcf*100:.1f}%)"
+        else:
+            pct_str = "(N/A - total FCF near zero)"
+        print(f"  {seg_name}: ${fcf:,.0f}M {pct_str}")
 
     print(f"\nVALUATION:")
     print(f"  USS Standalone (@ {base.uss_wacc*100:.1f}% WACC): ${analysis['val_uss']['share_price']:.2f}/share")

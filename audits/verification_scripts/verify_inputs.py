@@ -334,9 +334,12 @@ class InputVerifier:
         review = len([i for i in self.issues if i['Severity'] == 'Medium'])
 
         print(f"\nTotal Checks: {total_checks}")
-        print(f"Passed: {passed} ({passed/total_checks*100:.1f}%)")
-        print(f"Review: {review} ({review/total_checks*100:.1f}%)")
-        print(f"Flagged: {flagged} ({flagged/total_checks*100:.1f}%)")
+        if total_checks > 0:
+            print(f"Passed: {passed} ({passed/total_checks*100:.1f}%)")
+            print(f"Review: {review} ({review/total_checks*100:.1f}%)")
+            print(f"Flagged: {flagged} ({flagged/total_checks*100:.1f}%)")
+        else:
+            print("No checks were performed.")
 
         if flagged > 0:
             print("\n" + "=" * 80)
