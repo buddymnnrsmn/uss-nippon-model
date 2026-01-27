@@ -1987,6 +1987,8 @@ def main():
             nippon_credit_spread=scenario.nippon_credit_spread,
             nippon_debt_ratio=scenario.nippon_debt_ratio,
             nippon_tax_rate=scenario.nippon_tax_rate,
+            override_irp=scenario.override_irp,
+            manual_nippon_usd_wacc=scenario.manual_nippon_usd_wacc,
             include_projects=scenario.include_projects
         )
         temp_model = PriceVolumeModel(temp_scenario, custom_benchmarks=custom_benchmarks)
@@ -2337,6 +2339,8 @@ def main():
                 nippon_credit_spread=scenario.nippon_credit_spread,
                 nippon_debt_ratio=scenario.nippon_debt_ratio,
                 nippon_tax_rate=scenario.nippon_tax_rate,
+                override_irp=scenario.override_irp,
+                manual_nippon_usd_wacc=scenario.manual_nippon_usd_wacc,
                 include_projects=scenario.include_projects
             )
 
