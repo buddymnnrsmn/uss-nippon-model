@@ -186,6 +186,10 @@ class ModelScenario:
     nippon_debt_ratio: float
     nippon_tax_rate: float
 
+    # IRP Override (optional)
+    override_irp: bool = False  # If True, use manual_nippon_usd_wacc instead of IRP formula
+    manual_nippon_usd_wacc: Optional[float] = None  # Manual USD WACC for Nippon (when override_irp=True)
+
     # Capital projects to include
     include_projects: List[str] = field(default_factory=list)
 
@@ -974,6 +978,8 @@ class PriceVolumeModel:
         Now properly linked to JGB rate:
         - Cost of Equity = JGB + Equity Risk Premium
         - Cost of Debt = JGB + Credit Spread
+
+        If override_irp is True, uses manual_nippon_usd_wacc instead of IRP formula.
         """
         s = self.scenario
 
@@ -989,8 +995,12 @@ class PriceVolumeModel:
             debt_weight * nippon_cost_of_debt * (1 - s.nippon_tax_rate)
         )
 
-        # IRP conversion to USD
-        usd_wacc = (1 + jpy_wacc) * (1 + s.us_10yr) / (1 + s.japan_10yr) - 1
+        # USD WACC: Use manual override if specified, otherwise apply IRP
+        if s.override_irp and s.manual_nippon_usd_wacc is not None:
+            usd_wacc = s.manual_nippon_usd_wacc
+        else:
+            # IRP conversion to USD
+            usd_wacc = (1 + jpy_wacc) * (1 + s.us_10yr) / (1 + s.japan_10yr) - 1
 
         return jpy_wacc, usd_wacc
 

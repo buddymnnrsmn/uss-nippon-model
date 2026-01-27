@@ -180,6 +180,9 @@ def render_sidebar():
         st.session_state.n_cs = preset.nippon_credit_spread * 100
         st.session_state.n_dr = preset.nippon_debt_ratio * 100
         st.session_state.n_tr = preset.nippon_tax_rate * 100
+        st.session_state.override_irp = False
+        if 'manual_nippon_usd_wacc' in st.session_state:
+            del st.session_state.manual_nippon_usd_wacc
         # Reset capital projects
         st.session_state.include_br2 = 'BR2 Mini Mill' in preset.include_projects
         st.session_state.include_gary = 'Gary Works BF' in preset.include_projects
@@ -285,23 +288,23 @@ def render_sidebar():
         st.session_state.reset_section = None
 
     with st.sidebar.expander("Volume Factors by Segment", expanded=False):
-        fr_vol_factor = st.slider("Flat-Rolled", 0.5, 1.2, st.session_state.get('fr_vf', preset.volume_scenario.flat_rolled_volume_factor), 0.05, key="fr_vf",
+        fr_vol_factor = st.slider("Flat-Rolled", 0.7, 1.3, st.session_state.get('fr_vf', preset.volume_scenario.flat_rolled_volume_factor), 0.05, key="fr_vf",
                                    help="Integrated steel mills (Gary, Mon Valley). Facing structural decline without investment.")
-        mm_vol_factor = st.slider("Mini Mill", 0.5, 1.3, st.session_state.get('mm_vf', preset.volume_scenario.mini_mill_volume_factor), 0.05, key="mm_vf",
+        mm_vol_factor = st.slider("Mini Mill", 0.8, 1.5, st.session_state.get('mm_vf', preset.volume_scenario.mini_mill_volume_factor), 0.05, key="mm_vf",
                                    help="Electric Arc Furnace operations (Big River Steel). Highest growth segment.")
-        usse_vol_factor = st.slider("USSE", 0.5, 1.2, st.session_state.get('usse_vf', preset.volume_scenario.usse_volume_factor), 0.05, key="usse_vf",
+        usse_vol_factor = st.slider("USSE", 0.7, 1.3, st.session_state.get('usse_vf', preset.volume_scenario.usse_volume_factor), 0.05, key="usse_vf",
                                      help="U.S. Steel Europe (Slovakia). Exposed to EU market conditions.")
-        tub_vol_factor = st.slider("Tubular", 0.5, 1.3, st.session_state.get('tub_vf', preset.volume_scenario.tubular_volume_factor), 0.05, key="tub_vf",
+        tub_vol_factor = st.slider("Tubular", 0.6, 1.5, st.session_state.get('tub_vf', preset.volume_scenario.tubular_volume_factor), 0.05, key="tub_vf",
                                     help="Oil Country Tubular Goods (OCTG). Tied to energy sector drilling activity.")
 
     with st.sidebar.expander("Volume Growth Adjustments", expanded=False):
-        fr_growth_adj = st.slider("Flat-Rolled Growth Adj", -5.0, 3.0, st.session_state.get('fr_ga', preset.volume_scenario.flat_rolled_growth_adj * 100), 0.5, format="%.1f%%", key="fr_ga",
+        fr_growth_adj = st.slider("Flat-Rolled Growth Adj", -3.0, 2.0, st.session_state.get('fr_ga', preset.volume_scenario.flat_rolled_growth_adj * 100), 0.5, format="%.1f%%", key="fr_ga",
                                    help="Typically negative due to aging blast furnaces and capacity rationalization") / 100
-        mm_growth_adj = st.slider("Mini Mill Growth Adj", -3.0, 5.0, st.session_state.get('mm_ga', preset.volume_scenario.mini_mill_growth_adj * 100), 0.5, format="%.1f%%", key="mm_ga",
+        mm_growth_adj = st.slider("Mini Mill Growth Adj", -2.0, 8.0, st.session_state.get('mm_ga', preset.volume_scenario.mini_mill_growth_adj * 100), 0.5, format="%.1f%%", key="mm_ga",
                                    help="Typically positive due to BR2 ramp-up and EAF market share gains") / 100
-        usse_growth_adj = st.slider("USSE Growth Adj", -3.0, 3.0, st.session_state.get('usse_ga', preset.volume_scenario.usse_growth_adj * 100), 0.5, format="%.1f%%", key="usse_ga",
+        usse_growth_adj = st.slider("USSE Growth Adj", -4.0, 4.0, st.session_state.get('usse_ga', preset.volume_scenario.usse_growth_adj * 100), 0.5, format="%.1f%%", key="usse_ga",
                                      help="Depends on European industrial demand and energy costs") / 100
-        tub_growth_adj = st.slider("Tubular Growth Adj", -3.0, 5.0, st.session_state.get('tub_ga', preset.volume_scenario.tubular_growth_adj * 100), 0.5, format="%.1f%%", key="tub_ga",
+        tub_growth_adj = st.slider("Tubular Growth Adj", -5.0, 10.0, st.session_state.get('tub_ga', preset.volume_scenario.tubular_growth_adj * 100), 0.5, format="%.1f%%", key="tub_ga",
                                     help="Cyclical with oil & gas drilling activity") / 100
 
     st.sidebar.markdown("---")
@@ -319,13 +322,13 @@ def render_sidebar():
         st.session_state.exit_multiple = preset.exit_multiple
         st.session_state.reset_section = None
 
-    uss_wacc = st.sidebar.slider("USS WACC", 8.0, 14.0, st.session_state.get('uss_wacc', preset.uss_wacc * 100), 0.1, format="%.1f%%",
+    uss_wacc = st.sidebar.slider("USS WACC", 7.0, 15.0, st.session_state.get('uss_wacc', preset.uss_wacc * 100), 0.1, format="%.1f%%",
                                   key="uss_wacc",
                                   help="USS standalone Weighted Average Cost of Capital. Higher = lower valuation. Typical range 10-12% for steel companies.") / 100
-    terminal_growth = st.sidebar.slider("Terminal Growth", 0.0, 3.0, st.session_state.get('terminal_growth', preset.terminal_growth * 100), 0.25, format="%.2f%%",
+    terminal_growth = st.sidebar.slider("Terminal Growth", 0.0, 3.5, st.session_state.get('terminal_growth', preset.terminal_growth * 100), 0.25, format="%.2f%%",
                                          key="terminal_growth",
                                          help="Perpetual growth rate after 2033 for Gordon Growth terminal value. Steel is mature industry, typically 0-2%.") / 100
-    exit_multiple = st.sidebar.slider("Exit Multiple (EBITDA)", 3.0, 7.0, st.session_state.get('exit_multiple', preset.exit_multiple), 0.5, format="%.1fx",
+    exit_multiple = st.sidebar.slider("Exit Multiple (EBITDA)", 3.0, 8.0, st.session_state.get('exit_multiple', preset.exit_multiple), 0.5, format="%.1fx",
                                        key="exit_multiple",
                                        help="EV/EBITDA multiple for exit-based terminal value. Steel sector typically trades 4-6x.")
 
@@ -345,21 +348,66 @@ def render_sidebar():
         st.session_state.n_cs = preset.nippon_credit_spread * 100
         st.session_state.n_dr = preset.nippon_debt_ratio * 100
         st.session_state.n_tr = preset.nippon_tax_rate * 100
+        st.session_state.override_irp = False
+        if 'manual_nippon_usd_wacc' in st.session_state:
+            del st.session_state.manual_nippon_usd_wacc
         st.session_state.reset_section = None
 
-    us_10yr = st.sidebar.slider("US 10-Year Treasury", 2.0, 6.0, st.session_state.get('us_10yr', preset.us_10yr * 100), 0.25, format="%.2f%%",
+    us_10yr = st.sidebar.slider("US 10-Year Treasury", 1.0, 7.0, st.session_state.get('us_10yr', preset.us_10yr * 100), 0.25, format="%.2f%%",
                                  key="us_10yr",
                                  help="Current US government bond yield. Used to calculate interest rate differential with Japan.") / 100
-    japan_10yr = st.sidebar.slider("Japan 10-Year JGB", 0.0, 2.0, st.session_state.get('japan_10yr', preset.japan_10yr * 100), 0.25, format="%.2f%%",
+    japan_10yr = st.sidebar.slider("Japan 10-Year JGB", -0.5, 5.0, st.session_state.get('japan_10yr', preset.japan_10yr * 100), 0.25, format="%.2f%%",
                                     key="japan_10yr",
                                     help="Japanese Government Bond yield. Nippon's cost of capital rises with this rate.") / 100
 
+    # IRP Override Toggle
+    st.sidebar.markdown("---")
+    override_irp = st.sidebar.checkbox(
+        "Override IRP",
+        value=st.session_state.get('override_irp', False),
+        key="override_irp",
+        help="Override Interest Rate Parity formula and manually set Nippon's USD WACC. Use for stress testing scenarios where currency moves independently of rate differentials."
+    )
+
+    # Manual USD WACC slider (only shown when override is enabled)
+    manual_nippon_usd_wacc = None
+    if override_irp:
+        # Calculate IRP-implied WACC for comparison
+        nippon_cost_of_equity_temp = japan_10yr + st.session_state.get('n_erp', preset.nippon_equity_risk_premium * 100) / 100
+        nippon_cost_of_debt_temp = japan_10yr + st.session_state.get('n_cs', preset.nippon_credit_spread * 100) / 100
+        debt_ratio_temp = st.session_state.get('n_dr', preset.nippon_debt_ratio * 100) / 100
+        tax_rate_temp = st.session_state.get('n_tr', preset.nippon_tax_rate * 100) / 100
+        jpy_wacc_temp = (
+            (1 - debt_ratio_temp) * nippon_cost_of_equity_temp +
+            debt_ratio_temp * nippon_cost_of_debt_temp * (1 - tax_rate_temp)
+        )
+        irp_implied_usd_wacc = (1 + jpy_wacc_temp) * (1 + us_10yr) / (1 + japan_10yr) - 1
+
+        st.sidebar.info(f"IRP-Implied USD WACC: **{irp_implied_usd_wacc*100:.2f}%**")
+
+        manual_nippon_usd_wacc = st.sidebar.slider(
+            "Manual Nippon USD WACC",
+            5.0, 12.0,
+            st.session_state.get('manual_nippon_usd_wacc', irp_implied_usd_wacc * 100),
+            0.1,
+            format="%.1f%%",
+            key="manual_nippon_usd_wacc",
+            help="Manually specified USD discount rate for Nippon. Higher = lower valuation to Nippon."
+        ) / 100
+
+        delta = (manual_nippon_usd_wacc - irp_implied_usd_wacc) * 100
+        if abs(delta) > 0.05:
+            delta_direction = "Higher" if delta > 0 else "Lower"
+            st.sidebar.caption(f"{delta_direction} by {abs(delta):.2f}% vs IRP")
+
+    st.sidebar.markdown("---")
+
     with st.sidebar.expander("Nippon WACC Components", expanded=False):
-        nippon_erp = st.slider("Equity Risk Premium", 3.0, 6.0, st.session_state.get('n_erp', preset.nippon_equity_risk_premium * 100), 0.25, format="%.2f%%", key="n_erp",
+        nippon_erp = st.slider("Equity Risk Premium", 2.5, 7.0, st.session_state.get('n_erp', preset.nippon_equity_risk_premium * 100), 0.25, format="%.2f%%", key="n_erp",
                                 help="Premium over JGB rate for equity. Cost of Equity = JGB + This Premium.") / 100
-        nippon_cs = st.slider("Credit Spread", 0.25, 2.0, st.session_state.get('n_cs', preset.nippon_credit_spread * 100), 0.25, format="%.2f%%", key="n_cs",
+        nippon_cs = st.slider("Credit Spread", 0.25, 3.0, st.session_state.get('n_cs', preset.nippon_credit_spread * 100), 0.25, format="%.2f%%", key="n_cs",
                                 help="Spread over JGB rate for debt. Cost of Debt = JGB + This Spread.") / 100
-        nippon_debt_ratio = st.slider("Debt Ratio", 20.0, 50.0, st.session_state.get('n_dr', preset.nippon_debt_ratio * 100), 5.0, format="%.0f%%", key="n_dr",
+        nippon_debt_ratio = st.slider("Debt Ratio", 10.0, 60.0, st.session_state.get('n_dr', preset.nippon_debt_ratio * 100), 5.0, format="%.0f%%", key="n_dr",
                                        help="Nippon's debt as percentage of total capital. Affects weighted average.") / 100
         nippon_tax_rate = st.slider("Japan Tax Rate", 25.0, 35.0, st.session_state.get('n_tr', preset.nippon_tax_rate * 100), 1.0, format="%.0f%%", key="n_tr",
                                      help="Japan corporate tax rate. Interest is tax-deductible, reducing effective cost of debt.") / 100
@@ -468,6 +516,8 @@ def render_sidebar():
         nippon_credit_spread=nippon_cs,
         nippon_debt_ratio=nippon_debt_ratio,
         nippon_tax_rate=nippon_tax_rate,
+        override_irp=override_irp,
+        manual_nippon_usd_wacc=manual_nippon_usd_wacc,
         include_projects=include_projects
     )
 
@@ -1889,6 +1939,8 @@ def main():
             nippon_credit_spread=scenario.nippon_credit_spread,
             nippon_debt_ratio=scenario.nippon_debt_ratio,
             nippon_tax_rate=scenario.nippon_tax_rate,
+            override_irp=scenario.override_irp,
+            manual_nippon_usd_wacc=scenario.manual_nippon_usd_wacc,
             include_projects=scenario.include_projects
         )
         temp_model = PriceVolumeModel(test_scenario, custom_benchmarks=custom_benchmarks)
