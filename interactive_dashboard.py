@@ -558,6 +558,42 @@ def main():
     financing_impact = analysis.get('financing_impact', {})
 
     # =========================================================================
+    # EXPORT MODEL SECTION (in sidebar)
+    # =========================================================================
+    st.sidebar.markdown("---")
+    st.sidebar.header("Export Model")
+
+    export_type = st.sidebar.radio(
+        "Export Type",
+        ["Current Scenario (Static)", "All Scenarios Comparison", "Interactive Model (Formulas)"],
+        help="Static exports values; Interactive exports working Excel formulas"
+    )
+
+    if st.sidebar.button("Generate Excel Export", type="primary"):
+        from export_model import ModelExporter, FormulaModelExporter, get_export_filename
+
+        with st.sidebar.spinner("Generating Excel file..."):
+            if export_type == "Interactive Model (Formulas)":
+                exporter = FormulaModelExporter(scenario, execution_factor, custom_benchmarks)
+                excel_bytes = exporter.export_with_formulas()
+                filename = get_export_filename(scenario_name, "formula")
+            else:
+                exporter = ModelExporter(scenario, execution_factor, custom_benchmarks)
+                if export_type == "Current Scenario (Static)":
+                    excel_bytes = exporter.export_single_scenario()
+                    filename = get_export_filename(scenario_name, "single")
+                else:
+                    excel_bytes = exporter.export_multi_scenario()
+                    filename = get_export_filename(scenario_name, "multi")
+
+            st.sidebar.download_button(
+                label="Download Excel File",
+                data=excel_bytes,
+                file_name=filename,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    # =========================================================================
     # EXECUTIVE DECISION SUMMARY
     # =========================================================================
 
