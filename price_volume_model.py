@@ -422,13 +422,13 @@ def get_conservative_price_scenario() -> SteelPriceScenario:
 def get_wall_street_price_scenario() -> SteelPriceScenario:
     return SteelPriceScenario(
         name="Wall Street Consensus",
-        description="Analyst consensus - modest price weakness then recovery",
-        hrc_us_factor=0.90,  # Aligned with 0.05 step
-        crc_us_factor=0.90,  # Aligned with 0.05 step
-        coated_us_factor=0.90,  # Aligned with 0.05 step
-        hrc_eu_factor=0.90,
-        octg_factor=0.95,
-        annual_price_growth=0.025
+        description="Analyst consensus - flat pricing calibrated to $39-52 fairness opinion range",
+        hrc_us_factor=0.97,  # Calibrated to match analyst DCF valuations
+        crc_us_factor=0.97,
+        coated_us_factor=0.97,
+        hrc_eu_factor=0.97,
+        octg_factor=0.97,
+        annual_price_growth=0.00  # Flat pricing (no growth) per analyst assumptions
     )
 
 
