@@ -67,11 +67,11 @@ The dashboard will open in your browser at `http://localhost:8501`
 
 | Scenario | Steel Prices | WACC | Key Assumptions | Probability | USS Value |
 |----------|-------------|------|-----------------|-------------|-----------|
-| **Severe Downturn** | 0.70x | 13.5% | Recession: 2009/2015/2020 conditions | 25% | ~$0/share* |
-| **Downside** | 0.85x | 12.0% | Weak markets, import pressure | 30% | $24/share |
-| **Base Case** | 0.90x | 10.9% | Mid-cycle, historical median | 30% | $38/share |
-| **Above Average** | 0.95x | 10.9% | Strong cycle like 2017-18 | 10% | $51/share |
-| **Optimistic** | 0.92x | 10.9% | Peak cycle: 2021-22 conditions | 5% | $75/share |
+| **Severe Downturn** | 0.70x, -2% | 13.5% | Recession: 2009/2015/2020 conditions | 25% | ~$0/share* |
+| **Downside** | 0.85x flat | 12.0% | Weak markets, flat pricing | 30% | $15/share |
+| **Base Case** | 0.90x, +1% | 10.9% | Mid-cycle, modest growth | 30% | $38/share |
+| **Above Average** | 0.95x, +1.5% | 10.9% | Strong cycle, good growth | 10% | $67/share |
+| **Optimistic** | 1.00x, +2% | 10.9% | Sustained favorable markets | 5% | $97/share |
 | Wall Street | 0.97x flat | 12.5% | Barclays/Goldman calibrated ($39-52 range) | - | $46/share |
 | Nippon Case | 0.95x | 10.5% | $14B CapEx, all 6 projects | - | $47/share** |
 

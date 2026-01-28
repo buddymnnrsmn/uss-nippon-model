@@ -395,27 +395,27 @@ def validate_margin_vs_peers(segment_margin: float, segment_name: str) -> dict:
 
 def get_base_price_scenario() -> SteelPriceScenario:
     return SteelPriceScenario(
-        name="Base Case Prices",
-        description="Mid-cycle pricing, modest inflation, no real price gains",
+        name="Above Average Prices",
+        description="Strong markets with good pricing power and sustained growth",
         hrc_us_factor=0.95,  # Slight pullback from 2023 elevated levels
         crc_us_factor=0.95,
         coated_us_factor=0.95,
         hrc_eu_factor=0.90,  # Aligned with 0.05 step
         octg_factor=0.95,
-        annual_price_growth=0.005  # 0.5% - barely keeps pace with costs
+        annual_price_growth=0.015  # 1.5% - good growth in strong markets
     )
 
 
 def get_conservative_price_scenario() -> SteelPriceScenario:
     return SteelPriceScenario(
         name="Conservative Prices",
-        description="Steel prices decline 15-20% from 2023 due to weak demand",
+        description="Steel prices decline 15-20% from 2023, remain flat in weak demand",
         hrc_us_factor=0.85,
         crc_us_factor=0.85,
         coated_us_factor=0.85,
         hrc_eu_factor=0.80,
         octg_factor=0.85,
-        annual_price_growth=0.01
+        annual_price_growth=0.00  # Flat pricing in weak markets
     )
 
 
@@ -447,14 +447,14 @@ def get_management_price_scenario() -> SteelPriceScenario:
 
 def get_optimistic_price_scenario() -> SteelPriceScenario:
     return SteelPriceScenario(
-        name="Peak Cycle Pricing",
-        description="2021-2022 boom: elevated prices with modest growth",
-        hrc_us_factor=0.92,
-        crc_us_factor=0.92,
-        coated_us_factor=0.92,
-        hrc_eu_factor=0.95,
-        octg_factor=1.0,
-        annual_price_growth=0.02
+        name="Optimistic Pricing",
+        description="Sustained favorable markets: benchmark pricing with strong 2% growth",
+        hrc_us_factor=1.00,  # At benchmark level
+        crc_us_factor=1.00,
+        coated_us_factor=1.00,
+        hrc_eu_factor=1.00,
+        octg_factor=1.00,
+        annual_price_growth=0.02  # 2% sustained growth
     )
 
 
@@ -703,12 +703,12 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
         ),
 
         ScenarioType.OPTIMISTIC: ModelScenario(
-            name="Optimistic (Peak Cycle)",
+            name="Optimistic (Sustained Growth)",
             scenario_type=ScenarioType.OPTIMISTIC,
-            description="2021-2022 conditions: peak pricing and margins",
+            description="Sustained favorable markets: benchmark pricing with 2% growth",
             price_scenario=get_optimistic_price_scenario(),
             volume_scenario=VolumeScenario(
-                name="Peak Cycle Volumes",
+                name="Strong Market Volumes",
                 description="Strong demand across all segments",
                 flat_rolled_volume_factor=0.95,
                 mini_mill_volume_factor=1.0,
@@ -734,12 +734,12 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
 
         # Keep MANAGEMENT as alias for backward compatibility
         ScenarioType.MANAGEMENT: ModelScenario(
-            name="Optimistic (Peak Cycle)",
+            name="Optimistic (Sustained Growth)",
             scenario_type=ScenarioType.OPTIMISTIC,
-            description="2021-2022 conditions: peak pricing and margins",
+            description="Sustained favorable markets: benchmark pricing with 2% growth",
             price_scenario=get_optimistic_price_scenario(),
             volume_scenario=VolumeScenario(
-                name="Peak Cycle Volumes",
+                name="Strong Market Volumes",
                 description="Strong demand across all segments",
                 flat_rolled_volume_factor=0.95,
                 mini_mill_volume_factor=1.0,

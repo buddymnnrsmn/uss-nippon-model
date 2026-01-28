@@ -194,7 +194,7 @@ def render_sidebar():
         "Base Case - Mid-Cycle": ScenarioType.BASE_CASE,
         "Above Average - Strong Cycle": ScenarioType.ABOVE_AVERAGE,
         "Wall Street - Analyst Views": ScenarioType.WALL_STREET,
-        "Optimistic - Peak Cycle": ScenarioType.OPTIMISTIC,
+        "Optimistic - Sustained Growth": ScenarioType.OPTIMISTIC,
         "Nippon Investment Case": ScenarioType.NIPPON_COMMITMENTS,
         "Custom": ScenarioType.CUSTOM
     }
@@ -214,12 +214,12 @@ def render_sidebar():
 
     # Show scenario description
     scenario_descriptions = {
-        "Severe Downturn - Historical Crisis": "Recession scenario (0.70x prices, -20% volumes, 13.5% WACC) - Historical frequency: 24%",
-        "Downside - Weak Markets": "Below-average cycle (0.85x prices, 12% WACC) - Historical frequency: 30%",
-        "Base Case - Mid-Cycle": "Historical median performance (0.90x prices, 10.9% WACC) - Historical frequency: 30%",
-        "Above Average - Strong Cycle": "Good markets like 2017-18 (0.95x prices, 10.9% WACC) - Historical frequency: 10%",
+        "Severe Downturn - Historical Crisis": "Recession scenario (0.70x prices, -2% decline, 13.5% WACC) - Historical frequency: 25%",
+        "Downside - Weak Markets": "Weak cycle (0.85x flat prices, 12% WACC) - Historical frequency: 30%",
+        "Base Case - Mid-Cycle": "Mid-cycle (0.90x prices, +1% growth, 10.9% WACC) - Historical frequency: 30%",
+        "Above Average - Strong Cycle": "Strong markets (0.95x prices, +1.5% growth, 10.9% WACC) - Historical frequency: 10%",
         "Wall Street - Analyst Views": "Barclays/Goldman calibrated (0.97x flat prices, 12.5% WACC) - Produces $39-52 range",
-        "Optimistic - Peak Cycle": "2021-22 boom conditions (0.92x prices, 2% growth) - Historical frequency: 5%",
+        "Optimistic - Sustained Growth": "Sustained favorable markets (1.00x benchmark, +2% growth) - Historical frequency: 5%",
         "Nippon Investment Case": "$14B capital program, all 6 projects, no plant closures through 2035",
         "Custom": "Manually adjust all parameters below."
     }
