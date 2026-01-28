@@ -64,6 +64,7 @@ def render_sidebar():
         - [Without the Deal](#without-the-deal)
         - [Golden Share & NSA Commitments](#golden-share-nsa)
         - [Alternative Buyer Comparison](#alternative-buyer-comparison)
+        - [Peer Company Benchmarking](#peer-benchmarking)
         - [Sensitivity Thresholds](#sensitivity-thresholds)
 
         **Valuation Details**
@@ -1168,6 +1169,451 @@ def main():
 
         **Value Creation:** {nippon_value_str}/share vs offer price
         """)
+
+    # =========================================================================
+    # PEER COMPANY BENCHMARKING
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Peer Company Benchmarking", anchor="peer-benchmarking")
+
+    st.caption("📅 **Data as of December 31, 2023** (Capital IQ comps, SEC 10-K/20-F filings)")
+
+    st.markdown("""
+    **How to read this section:**
+    - Compare USS financial and operational metrics against peer steel companies
+    - Valuation multiples show how market values comparable companies
+    - USS percentile ranking indicates competitive positioning
+    """)
+
+    # Import benchmark data with error handling
+    try:
+        from benchmark_data import BenchmarkData
+        benchmark = BenchmarkData()
+        benchmark_available = True
+    except Exception as e:
+        benchmark_available = False
+        st.warning(f"Benchmark data not available: {e}")
+
+    if benchmark_available:
+        # Subsection A: Valuation Multiples Comparison
+        st.subheader("Valuation Multiples")
+
+        mult_col1, mult_col2 = st.columns(2)
+
+        with mult_col1:
+            # Get peer multiples
+            multiples = benchmark.get_peer_multiples()
+            if multiples:
+                # Create comparison data for chart
+                mult_data = []
+                for name, stats in multiples.items():
+                    mult_data.append({
+                        'Metric': name.replace('_', '/').upper(),
+                        'Min': stats.min,
+                        'Q1': stats.q1,
+                        'Median': stats.median,
+                        'Q3': stats.q3,
+                        'Max': stats.max
+                    })
+
+                if mult_data:
+                    mult_df = pd.DataFrame(mult_data)
+                    # Create grouped bar chart
+                    fig_mult = go.Figure()
+                    fig_mult.add_trace(go.Bar(
+                        name='Q1 (25th)',
+                        x=mult_df['Metric'],
+                        y=mult_df['Q1'],
+                        marker_color='#636EFA'
+                    ))
+                    fig_mult.add_trace(go.Bar(
+                        name='Median',
+                        x=mult_df['Metric'],
+                        y=mult_df['Median'],
+                        marker_color='#EF553B'
+                    ))
+                    fig_mult.add_trace(go.Bar(
+                        name='Q3 (75th)',
+                        x=mult_df['Metric'],
+                        y=mult_df['Q3'],
+                        marker_color='#00CC96'
+                    ))
+                    fig_mult.update_layout(
+                        title="Peer Valuation Multiple Distribution",
+                        barmode='group',
+                        yaxis_title="Multiple",
+                        height=350
+                    )
+                    st.plotly_chart(fig_mult, use_container_width=True)
+            else:
+                st.info("Peer multiple data not available")
+
+        with mult_col2:
+            # Exit multiple guidance
+            exit_range = benchmark.get_exit_multiple_range()
+            st.metric("Peer Median TEV/EBITDA", f"{exit_range['base']:.1f}x")
+            st.metric("Peer Q1-Q3 Range", f"{exit_range['low']:.1f}x - {exit_range['high']:.1f}x")
+            st.info(f"Model uses {scenario.exit_multiple:.1f}x exit multiple")
+
+            # Show if using benchmark multiples
+            if scenario.use_benchmark_multiples:
+                st.success("Benchmark-driven exit multiples enabled")
+                if 'exit_multiple_used' in val_uss:
+                    st.metric("Effective Exit Multiple", f"{val_uss['exit_multiple_used']:.2f}x")
+
+        # Subsection B: Margin & Operational Comparison
+        st.subheader("Operating Metrics Comparison")
+
+        try:
+            # Get USS metrics
+            uss_metrics = benchmark.get_uss_metrics()
+            peer_summary = benchmark.get_peer_summary()
+
+            # Load steel operational metrics (capacity, shipments, utilization)
+            steel_ops = {}
+            try:
+                steel_ops_df = pd.read_csv('local/extracted_steel_metrics.csv')
+                for _, row in steel_ops_df.iterrows():
+                    ticker = row.get('Ticker', '')
+                    if ticker:
+                        steel_ops[ticker] = {
+                            'capacity': row.get('Capacity_Mtons'),
+                            'shipments': row.get('Shipments_Mtons'),
+                            'utilization': row.get('Utilization_Pct')
+                        }
+            except Exception:
+                pass  # Steel ops data not available
+
+            # Build comparison table
+            comparison_data = []
+
+            # USS row
+            uss_revenue = uss_metrics.get('revenue', 0)
+            uss_margin = uss_metrics.get('ebitda_margin', 0)
+            comparison_data.append({
+                'Company': 'United States Steel (X)',
+                'Revenue ($B)': uss_revenue/1000 if uss_revenue else None,
+                'EBITDA Margin %': uss_margin*100 if uss_margin else None,
+                'Capacity (Mt)': uss_metrics.get('capacity_mtons'),
+                'Shipments (Mt)': uss_metrics.get('shipments_mtons'),
+                'Utilization %': 66.0,  # USS 2023 utilization
+            })
+
+            # Add peer data from summary, merged with steel ops
+            seen_tickers = set(['X'])  # Track tickers to avoid duplicates
+            if not peer_summary.empty:
+                for _, row in peer_summary.head(15).iterrows():
+                    company_name = row.get('company', '')
+                    # Extract ticker from company name - handle various formats
+                    ticker = None
+                    company_upper = company_name.upper()
+
+                    # Direct ticker matches
+                    for t in ['NUE', 'CLF', 'STLD', 'CMC', 'ZEUS', 'BSL', 'TX']:
+                        if f":{t})" in company_upper or f"({t})" in company_upper:
+                            ticker = t
+                            break
+
+                    # Special cases for foreign exchanges
+                    if ticker is None:
+                        if 'ARCELORMITTAL' in company_upper or 'ENXTAM:MT' in company_upper:
+                            ticker = 'MT'
+                        elif 'POSCO' in company_upper or 'KOSE:' in company_upper:
+                            ticker = 'PKX'
+                        elif 'NIPPON STEEL' in company_upper or 'TSE:5401' in company_upper:
+                            ticker = 'NPSCY'
+                        elif 'GERDAU' in company_upper or 'BOVESPA:' in company_upper:
+                            ticker = 'GGB'
+
+                    # Skip if no ticker found or already seen
+                    if ticker is None or ticker in seen_tickers:
+                        continue
+                    seen_tickers.add(ticker)
+
+                    rev = row.get('LTM Total Revenue ', 0)
+                    ebitda = row.get('LTM EBITDA ', 0)
+                    margin = ebitda / rev if rev and rev > 0 else 0
+
+                    # Get steel operational metrics for this company
+                    ops = steel_ops.get(ticker, {})
+                    capacity = ops.get('capacity')
+                    shipments = ops.get('shipments')
+                    utilization = ops.get('utilization')
+
+                    comparison_data.append({
+                        'Company': company_name[:40] + '...' if len(company_name) > 40 else company_name,
+                        'Revenue ($B)': rev/1000 if rev else None,
+                        'EBITDA Margin %': margin*100 if margin else None,
+                        'Capacity (Mt)': capacity if pd.notna(capacity) else None,
+                        'Shipments (Mt)': shipments if pd.notna(shipments) else None,
+                        'Utilization %': utilization if pd.notna(utilization) else None,
+                    })
+
+            # Note: seen_tickers is already populated from the loop above
+            # Only add companies from steel_ops that weren't matched in Capital IQ data
+            # (This handles cases where a company has operational data but no financial data)
+            try:
+                for _, row in steel_ops_df.iterrows():
+                    ticker = row.get('Ticker', '')
+                    # Skip if already added, if it's a distributor, or if no capacity data
+                    if ticker and ticker not in seen_tickers and ticker != 'ZEUS':
+                        capacity = row.get('Capacity_Mtons')
+                        if pd.notna(capacity):
+                            shipments = row.get('Shipments_Mtons')
+                            utilization = row.get('Utilization_Pct')
+                            comparison_data.append({
+                                'Company': row.get('Company', ticker),
+                                'Revenue ($B)': None,
+                                'EBITDA Margin %': None,
+                                'Capacity (Mt)': capacity if pd.notna(capacity) else None,
+                                'Shipments (Mt)': shipments if pd.notna(shipments) else None,
+                                'Utilization %': utilization if pd.notna(utilization) else None,
+                            })
+                            seen_tickers.add(ticker)
+            except Exception:
+                pass
+
+            # Display as table with proper numeric formatting
+            comparison_df = pd.DataFrame(comparison_data)
+            st.dataframe(
+                comparison_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    'Company': st.column_config.TextColumn('Company', width='medium'),
+                    'Revenue ($B)': st.column_config.NumberColumn('Revenue ($B)', format='$%.1f'),
+                    'EBITDA Margin %': st.column_config.NumberColumn('EBITDA Margin', format='%.1f%%'),
+                    'Capacity (Mt)': st.column_config.NumberColumn('Capacity (Mt)', format='%.1f'),
+                    'Shipments (Mt)': st.column_config.NumberColumn('Shipments (Mt)', format='%.1f'),
+                    'Utilization %': st.column_config.NumberColumn('Utilization', format='%.0f%%'),
+                }
+            )
+
+        except Exception as e:
+            st.warning(f"Could not load peer comparison: {e}")
+
+        # Subsection B2: Financial Health & Returns Comparison
+        st.subheader("Financial Health & Returns")
+
+        try:
+            comps = benchmark._get_comps_data()
+
+            fin_health_col1, fin_health_col2 = st.columns(2)
+
+            with fin_health_col1:
+                # Leverage & Credit metrics from operating_statistics and financial_data
+                leverage_data = []
+
+                # Get data from operating_statistics (has Total Debt/EBITDA)
+                if 'operating_statistics' in comps and not comps['operating_statistics'].empty:
+                    ops_df = comps['operating_statistics'].copy()
+                    fin_df = comps.get('financial_data', pd.DataFrame())
+
+                    for _, row in ops_df.iterrows():
+                        company = row.get('Company Name', '')[:30]
+                        total_debt_ebitda = row.get('LTM Total Debt/EBITDA ', None)
+
+                        # Try to get Net Debt/EBITDA from financial_data
+                        net_debt_ebitda = None
+                        if not fin_df.empty:
+                            match = fin_df[fin_df['Company Name'].str.contains(company[:15], na=False, regex=False)]
+                            if not match.empty:
+                                net_debt = match['LTM Net Debt '].iloc[0]
+                                ebitda = match['LTM EBITDA '].iloc[0]
+                                if pd.notna(net_debt) and pd.notna(ebitda) and ebitda > 0:
+                                    net_debt_ebitda = net_debt / ebitda
+
+                        if company:
+                            leverage_data.append({
+                                'Company': company,
+                                'Net Debt/EBITDA': f"{net_debt_ebitda:.1f}x" if pd.notna(net_debt_ebitda) else "-",
+                                'Total Debt/EBITDA': f"{total_debt_ebitda:.1f}x" if pd.notna(total_debt_ebitda) else "-",
+                            })
+
+                # Add USS metrics from calculated data
+                uss_net_debt_ebitda = uss_metrics.get('net_debt_ebitda')
+                leverage_data.insert(0, {
+                    'Company': 'United States Steel (X)',
+                    'Net Debt/EBITDA': f"{uss_net_debt_ebitda:.1f}x" if uss_net_debt_ebitda else "0.7x",
+                    'Total Debt/EBITDA': f"{uss_metrics.get('total_debt', 4339) / uss_metrics.get('ebitda', 1919):.1f}x",
+                })
+
+                if leverage_data:
+                    st.markdown("**Leverage Metrics (as of 12/31/2023)**")
+                    st.dataframe(pd.DataFrame(leverage_data), use_container_width=True, hide_index=True)
+
+            with fin_health_col2:
+                # Profitability & Growth metrics from operating_statistics
+                if 'operating_statistics' in comps and not comps['operating_statistics'].empty:
+                    ops_df = comps['operating_statistics'].copy()
+                    profit_data = []
+
+                    for _, row in ops_df.iterrows():
+                        company = row.get('Company Name', '')[:30]
+                        gross_margin = row.get('LTM Gross Margin % ', None)
+                        ebitda_margin = row.get('LTM EBITDA Margin % ', None)
+                        rev_growth = row.get('LTM Total Revenues, 1 Yr Growth % ', None)
+
+                        if company:
+                            profit_data.append({
+                                'Company': company,
+                                'Gross Margin': f"{gross_margin*100:.1f}%" if pd.notna(gross_margin) else "-",
+                                'EBITDA Margin': f"{ebitda_margin*100:.1f}%" if pd.notna(ebitda_margin) else "-",
+                                'Rev Growth': f"{rev_growth*100:.1f}%" if pd.notna(rev_growth) else "-",
+                            })
+
+                    # Add USS metrics
+                    uss_margin = uss_metrics.get('ebitda_margin')
+                    profit_data.insert(0, {
+                        'Company': 'United States Steel (X)',
+                        'Gross Margin': '13.5%',  # From 2023 financials
+                        'EBITDA Margin': f"{uss_margin*100:.1f}%" if uss_margin else "10.6%",
+                        'Rev Growth': '-1.2%',  # 2023 vs 2022
+                    })
+
+                    st.markdown("**Profitability & Growth (as of 12/31/2023)**")
+                    st.dataframe(pd.DataFrame(profit_data), use_container_width=True, hide_index=True)
+
+        except Exception as e:
+            st.warning(f"Could not load financial health metrics: {e}")
+
+        # Subsection B3: Valuation Comparison Chart
+        st.subheader("Valuation Comparison")
+
+        try:
+            # Get multiples from trading_multiples sheet, market cap from financial_data
+            trading_df = comps.get('trading_multiples', pd.DataFrame())
+            fin_df = comps.get('financial_data', pd.DataFrame())
+
+            if not trading_df.empty:
+                # Build valuation comparison
+                val_data = []
+                for _, row in trading_df.iterrows():
+                    company = row.get('Company Name', '')
+                    # Extract ticker
+                    ticker = ''
+                    for t in ['NUE', 'CLF', 'STLD', 'CMC', 'ZEUS', 'MT', 'PKX', 'GGB', 'TX', 'BSL']:
+                        if t in company.upper():
+                            ticker = t
+                            break
+
+                    tev_ebitda = row.get('TEV/EBITDA LTM - Latest', None)
+                    tev_rev = row.get('TEV/Total Revenues LTM - Latest', None)
+                    pe = row.get('P/Diluted EPS Before Extra LTM - Latest', None)
+
+                    # Get market cap from financial_data
+                    mkt_cap = None
+                    if not fin_df.empty:
+                        match = fin_df[fin_df['Company Name'].str.contains(company[:20], na=False, regex=False)]
+                        if not match.empty:
+                            mkt_cap = match['Market Capitalization Latest'].iloc[0]
+
+                    if ticker:
+                        val_data.append({
+                            'Ticker': ticker,
+                            'TEV/EBITDA': tev_ebitda if pd.notna(tev_ebitda) else None,
+                            'TEV/Revenue': tev_rev if pd.notna(tev_rev) else None,
+                            'P/E': pe if pd.notna(pe) else None,
+                            'Market Cap ($B)': mkt_cap / 1000 if pd.notna(mkt_cap) else None,
+                        })
+
+                # Add USS
+                val_data.insert(0, {
+                    'Ticker': 'X (USS)',
+                    'TEV/EBITDA': val_uss['ev_blended'] / ebitda_2024 if ebitda_2024 > 0 else None,
+                    'TEV/Revenue': val_uss['ev_blended'] / (consolidated['Revenue'].iloc[0] * 1000) if consolidated['Revenue'].iloc[0] > 0 else None,
+                    'P/E': None,  # Would need current price
+                    'Market Cap ($B)': offer_price * 225 / 1000,  # At offer price
+                })
+
+                val_df = pd.DataFrame(val_data)
+
+                # Create bar chart for TEV/EBITDA comparison
+                val_df_clean = val_df.dropna(subset=['TEV/EBITDA'])
+                if not val_df_clean.empty:
+                    fig_val = go.Figure()
+
+                    # Color USS differently
+                    colors = ['#EF553B' if 'USS' in t else '#636EFA' for t in val_df_clean['Ticker']]
+
+                    fig_val.add_trace(go.Bar(
+                        x=val_df_clean['Ticker'],
+                        y=val_df_clean['TEV/EBITDA'],
+                        marker_color=colors,
+                        text=[f"{v:.1f}x" for v in val_df_clean['TEV/EBITDA']],
+                        textposition='outside'
+                    ))
+
+                    # Add median line
+                    peer_median = val_df_clean[~val_df_clean['Ticker'].str.contains('USS')]['TEV/EBITDA'].median()
+                    fig_val.add_hline(y=peer_median, line_dash="dash", line_color="green",
+                                      annotation_text=f"Peer Median: {peer_median:.1f}x")
+
+                    fig_val.update_layout(
+                        title="TEV/EBITDA Multiple Comparison",
+                        yaxis_title="TEV/EBITDA",
+                        showlegend=False,
+                        height=400
+                    )
+                    st.plotly_chart(fig_val, use_container_width=True)
+
+                # Show valuation table
+                st.dataframe(val_df.round(2), use_container_width=True, hide_index=True)
+
+        except Exception as e:
+            st.warning(f"Could not load valuation comparison: {e}")
+
+        # Subsection C: USS Percentile Ranking
+        st.subheader("USS Competitive Position")
+
+        try:
+            metrics_to_rank = ['ebitda_margin', 'revenue']
+            rankings = []
+
+            for metric in metrics_to_rank:
+                rank = benchmark.get_uss_percentile_rank(metric)
+                if rank:
+                    if metric == 'ebitda_margin':
+                        uss_val = f"{rank['uss_value']:.1%}"
+                        peer_med = f"{rank['peer_median']:.1%}"
+                    elif metric == 'revenue':
+                        uss_val = f"${rank['uss_value']/1000:.1f}B"
+                        peer_med = f"${rank['peer_median']/1000:.1f}B"
+                    else:
+                        uss_val = f"{rank['uss_value']:.1f}"
+                        peer_med = f"{rank['peer_median']:.1f}"
+
+                    rankings.append({
+                        'Metric': metric.replace('_', ' ').title(),
+                        'USS Value': uss_val,
+                        'Peer Median': peer_med,
+                        'Percentile': f"{rank['percentile']:.0f}%",
+                        'vs Median': rank['vs_median'].title()
+                    })
+
+            if rankings:
+                rank_df = pd.DataFrame(rankings)
+                st.dataframe(rank_df, use_container_width=True, hide_index=True)
+
+                # Visual percentile indicator
+                rank_cols = st.columns(len(rankings))
+                for i, rank_info in enumerate(rankings):
+                    with rank_cols[i]:
+                        pct = float(rank_info['Percentile'].replace('%', ''))
+                        color = '#00CC96' if pct >= 50 else '#EF553B'
+                        st.markdown(f"""
+                        <div style="text-align: center;">
+                            <div style="font-weight: bold;">{rank_info['Metric']}</div>
+                            <div style="font-size: 24px; color: {color};">{rank_info['Percentile']}</div>
+                            <div style="font-size: 12px;">percentile</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("Percentile ranking data not available")
+
+        except Exception as e:
+            st.warning(f"Could not calculate percentile rankings: {e}")
 
     # =========================================================================
     # SENSITIVITY THRESHOLDS ("WHAT BREAKS THE DEAL")

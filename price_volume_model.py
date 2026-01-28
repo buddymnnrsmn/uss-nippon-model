@@ -199,6 +199,88 @@ class ModelScenario:
     # Financing assumptions for USS standalone (used when calculating "USS - No Sale" value)
     financing: FinancingAssumptions = field(default_factory=FinancingAssumptions)
 
+    # Benchmark integration (optional)
+    use_benchmark_multiples: bool = False  # Toggle benchmark-driven exit multiples
+
+
+# =============================================================================
+# BENCHMARK INTEGRATION
+# =============================================================================
+
+def get_benchmark_exit_multiple(scenario_type: str, use_benchmark: bool = False) -> Optional[float]:
+    """Get exit multiple from peer data or return None to use scenario default.
+
+    Args:
+        scenario_type: Scenario name (e.g., 'base_case', 'severe_downturn')
+        use_benchmark: If False, returns None to use scenario default
+
+    Returns:
+        Exit multiple from peer benchmarks, or None if benchmarks not available/enabled
+    """
+    if not use_benchmark:
+        return None
+
+    try:
+        from benchmark_data import BenchmarkData
+        benchmark = BenchmarkData()
+        multiples = benchmark.get_exit_multiple_range()
+
+        # Map scenario to benchmark percentile
+        mapping = {
+            'severe_downturn': multiples['low'] * 0.85,  # Below Q1
+            'severe downturn (historical crisis)': multiples['low'] * 0.85,
+            'downside': multiples['low'],                 # Q1
+            'downside (weak markets)': multiples['low'],
+            'base_case': multiples['base'],               # Median
+            'base case (mid-cycle)': multiples['base'],
+            'above_average': multiples['base'] * 1.1,     # Above median
+            'above average (strong cycle)': multiples['base'] * 1.1,
+            'optimistic': multiples['high'],              # Q3
+            'optimistic (peak cycle)': multiples['high'],
+            'wall_street': multiples['base'],             # Use median for consensus
+            'wall street consensus': multiples['base'],
+            'nippon_commitments': multiples['base'] * 1.05,  # Slight premium for strategic value
+            'nsa mandated capex': multiples['base'] * 1.05,
+        }
+        return mapping.get(scenario_type.lower(), multiples['base'])
+    except Exception:
+        # Fallback if benchmark data not available
+        return None
+
+
+def validate_margin_vs_peers(segment_margin: float, segment_name: str) -> dict:
+    """Compare segment margin against peer benchmarks.
+
+    Args:
+        segment_margin: The margin to validate (e.g., 0.12 for 12%)
+        segment_name: Name of the segment for context
+
+    Returns:
+        Dict with margin comparison results
+    """
+    try:
+        from benchmark_data import BenchmarkData
+        benchmark = BenchmarkData()
+        peer_stats = benchmark.get_margin_stats()
+
+        # Look for EBITDA margin in stats
+        for key in ['ltm_ebitda_margin', 'ebitda_margin_ltm', 'ebitda_margin']:
+            if key in peer_stats:
+                stats = peer_stats[key]
+                deviation = segment_margin - stats.median
+                return {
+                    'segment': segment_name,
+                    'margin': segment_margin,
+                    'peer_median': stats.median,
+                    'peer_range': (stats.q1, stats.q3),
+                    'deviation_from_median': deviation,
+                    'vs_peers': 'above' if segment_margin > stats.median else 'below',
+                    'significant_deviation': abs(deviation) > (stats.q3 - stats.q1) / 2
+                }
+        return {'segment': segment_name, 'margin': segment_margin, 'peer_median': None}
+    except Exception:
+        return {'segment': segment_name, 'margin': segment_margin, 'peer_median': None}
+
 
 # =============================================================================
 # SCENARIO PRESETS
@@ -1153,7 +1235,13 @@ class PriceVolumeModel:
 
         # Terminal value - Exit Multiple
         terminal_ebitda = df['Total_EBITDA'].iloc[-1]
-        tv_exit = terminal_ebitda * s.exit_multiple
+        # Use benchmark multiple if enabled, otherwise scenario default
+        effective_multiple = s.exit_multiple
+        if s.use_benchmark_multiples:
+            benchmark_mult = get_benchmark_exit_multiple(s.name.lower(), use_benchmark=True)
+            if benchmark_mult is not None:
+                effective_multiple = benchmark_mult
+        tv_exit = terminal_ebitda * effective_multiple
         pv_tv_exit = tv_exit * discount_factors[-1]
 
         # Enterprise values
@@ -1203,7 +1291,9 @@ class PriceVolumeModel:
             'share_price': share_price,
             'terminal_ebitda': terminal_ebitda,
             'shares_used': shares,
-            'financing_impact': financing_impact
+            'financing_impact': financing_impact,
+            'exit_multiple_used': effective_multiple,
+            'used_benchmark_multiple': s.use_benchmark_multiples and effective_multiple != s.exit_multiple
         }
 
     def run_full_analysis(self) -> Dict:

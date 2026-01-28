@@ -30,3 +30,11 @@ Thumbs.db
 
 # Claude Code
 .claude/
+
+# Local data folder (WRDS credentials and cached data)
+local/
+
+documentation/
+
+# Large reference data files (SEC filings, RTFs)
+reference_materials/steel_comps/
