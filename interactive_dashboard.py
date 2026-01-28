@@ -1346,7 +1346,7 @@ def main():
         | Requirement | Status | Evidence |
         |-------------|--------|----------|
         | **Market Canvass** | Complete | Multiple bidders contacted; Cleveland-Cliffs, PE firms considered |
-        | **Fairness Opinions** | Obtained | Barclays (\\$39-48) and Goldman Sachs (\\$42-52) DCF ranges |
+        | **Fairness Opinions** | Obtained | Barclays (\\$39-50) and Goldman Sachs (\\$38-52) DCF ranges |
         | **Premium to Market** | 40% Premium | \\$55 vs \\$39.33 pre-announcement (Dec 2023) |
         | **Premium to DCF** | {premium_color} | \\$55 vs \\${standalone_str} standalone ({offer_diff_str}) |
         | **Superior Alternatives** | None Exist | Cliffs bid \\$35, PE max \\$40, no other strategic interest |
@@ -2676,8 +2676,8 @@ def main():
         - Severe Downturn: 25% (2009, 2015, 2020-type events)
         - Downside: 30% (below-average but not crisis)
         - Base Case: 30% (mid-cycle, median performance)
-        - Above Average: 10% (2017-18 type conditions)
-        - Optimistic: 5% (2021-22 peak conditions)
+        - Above Average: 10% (2017-18 type strong markets)
+        - Optimistic: 5% (sustained favorable markets with growth)
 
         **Total: 100%**
         """)
@@ -3217,7 +3217,7 @@ def main():
         'Method': 'Analyst Fairness Opinions',
         'Low': 39.0,
         'High': 52.0,
-        'Description': 'Barclays ($39-48) & Goldman ($42-52) DCF ranges from Dec 2023 proxy filing'
+        'Description': 'Barclays ($39-50) & Goldman ($38-52) DCF ranges from Dec 2023 proxy filing'
     })
 
     # 6. PE LBO Alternative (maximum price to achieve 20% IRR)

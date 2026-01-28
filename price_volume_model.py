@@ -10,7 +10,7 @@ Key Features:
 - Price x Volume revenue derivation by segment
 - Steel price scenarios (HRC, CRC, Coated, OCTG benchmarks)
 - Volume scenarios (capacity utilization, demand cycles)
-- Pre-built scenario presets (Base, Conservative, Wall Street, Management, Nippon Commitments)
+- Pre-built scenario presets (Severe Downturn, Downside, Base Case, Above Average, Optimistic, Wall Street, Nippon Commitments)
 - IRP-adjusted WACC for cross-border valuation
 """
 
@@ -343,7 +343,7 @@ def get_benchmark_exit_multiple(scenario_type: str, use_benchmark: bool = False)
             'above_average': multiples['base'] * 1.1,     # Above median
             'above average (strong cycle)': multiples['base'] * 1.1,
             'optimistic': multiples['high'],              # Q3
-            'optimistic (peak cycle)': multiples['high'],
+            'optimistic (sustained growth)': multiples['high'],
             'wall_street': multiples['base'],             # Use median for consensus
             'wall street consensus': multiples['base'],
             'nippon_commitments': multiples['base'] * 1.05,  # Slight premium for strategic value
