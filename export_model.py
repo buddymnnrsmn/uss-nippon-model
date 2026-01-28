@@ -31,7 +31,7 @@ from price_volume_model import (
     PriceVolumeModel, ModelScenario, ScenarioType,
     get_scenario_presets, get_segment_configs, get_capital_projects,
     compare_scenarios, calculate_probability_weighted_valuation,
-    BENCHMARK_PRICES_2023, Segment
+    BENCHMARK_PRICES_2023, Segment, get_synergy_presets, SynergyAssumptions
 )
 
 
@@ -166,6 +166,10 @@ class ModelExporter:
         self._create_equity_bridge_sheet(wb)
         self._create_financing_sheet(wb)
 
+        # Add synergy sheet if synergies are enabled
+        if self.analysis.get('synergy_schedule') is not None:
+            self._create_synergy_sheet(wb)
+
         # Remove default empty sheet if it exists
         if 'Sheet' in wb.sheetnames and len(wb.sheetnames) > 1:
             del wb['Sheet']
@@ -203,6 +207,10 @@ class ModelExporter:
         self._create_projects_sheet(wb)
         self._create_equity_bridge_sheet(wb)
         self._create_financing_sheet(wb)
+
+        # Add synergy sheet if synergies are enabled
+        if self.analysis.get('synergy_schedule') is not None:
+            self._create_synergy_sheet(wb)
 
         # Add multi-scenario sheets
         self._create_scenario_comparison_sheet(wb, scenario_types)
@@ -1010,6 +1018,174 @@ class ModelExporter:
         # Column widths
         ws.column_dimensions['A'].width = 40
         ws.column_dimensions['B'].width = 20
+
+    def _create_synergy_sheet(self, wb: Workbook):
+        """Create synergy analysis sheet"""
+        ws = wb.create_sheet("Synergy Analysis")
+
+        synergy_schedule = self.analysis.get('synergy_schedule')
+        synergy_value = self.analysis.get('synergy_value')
+        synergies = self.scenario.synergies
+
+        if synergy_schedule is None or synergies is None:
+            ws['A1'] = "No synergies configured for this scenario"
+            return
+
+        # Title
+        ws['A1'] = "SYNERGY & TECHNOLOGY TRANSFER ANALYSIS"
+        ws['A1'].font = self.styler.title_font
+        ws['A2'] = f"Synergy Preset: {synergies.name}"
+        ws['A2'].font = self.styler.subtitle_font
+
+        row = 4
+
+        # Summary section
+        self.styler.style_section_header(ws, row, "SYNERGY VALUE SUMMARY", 1, 2)
+        row += 1
+
+        if synergy_value:
+            summary_items = [
+                ("NPV of Synergies", synergy_value['npv_synergies'], self.styler.currency_format),
+                ("Synergy Value per Share", synergy_value['synergy_value_per_share'], self.styler.currency_decimal_format),
+                ("Run-Rate Synergies (2033)", synergy_value['run_rate_synergies'], self.styler.currency_format),
+                ("Total Integration Costs", synergy_value['total_integration_costs'], self.styler.currency_format),
+                ("", "", ""),
+                ("Operating Run-Rate", synergies.operating.get_total_run_rate(), self.styler.currency_format),
+                ("Revenue Synergy EBITDA", synergies.revenue.get_run_rate_ebitda(), self.styler.currency_format),
+                ("Integration Total", synergies.integration.get_total_cost(), self.styler.currency_format),
+            ]
+
+            for item, value, fmt in summary_items:
+                ws.cell(row=row, column=1, value=item)
+                if value != "":
+                    cell = ws.cell(row=row, column=2, value=value)
+                    cell.number_format = fmt
+                if item:
+                    self.styler.style_data_cell(ws, row, 1)
+                    if value != "":
+                        value_type = 'positive' if isinstance(value, (int, float)) and value > 0 else None
+                        self.styler.style_data_cell(ws, row, 2, value_type)
+                row += 1
+
+        row += 1
+
+        # Operating Synergies Detail
+        self.styler.style_section_header(ws, row, "OPERATING SYNERGIES ASSUMPTIONS", 1, 3)
+        row += 1
+
+        op = synergies.operating
+        op_items = [
+            ("Procurement Savings (Annual)", op.procurement_savings_annual, op.procurement_confidence),
+            ("Logistics Savings (Annual)", op.logistics_savings_annual, op.logistics_confidence),
+            ("Overhead Savings (Annual)", op.overhead_savings_annual, op.overhead_confidence),
+        ]
+
+        headers = ["Category", "Run-Rate ($M)", "Confidence"]
+        for col, header in enumerate(headers, 1):
+            ws.cell(row=row, column=col, value=header)
+        self.styler.style_header_row(ws, row, 1, 3)
+        row += 1
+
+        for item, value, conf in op_items:
+            ws.cell(row=row, column=1, value=item)
+            ws.cell(row=row, column=2, value=value)
+            ws.cell(row=row, column=2).number_format = self.styler.currency_format
+            ws.cell(row=row, column=3, value=conf)
+            ws.cell(row=row, column=3).number_format = self.styler.percent_format
+            for col in range(1, 4):
+                self.styler.style_data_cell(ws, row, col)
+            row += 1
+
+        row += 1
+
+        # Technology Transfer Detail
+        self.styler.style_section_header(ws, row, "TECHNOLOGY TRANSFER ASSUMPTIONS", 1, 3)
+        row += 1
+
+        tech = synergies.technology
+        tech_items = [
+            ("Yield Improvement", tech.yield_improvement_pct, self.styler.percent_format),
+            ("Quality Price Premium", tech.quality_price_premium_pct, self.styler.percent_format),
+            ("Conversion Cost Reduction", tech.conversion_cost_reduction_pct, self.styler.percent_format),
+            ("Confidence Factor", tech.confidence, self.styler.percent_format),
+        ]
+
+        for item, value, fmt in tech_items:
+            ws.cell(row=row, column=1, value=item)
+            cell = ws.cell(row=row, column=2, value=value)
+            cell.number_format = fmt
+            self.styler.style_data_cell(ws, row, 1)
+            self.styler.style_data_cell(ws, row, 2)
+            row += 1
+
+        row += 1
+
+        # Revenue Synergies Detail
+        self.styler.style_section_header(ws, row, "REVENUE SYNERGIES ASSUMPTIONS", 1, 3)
+        row += 1
+
+        rev = synergies.revenue
+        rev_items = [
+            ("Cross-Sell Revenue (Annual)", rev.cross_sell_revenue_annual, rev.cross_sell_margin, rev.cross_sell_confidence),
+            ("Product Mix Uplift (Annual)", rev.product_mix_revenue_uplift, rev.product_mix_margin, rev.product_mix_confidence),
+        ]
+
+        headers = ["Category", "Revenue ($M)", "Margin", "Confidence"]
+        for col, header in enumerate(headers, 1):
+            ws.cell(row=row, column=col, value=header)
+        self.styler.style_header_row(ws, row, 1, 4)
+        row += 1
+
+        for item, rev_val, margin, conf in rev_items:
+            ws.cell(row=row, column=1, value=item)
+            ws.cell(row=row, column=2, value=rev_val)
+            ws.cell(row=row, column=2).number_format = self.styler.currency_format
+            ws.cell(row=row, column=3, value=margin)
+            ws.cell(row=row, column=3).number_format = self.styler.percent_format
+            ws.cell(row=row, column=4, value=conf)
+            ws.cell(row=row, column=4).number_format = self.styler.percent_format
+            for col in range(1, 5):
+                self.styler.style_data_cell(ws, row, col)
+            row += 1
+
+        row += 2
+
+        # Year-by-year schedule
+        self.styler.style_section_header(ws, row, "SYNERGY SCHEDULE ($M)", 1, len(synergy_schedule) + 1)
+        row += 1
+
+        # Headers
+        headers = list(synergy_schedule.columns)
+        for col, header in enumerate(headers, 1):
+            ws.cell(row=row, column=col, value=header)
+        self.styler.style_header_row(ws, row, 1, len(headers))
+        row += 1
+
+        # Data rows
+        for _, data_row in synergy_schedule.iterrows():
+            for col, header in enumerate(headers, 1):
+                value = data_row[header]
+                cell = ws.cell(row=row, column=col, value=value)
+
+                if header != 'Year':
+                    cell.number_format = self.styler.currency_format
+
+                value_type = None
+                if header == 'Integration_Cost' and value > 0:
+                    value_type = 'negative'
+                elif header in ['Total_Synergy_EBITDA', 'Cumulative_Synergy'] and value > 0:
+                    value_type = 'positive'
+
+                self.styler.style_data_cell(ws, row, col, value_type)
+            row += 1
+
+        # Column widths
+        ws.column_dimensions['A'].width = 30
+        ws.column_dimensions['B'].width = 18
+        ws.column_dimensions['C'].width = 12
+        ws.column_dimensions['D'].width = 12
+        for col in range(5, len(headers) + 2):
+            ws.column_dimensions[get_column_letter(col)].width = 12
 
     def _create_scenario_comparison_sheet(self, wb: Workbook, scenario_types: List[ScenarioType] = None):
         """Create scenario comparison sheet"""
