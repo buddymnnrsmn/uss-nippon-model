@@ -20,6 +20,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pathlib import Path
+import hashlib
+import json
+from datetime import datetime
+import cache_persistence as cp
 
 # Import the price x volume model
 from price_volume_model import (
@@ -27,8 +31,92 @@ from price_volume_model import (
     SteelPriceScenario, VolumeScenario, Segment,
     get_scenario_presets, get_segment_configs, compare_scenarios,
     calculate_probability_weighted_valuation,
-    get_capital_projects, BENCHMARK_PRICES_2023
+    get_capital_projects, BENCHMARK_PRICES_2023,
+    get_synergy_presets, SynergyAssumptions, OperatingSynergies,
+    TechnologyTransfer, RevenueSynergies, IntegrationCosts, SynergyRampSchedule
 )
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def create_scenario_hash(scenario, execution_factor, custom_benchmarks):
+    """Generate hash of current scenario parameters for cache invalidation."""
+    scenario_dict = {
+        'scenario_type': scenario.scenario_type.name,
+        'execution_factor': execution_factor,
+        'prices': {
+            'hrc_us': scenario.price_scenario.hrc_us_factor,
+            'crc_us': scenario.price_scenario.crc_us_factor,
+            'coated_us': scenario.price_scenario.coated_us_factor,
+            'hrc_eu': scenario.price_scenario.hrc_eu_factor,
+            'octg': scenario.price_scenario.octg_factor,
+        },
+        'volumes': {
+            'flat_rolled_vf': scenario.volume_scenario.flat_rolled_volume_factor,
+            'flat_rolled_ga': scenario.volume_scenario.flat_rolled_growth_adj,
+            'mini_mill_vf': scenario.volume_scenario.mini_mill_volume_factor,
+            'mini_mill_ga': scenario.volume_scenario.mini_mill_growth_adj,
+            'usse_vf': scenario.volume_scenario.usse_volume_factor,
+            'usse_ga': scenario.volume_scenario.usse_growth_adj,
+            'tubular_vf': scenario.volume_scenario.tubular_volume_factor,
+            'tubular_ga': scenario.volume_scenario.tubular_growth_adj,
+        },
+        'financial': {
+            'uss_wacc': scenario.uss_wacc,
+            'terminal_growth': scenario.terminal_growth,
+            'exit_multiple': scenario.exit_multiple,
+        },
+        'projects': scenario.include_projects if scenario.include_projects else [],
+        'custom_benchmarks': custom_benchmarks if custom_benchmarks else {}
+    }
+    return hashlib.md5(json.dumps(scenario_dict, sort_keys=True).encode()).hexdigest()
+
+
+def render_calculation_button(
+    section_name: str,
+    button_label: str,
+    session_key: str
+) -> bool:
+    """
+    Render a consistent calculation button with status messages.
+
+    Returns: True if button was clicked, False otherwise
+    """
+    col1, col2 = st.columns([1, 4])
+
+    with col1:
+        is_calculated = st.session_state[session_key] is not None
+        is_stale = session_key in st.session_state.get('stale_sections', set())
+
+        button_text = "Recalculate" if is_calculated else button_label
+        button_type = "primary" if (not is_calculated or is_stale) else "secondary"
+
+        clicked = st.button(
+            button_text,
+            type=button_type,
+            key=f"btn_{session_key}"
+        )
+
+    with col2:
+        if is_stale:
+            st.warning(f"Parameters changed. Click {button_text} to update.")
+        elif is_calculated:
+            result = st.session_state[session_key]
+            if 'timestamp' in result:
+                time_str = result['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+                st.success(f"Calculated at {time_str}")
+            else:
+                st.success("Up to date")
+        else:
+            st.info(f"Click to {button_label.lower()}")
+
+    # Clear stale flag after recalculation
+    if clicked and is_stale:
+        st.session_state.stale_sections.discard(session_key)
+
+    return clicked
 
 
 # =============================================================================
@@ -70,6 +158,7 @@ def render_sidebar():
         **Valuation Details**
         - [Valuation Details](#valuation-details)
         - [USS Standalone Financing Impact](#uss-standalone-financing)
+        - [Synergy Analysis](#synergy-analysis)
         - [Scenario Comparison](#scenario-comparison)
         - [Probability-Weighted Expected Value](#probability-weighted-value)
         - [Capital Projects Analysis](#capital-projects)
@@ -118,10 +207,10 @@ def render_sidebar():
     )
     selected_scenario_type = scenario_options[selected_scenario_name]
 
-    # Check if scenario changed - if so, trigger reset to load new defaults
-    if st.session_state.previous_scenario != selected_scenario_name and selected_scenario_type != ScenarioType.CUSTOM:
+    # Auto-reset values when scenario changes (but not on initial load)
+    if st.session_state.previous_scenario is not None and st.session_state.previous_scenario != selected_scenario_name:
         st.session_state.reset_section = "all"
-        st.session_state.previous_scenario = selected_scenario_name
+    st.session_state.previous_scenario = selected_scenario_name
 
     # Show scenario description
     scenario_descriptions = {
@@ -192,6 +281,7 @@ def render_sidebar():
         st.session_state.include_mining = 'Mining Investment' in preset.include_projects
         st.session_state.include_fairfield = 'Fairfield Works' in preset.include_projects
         st.session_state.reset_section = None
+        st.rerun()  # Rerun to apply the new values to widgets
 
     st.sidebar.markdown("---")
 
@@ -477,6 +567,184 @@ def render_sidebar():
         )
         execution_factor = execution_pct / 100.0
 
+    # ==========================================================================
+    # SYNERGY ASSUMPTIONS
+    # ==========================================================================
+    st.sidebar.markdown("---")
+    st.sidebar.header("Synergy Assumptions")
+
+    synergy_presets = get_synergy_presets()
+    synergy_options = {
+        "None (No Synergies)": "none",
+        "Conservative": "conservative",
+        "Base Case": "base_case",
+        "Optimistic": "optimistic",
+        "Custom": "custom"
+    }
+
+    selected_synergy_name = st.sidebar.selectbox(
+        "Synergy Preset",
+        options=list(synergy_options.keys()),
+        index=0,  # Default to None
+        help="Select synergy assumptions for Nippon valuation. Synergies only apply to Nippon's value, not USS standalone."
+    )
+    selected_synergy_key = synergy_options[selected_synergy_name]
+
+    # Synergy descriptions
+    synergy_descriptions = {
+        "None (No Synergies)": "No merger synergies modeled. Nippon value = WACC advantage only.",
+        "Conservative": "\\$120M operating + 1% tech + \\$150M revenue synergies, \\$325M integration costs",
+        "Base Case": "\\$240M operating + 2% tech + \\$350M revenue synergies, \\$325M integration costs",
+        "Optimistic": "\\$370M operating + 3% tech + \\$700M revenue synergies, \\$450M integration costs",
+        "Custom": "Manually configure all synergy parameters below"
+    }
+    st.sidebar.caption(synergy_descriptions.get(selected_synergy_name, ""))
+
+    # Get synergy preset
+    if selected_synergy_key == "custom":
+        synergy_preset = synergy_presets["base_case"]  # Start from base case for custom
+    elif selected_synergy_key in synergy_presets:
+        synergy_preset = synergy_presets[selected_synergy_key]
+    else:
+        synergy_preset = None
+
+    # Custom synergy inputs (only if Custom selected)
+    synergies = synergy_preset
+
+    if selected_synergy_key == "custom":
+        with st.sidebar.expander("Operating Synergies", expanded=False):
+            custom_procurement = st.slider(
+                "Procurement Savings ($M/yr)",
+                0.0, 200.0, 100.0, 10.0,
+                key="syn_procurement",
+                help="Annual savings from combined purchasing power"
+            )
+            custom_logistics = st.slider(
+                "Logistics Savings ($M/yr)",
+                0.0, 150.0, 60.0, 10.0,
+                key="syn_logistics",
+                help="Annual savings from network optimization"
+            )
+            custom_overhead = st.slider(
+                "Overhead Savings ($M/yr)",
+                0.0, 150.0, 80.0, 10.0,
+                key="syn_overhead",
+                help="Annual savings from G&A consolidation"
+            )
+
+        with st.sidebar.expander("Technology Transfer", expanded=False):
+            custom_yield = st.slider(
+                "Yield Improvement (%)",
+                0.0, 5.0, 2.0, 0.5,
+                key="syn_yield",
+                help="Production yield improvement from Nippon know-how"
+            ) / 100
+            custom_quality_premium = st.slider(
+                "Quality Price Premium (%)",
+                0.0, 5.0, 2.0, 0.5,
+                key="syn_quality",
+                help="Price premium from improved quality"
+            ) / 100
+            custom_conversion = st.slider(
+                "Conversion Cost Reduction (%)",
+                0.0, 8.0, 4.0, 1.0,
+                key="syn_conversion",
+                help="Reduction in conversion costs"
+            ) / 100
+            custom_tech_confidence = st.slider(
+                "Technology Confidence",
+                0.5, 1.0, 0.70, 0.05,
+                key="syn_tech_conf",
+                help="Probability of achieving technology synergies"
+            )
+
+        with st.sidebar.expander("Revenue Synergies", expanded=False):
+            custom_crosssell = st.slider(
+                "Cross-Sell Revenue ($M/yr)",
+                0.0, 500.0, 200.0, 25.0,
+                key="syn_crosssell",
+                help="Additional revenue from cross-selling to Nippon customers"
+            )
+            custom_productmix = st.slider(
+                "Product Mix Uplift ($M/yr)",
+                0.0, 400.0, 150.0, 25.0,
+                key="syn_productmix",
+                help="Revenue from improved product mix"
+            )
+
+        with st.sidebar.expander("Integration Costs", expanded=False):
+            custom_it_cost = st.slider(
+                "IT Integration ($M)",
+                0.0, 300.0, 125.0, 25.0,
+                key="syn_it_cost",
+                help="One-time IT integration costs"
+            )
+            custom_cultural_cost = st.slider(
+                "Cultural Integration ($M)",
+                0.0, 150.0, 50.0, 10.0,
+                key="syn_cultural",
+                help="Training, change management costs"
+            )
+            custom_restructuring = st.slider(
+                "Restructuring ($M)",
+                0.0, 300.0, 150.0, 25.0,
+                key="syn_restructuring",
+                help="Severance, facility consolidation"
+            )
+
+        # Build custom synergy assumptions
+        standard_ramp = SynergyRampSchedule(schedule={
+            2024: 0.0, 2025: 0.20, 2026: 0.50, 2027: 0.80, 2028: 1.0,
+            2029: 1.0, 2030: 1.0, 2031: 1.0, 2032: 1.0, 2033: 1.0
+        })
+        technology_ramp = SynergyRampSchedule(schedule={
+            2024: 0.0, 2025: 0.0, 2026: 0.20, 2027: 0.50, 2028: 0.80,
+            2029: 1.0, 2030: 1.0, 2031: 1.0, 2032: 1.0, 2033: 1.0
+        })
+        integration_schedule = {2024: 0.40, 2025: 0.40, 2026: 0.20}
+
+        synergies = SynergyAssumptions(
+            name="Custom",
+            description="User-defined synergy assumptions",
+            operating=OperatingSynergies(
+                procurement_savings_annual=custom_procurement,
+                procurement_confidence=0.80,
+                logistics_savings_annual=custom_logistics,
+                logistics_confidence=0.75,
+                overhead_savings_annual=custom_overhead,
+                overhead_confidence=0.85,
+                ramp_schedule=standard_ramp
+            ),
+            technology=TechnologyTransfer(
+                yield_improvement_pct=custom_yield,
+                yield_margin_impact=0.008,
+                quality_price_premium_pct=custom_quality_premium,
+                conversion_cost_reduction_pct=custom_conversion,
+                segment_allocation={'Flat-Rolled': 0.50, 'Mini Mill': 0.30, 'USSE': 0.15, 'Tubular': 0.05},
+                ramp_schedule=technology_ramp,
+                confidence=custom_tech_confidence
+            ),
+            revenue=RevenueSynergies(
+                cross_sell_revenue_annual=custom_crosssell,
+                cross_sell_margin=0.15,
+                cross_sell_confidence=0.60,
+                product_mix_revenue_uplift=custom_productmix,
+                product_mix_margin=0.20,
+                product_mix_confidence=0.65,
+                ramp_schedule=standard_ramp
+            ),
+            integration=IntegrationCosts(
+                it_integration_cost=custom_it_cost,
+                it_spend_schedule=integration_schedule,
+                cultural_integration_cost=custom_cultural_cost,
+                cultural_spend_schedule=integration_schedule,
+                restructuring_cost=custom_restructuring,
+                restructuring_spend_schedule=integration_schedule
+            ),
+            enabled=True,
+            overall_execution_factor=1.0
+        )
+
     # Build the custom scenario
     price_scenario = SteelPriceScenario(
         name="Custom" if selected_scenario_type == ScenarioType.CUSTOM else preset.price_scenario.name,
@@ -519,7 +787,8 @@ def render_sidebar():
         nippon_tax_rate=nippon_tax_rate,
         override_irp=override_irp,
         manual_nippon_usd_wacc=manual_nippon_usd_wacc,
-        include_projects=include_projects
+        include_projects=include_projects,
+        synergies=synergies
     )
 
     # Build custom benchmarks dictionary
@@ -546,9 +815,81 @@ def main():
     # Get assumptions from sidebar
     scenario, scenario_name, execution_factor, custom_benchmarks = render_sidebar()
 
+    # =========================================================================
+    # INITIALIZE SESSION STATE FOR CACHED CALCULATIONS
+    # =========================================================================
+    calc_states = [
+        'calc_football_field',
+        'calc_scenario_comparison',
+        'calc_probability_weighted',
+        'calc_price_sensitivity',
+        'calc_wacc_sensitivity',
+        'calc_lbo',
+        'cached_scenario_hash',
+        'stale_sections'
+    ]
+
+    for state in calc_states:
+        if state not in st.session_state:
+            if state == 'stale_sections':
+                st.session_state[state] = set()
+            else:
+                st.session_state[state] = None
+
+    # =========================================================================
+    # CACHE INVALIDATION SYSTEM
+    # =========================================================================
+    current_hash = create_scenario_hash(scenario, execution_factor, custom_benchmarks)
+
+    # Invalidate all caches if scenario changed
+    if st.session_state.cached_scenario_hash != current_hash:
+        # Mark existing caches as stale before clearing
+        for key in ['calc_football_field', 'calc_scenario_comparison',
+                    'calc_probability_weighted', 'calc_price_sensitivity',
+                    'calc_wacc_sensitivity', 'calc_lbo']:
+            if st.session_state[key] is not None:
+                st.session_state.stale_sections.add(key)
+
+        # Clear cached calculations from session state
+        st.session_state.calc_football_field = None
+        st.session_state.calc_scenario_comparison = None
+        st.session_state.calc_probability_weighted = None
+        st.session_state.calc_price_sensitivity = None
+        st.session_state.calc_wacc_sensitivity = None
+        st.session_state.calc_lbo = None
+        st.session_state.cached_scenario_hash = current_hash
+
+        # Clear old disk caches
+        cp.clear_old_caches(current_hash)
+    else:
+        # Load from disk if session state is empty but disk cache exists
+        for key in ['calc_scenario_comparison', 'calc_probability_weighted',
+                    'calc_price_sensitivity', 'calc_wacc_sensitivity']:
+            if st.session_state[key] is None:
+                cached_data = cp.load_calculation_cache(key, current_hash)
+                if cached_data is not None:
+                    st.session_state[key] = cached_data
+
     # Run the model with execution factor and custom benchmarks
-    model = PriceVolumeModel(scenario, execution_factor=execution_factor, custom_benchmarks=custom_benchmarks)
+    progress_bar = st.progress(0, text="Loading financial model...")
+
+    # Define callback function for real-time progress updates
+    def update_progress(percent: int, message: str):
+        progress_bar.progress(percent, text=message)
+
+    # Build model with callback
+    model = PriceVolumeModel(
+        scenario,
+        execution_factor=execution_factor,
+        custom_benchmarks=custom_benchmarks,
+        progress_callback=update_progress
+    )
+
+    # Run analysis (progress updates happen via callback)
     analysis = model.run_full_analysis()
+
+    # Clean up
+    progress_bar.empty()
 
     consolidated = analysis['consolidated']
     segment_dfs = analysis['segment_dfs']
@@ -557,6 +898,157 @@ def main():
     val_uss = analysis['val_uss']
     val_nippon = analysis['val_nippon']
     financing_impact = analysis.get('financing_impact', {})
+
+    # =========================================================================
+    # BULK OPERATIONS SECTION (in sidebar)
+    # =========================================================================
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Bulk Operations")
+
+    col1, col2 = st.sidebar.columns(2)
+
+    with col1:
+        if st.button("Calculate All", type="primary", key="btn_calc_all", use_container_width=True):
+            st.session_state.trigger_calc_all = True
+
+    with col2:
+        if st.button("Clear All", type="secondary", key="btn_clear_all", use_container_width=True):
+            st.session_state.calc_scenario_comparison = None
+            st.session_state.calc_probability_weighted = None
+            st.session_state.calc_price_sensitivity = None
+            st.session_state.calc_wacc_sensitivity = None
+            st.session_state.stale_sections.clear()
+            st.success("All calculations cleared")
+            st.rerun()
+
+    # Process Calculate All if triggered
+    if st.session_state.get('trigger_calc_all'):
+        st.sidebar.info("Running all calculations...")
+
+        # List of sections to calculate
+        sections = [
+            ('calc_scenario_comparison', 'Scenario Comparison'),
+            ('calc_probability_weighted', 'Probability-Weighted Valuation'),
+            ('calc_price_sensitivity', 'Steel Price Sensitivity'),
+            ('calc_wacc_sensitivity', 'WACC Sensitivity'),
+        ]
+
+        overall_progress = st.sidebar.progress(0, text="Calculating all sections...")
+
+        for i, (key, name) in enumerate(sections, 1):
+            overall_progress.progress(int((i-1) / len(sections) * 100), text=f"Calculating {name}... ({i}/{len(sections)})")
+
+            # Trigger calculation by setting a flag
+            if key == 'calc_scenario_comparison':
+                progress_bar_sc = st.progress(0, text="Comparing scenarios...")
+                comparison_df = compare_scenarios(execution_factor=execution_factor, custom_benchmarks=custom_benchmarks, progress_bar=progress_bar_sc)
+                progress_bar_sc.empty()
+                st.session_state.calc_scenario_comparison = {
+                    'dataframe': comparison_df,
+                    'timestamp': datetime.now()
+                }
+
+            elif key == 'calc_probability_weighted':
+                progress_bar_pw = st.progress(0, text="Calculating probability-weighted valuation...")
+                pw_results = calculate_probability_weighted_valuation(
+                    custom_benchmarks=custom_benchmarks,
+                    progress_bar=progress_bar_pw
+                )
+                progress_bar_pw.empty()
+                st.session_state.calc_probability_weighted = {
+                    'results': pw_results,
+                    'timestamp': datetime.now()
+                }
+
+            elif key == 'calc_price_sensitivity':
+                price_factors = np.arange(0.6, 1.5, 0.1)
+                sensitivity_data = []
+                progress_bar_ps = st.progress(0, text="Running steel price sensitivity...")
+
+                for j, pf in enumerate(price_factors, 1):
+                    progress_pct = int((j / len(price_factors)) * 100)
+                    progress_bar_ps.progress(progress_pct, text=f"Testing price level: {pf:.0%} ({j}/{len(price_factors)})")
+
+                    test_price_scenario = SteelPriceScenario(
+                        name="Test", description="Test",
+                        hrc_us_factor=pf, crc_us_factor=pf, coated_us_factor=pf,
+                        hrc_eu_factor=pf, octg_factor=pf,
+                        annual_price_growth=scenario.price_scenario.annual_price_growth
+                    )
+                    test_scenario = ModelScenario(
+                        name="Test", scenario_type=ScenarioType.CUSTOM, description="Test",
+                        price_scenario=test_price_scenario,
+                        volume_scenario=scenario.volume_scenario,
+                        uss_wacc=scenario.uss_wacc,
+                        terminal_growth=scenario.terminal_growth,
+                        exit_multiple=scenario.exit_multiple,
+                        us_10yr=scenario.us_10yr,
+                        japan_10yr=scenario.japan_10yr,
+                        nippon_equity_risk_premium=scenario.nippon_equity_risk_premium,
+                        nippon_credit_spread=scenario.nippon_credit_spread,
+                        nippon_debt_ratio=scenario.nippon_debt_ratio,
+                        nippon_tax_rate=scenario.nippon_tax_rate,
+                        override_irp=scenario.override_irp,
+                        manual_nippon_usd_wacc=scenario.manual_nippon_usd_wacc,
+                        include_projects=scenario.include_projects
+                    )
+                    test_model = PriceVolumeModel(test_scenario, custom_benchmarks=custom_benchmarks)
+                    test_analysis = test_model.run_full_analysis()
+                    sensitivity_data.append({
+                        'Price Factor': f"{pf:.0%}",
+                        'Price Factor Num': pf,
+                        'Nippon Value': test_analysis['val_nippon']['share_price'],
+                        'USS Value': test_analysis['val_uss']['share_price']
+                    })
+
+                sens_df = pd.DataFrame(sensitivity_data)
+                progress_bar_ps.empty()
+
+                price_proj_data = []
+                for seg_name, df in segment_dfs.items():
+                    for _, row in df.iterrows():
+                        price_proj_data.append({
+                            'Year': row['Year'],
+                            'Segment': seg_name,
+                            'Price': row['Price_per_ton']
+                        })
+                price_proj_df = pd.DataFrame(price_proj_data)
+
+                st.session_state.calc_price_sensitivity = {
+                    'sens_df': sens_df,
+                    'price_proj_df': price_proj_df,
+                    'timestamp': datetime.now()
+                }
+
+            elif key == 'calc_wacc_sensitivity':
+                wacc_range = np.arange(0.05, 0.14, 0.005)
+                wacc_sensitivity_data = []
+                progress_bar_wacc = st.progress(0, text="Running WACC sensitivity...")
+
+                for j, w in enumerate(wacc_range, 1):
+                    progress_pct = int((j / len(wacc_range)) * 100)
+                    progress_bar_wacc.progress(progress_pct, text=f"Testing WACC: {w:.1%} ({j}/{len(wacc_range)})")
+                    val = model.calculate_dcf(consolidated, w)
+                    wacc_sensitivity_data.append({
+                        'WACC': w * 100,
+                        'Equity Value': val['share_price']
+                    })
+
+                wacc_sens_df = pd.DataFrame(wacc_sensitivity_data)
+                progress_bar_wacc.empty()
+
+                st.session_state.calc_wacc_sensitivity = {
+                    'wacc_sens_df': wacc_sens_df,
+                    'uss_wacc': scenario.uss_wacc,
+                    'usd_wacc': usd_wacc,
+                    'timestamp': datetime.now()
+                }
+
+        overall_progress.progress(100, text="All calculations complete")
+        del st.session_state.trigger_calc_all
+        overall_progress.empty()
+        st.sidebar.success("All sections calculated successfully")
+        st.rerun()
 
     # =========================================================================
     # EXPORT MODEL SECTION (in sidebar)
@@ -1921,67 +2413,246 @@ def main():
         """)
 
     # =========================================================================
+    # SYNERGY ANALYSIS (only show when synergies are enabled)
+    # =========================================================================
+
+    synergy_schedule = analysis.get('synergy_schedule')
+    synergy_value = analysis.get('synergy_value')
+
+    if synergy_schedule is not None and synergy_value is not None:
+        st.markdown("---")
+        st.header("Synergy Analysis", anchor="synergy-analysis")
+
+        syn = scenario.synergies
+        st.markdown(f"**Synergy Preset:** {syn.name}")
+        st.caption(syn.description if syn.description else "")
+
+        # Summary metrics
+        syn_col1, syn_col2, syn_col3, syn_col4 = st.columns(4)
+
+        with syn_col1:
+            st.metric(
+                "Run-Rate Synergies (2033)",
+                f"${synergy_value['run_rate_synergies']:,.0f}M",
+                "Annual EBITDA at full realization"
+            )
+
+        with syn_col2:
+            st.metric(
+                "10-Year Synergy NPV",
+                f"${synergy_value['npv_synergies']:,.0f}M",
+                f"@ {usd_wacc*100:.2f}% discount rate"
+            )
+
+        with syn_col3:
+            st.metric(
+                "Total Integration Costs",
+                f"${synergy_value['total_integration_costs']:,.0f}M",
+                "One-time costs (Y1-Y3)"
+            )
+
+        with syn_col4:
+            st.metric(
+                "Synergy Value per Share",
+                f"${synergy_value['synergy_value_per_share']:.2f}",
+                "Addition to Nippon value"
+            )
+
+        # Synergy breakdown by category
+        st.markdown("### Synergy Sources at Run-Rate")
+
+        source_col1, source_col2, source_col3 = st.columns(3)
+
+        with source_col1:
+            st.markdown("#### Operating Synergies")
+            op = syn.operating
+            st.markdown(f"""
+            | Category | Annual ($M) | Confidence |
+            |----------|------------:|:----------:|
+            | Procurement | ${op.procurement_savings_annual:,.0f} | {op.procurement_confidence:.0%} |
+            | Logistics | ${op.logistics_savings_annual:,.0f} | {op.logistics_confidence:.0%} |
+            | Overhead | ${op.overhead_savings_annual:,.0f} | {op.overhead_confidence:.0%} |
+            | **Prob-Weighted** | **${op.get_total_run_rate():,.0f}** | |
+            """)
+
+        with source_col2:
+            st.markdown("#### Technology Transfer")
+            tech = syn.technology
+            st.markdown(f"""
+            | Metric | Value |
+            |--------|------:|
+            | Yield Improvement | {tech.yield_improvement_pct*100:.1f}% |
+            | Quality Premium | {tech.quality_price_premium_pct*100:.1f}% |
+            | Conversion Reduction | {tech.conversion_cost_reduction_pct*100:.1f}% |
+            | Confidence | {tech.confidence:.0%} |
+            """)
+
+        with source_col3:
+            st.markdown("#### Revenue Synergies")
+            rev = syn.revenue
+            st.markdown(f"""
+            | Category | Revenue ($M) | Margin | Conf |
+            |----------|-------------:|-------:|-----:|
+            | Cross-Sell | ${rev.cross_sell_revenue_annual:,.0f} | {rev.cross_sell_margin:.0%} | {rev.cross_sell_confidence:.0%} |
+            | Product Mix | ${rev.product_mix_revenue_uplift:,.0f} | {rev.product_mix_margin:.0%} | {rev.product_mix_confidence:.0%} |
+            | **EBITDA** | **${rev.get_run_rate_ebitda():,.0f}** | | |
+            """)
+
+        # Synergy ramp chart
+        st.markdown("### Synergy Realization by Year")
+
+        # Create stacked bar chart
+        fig_syn = go.Figure()
+
+        # Add traces for each synergy category
+        fig_syn.add_trace(go.Bar(
+            name='Operating',
+            x=synergy_schedule['Year'],
+            y=synergy_schedule['Operating_Synergy'],
+            marker_color='#2E86AB'
+        ))
+
+        fig_syn.add_trace(go.Bar(
+            name='Technology',
+            x=synergy_schedule['Year'],
+            y=synergy_schedule['Technology_Synergy'],
+            marker_color='#A23B72'
+        ))
+
+        fig_syn.add_trace(go.Bar(
+            name='Revenue',
+            x=synergy_schedule['Year'],
+            y=synergy_schedule['Revenue_Synergy'],
+            marker_color='#F18F01'
+        ))
+
+        fig_syn.add_trace(go.Bar(
+            name='Integration Costs',
+            x=synergy_schedule['Year'],
+            y=[-x for x in synergy_schedule['Integration_Cost']],  # Negative for costs
+            marker_color='#C73E1D'
+        ))
+
+        fig_syn.update_layout(
+            barmode='relative',
+            title='Synergy EBITDA Contribution by Category ($M)',
+            xaxis_title='Year',
+            yaxis_title='EBITDA Impact ($M)',
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+            height=400
+        )
+
+        st.plotly_chart(fig_syn, use_container_width=True)
+
+        # Synergy schedule table
+        with st.expander("Detailed Synergy Schedule", expanded=False):
+            st.dataframe(
+                synergy_schedule.style.format({
+                    'Operating_Synergy': '${:,.0f}M',
+                    'Technology_Synergy': '${:,.0f}M',
+                    'Revenue_Synergy': '${:,.0f}M',
+                    'Integration_Cost': '${:,.0f}M',
+                    'Total_Synergy_EBITDA': '${:,.0f}M',
+                    'Cumulative_Synergy': '${:,.0f}M'
+                }),
+                use_container_width=True
+            )
+
+        st.info(f"""
+        **Key Insight:** Synergies add **${synergy_value['synergy_value_per_share']:.2f}/share** to Nippon's value.
+        The standard ramp schedule achieves 50% realization by Year 3 and full run-rate by Year 5.
+        Technology synergies ramp slower (full realization by Year 6) as they require operational changes.
+        """)
+
+    # =========================================================================
     # SCENARIO COMPARISON
     # =========================================================================
 
     st.markdown("---")
     st.header("Scenario Comparison", anchor="scenario-comparison")
 
-    # Run comparison across all preset scenarios (with execution factor applied to Nippon Commitments)
-    comparison_df = compare_scenarios(execution_factor=execution_factor, custom_benchmarks=custom_benchmarks)
-
-    # Highlight the current scenario
-    comparison_df['Current'] = comparison_df['Scenario'] == scenario_name
-
-    # View toggle for USS vs Nippon perspective
-    col_toggle, col_spacer = st.columns([1, 3])
-    with col_toggle:
-        valuation_view = st.radio(
-            "Valuation Perspective",
-            options=["Value to Nippon (Acquirer's View)", "USS - No Sale (Status Quo)"],
-            horizontal=True,
-            help="Value to Nippon: What USS is worth to Nippon using their lower cost of capital (~7.5% WACC). USS - No Sale: What USS is worth as a standalone company (~10.9% WACC)."
-        )
-
-    # Determine which column to use for the chart
-    if valuation_view == "Value to Nippon (Acquirer's View)":
-        value_column = 'Value to Nippon ($/sh)'
-        chart_title = 'Share Value by Scenario (Value to Nippon @ 7.5% WACC)'
-        wacc_label = "~7.5% WACC"
-    else:
-        value_column = 'USS - No Sale ($/sh)'
-        chart_title = 'Share Value by Scenario (USS - No Sale @ 10.9% WACC)'
-        wacc_label = "~10.9% WACC"
-
-    # Bar chart comparing scenarios (above table)
-    fig = px.bar(
-        comparison_df,
-        x='Scenario',
-        y=value_column,
-        color='Scenario',
-        title=chart_title,
-        color_discrete_sequence=['#ff6b6b', '#ffa07a', '#98d8c8', '#7fcdbb', '#4ecdc4', '#45b7d1']
+    # Render button for on-demand calculation
+    calc_button_sc = render_calculation_button(
+        section_name="Scenario Comparison",
+        button_label="Compare Scenarios",
+        session_key="calc_scenario_comparison"
     )
-    fig.add_hline(y=55, line_dash="dash", line_color="green", annotation_text="$55 Offer")
-    fig.add_hline(y=0, line_color="black", line_width=1)
-    fig.update_layout(showlegend=False, yaxis_title=f"Equity Value ($/sh) [{wacc_label}]")
-    st.plotly_chart(fig, use_container_width=True)
 
-    # Summary table (below chart)
-    st.markdown("""
-    **How to read this table:**
-    - **USS - No Sale**: Share value if USS remains independent (discounted at USS's ~10.9% WACC)
-    - **Value to Nippon**: Share value from Nippon's perspective (discounted at Nippon's ~7.5% IRP-adjusted WACC)
-    - **Implied EV/EBITDA**: Enterprise Value divided by 2024 EBITDA (current-year implied multiple)
-    - **10Y FCF**: Total free cash flow generated over the 10-year forecast period (2024-2033)
-    - The difference between the two valuations reflects the "WACC advantage" Nippon gains from its lower cost of capital
-    """)
-    display_df = comparison_df[['Scenario', 'USS - No Sale ($/sh)', 'Value to Nippon ($/sh)', 'Implied EV/EBITDA', '10Y FCF ($B)']].copy()
-    display_df['USS - No Sale ($/sh)'] = display_df['USS - No Sale ($/sh)'].apply(lambda x: f"${x:.2f}")
-    display_df['Value to Nippon ($/sh)'] = display_df['Value to Nippon ($/sh)'].apply(lambda x: f"${x:.2f}")
-    display_df['Implied EV/EBITDA'] = display_df['Implied EV/EBITDA'].apply(lambda x: f"{x:.1f}x")
-    display_df['10Y FCF ($B)'] = display_df['10Y FCF ($B)'].apply(lambda x: f"${x:.1f}B")
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    # Calculate if button clicked
+    if calc_button_sc:
+        progress_bar_sc = st.progress(0, text="Comparing scenarios...")
+        comparison_df = compare_scenarios(execution_factor=execution_factor, custom_benchmarks=custom_benchmarks, progress_bar=progress_bar_sc)
+        progress_bar_sc.empty()
+
+        # Store results with timestamp
+        st.session_state.calc_scenario_comparison = {
+            'dataframe': comparison_df,
+            'timestamp': datetime.now()
+        }
+
+        # Persist to disk
+        cp.save_calculation_cache('calc_scenario_comparison', st.session_state.calc_scenario_comparison, current_hash)
+
+        st.rerun()
+
+    # Display results if available
+    if st.session_state.calc_scenario_comparison is not None:
+        comparison_df = st.session_state.calc_scenario_comparison['dataframe']
+
+        # Highlight the current scenario
+        comparison_df['Current'] = comparison_df['Scenario'] == scenario_name
+
+        # View toggle for USS vs Nippon perspective
+        col_toggle, col_spacer = st.columns([1, 3])
+        with col_toggle:
+            valuation_view = st.radio(
+                "Valuation Perspective",
+                options=["Value to Nippon (Acquirer's View)", "USS - No Sale (Status Quo)"],
+                horizontal=True,
+                help="Value to Nippon: What USS is worth to Nippon using their lower cost of capital (~7.5% WACC). USS - No Sale: What USS is worth as a standalone company (~10.9% WACC)."
+            )
+
+        # Determine which column to use for the chart
+        if valuation_view == "Value to Nippon (Acquirer's View)":
+            value_column = 'Value to Nippon ($/sh)'
+            chart_title = 'Share Value by Scenario (Value to Nippon @ 7.5% WACC)'
+            wacc_label = "~7.5% WACC"
+        else:
+            value_column = 'USS - No Sale ($/sh)'
+            chart_title = 'Share Value by Scenario (USS - No Sale @ 10.9% WACC)'
+            wacc_label = "~10.9% WACC"
+
+        # Bar chart comparing scenarios (above table)
+        fig = px.bar(
+            comparison_df,
+            x='Scenario',
+            y=value_column,
+            color='Scenario',
+            title=chart_title,
+            color_discrete_sequence=['#ff6b6b', '#ffa07a', '#98d8c8', '#7fcdbb', '#4ecdc4', '#45b7d1']
+        )
+        fig.add_hline(y=55, line_dash="dash", line_color="green", annotation_text="$55 Offer")
+        fig.add_hline(y=0, line_color="black", line_width=1)
+        fig.update_layout(showlegend=False, yaxis_title=f"Equity Value ($/sh) [{wacc_label}]")
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Summary table (below chart)
+        st.markdown("""
+        **How to read this table:**
+        - **USS - No Sale**: Share value if USS remains independent (discounted at USS's ~10.9% WACC)
+        - **Value to Nippon**: Share value from Nippon's perspective (discounted at Nippon's ~7.5% IRP-adjusted WACC)
+        - **Implied EV/EBITDA**: Enterprise Value divided by 2024 EBITDA (current-year implied multiple)
+        - **10Y FCF**: Total free cash flow generated over the 10-year forecast period (2024-2033)
+        - The difference between the two valuations reflects the "WACC advantage" Nippon gains from its lower cost of capital
+        """)
+        display_df = comparison_df[['Scenario', 'USS - No Sale ($/sh)', 'Value to Nippon ($/sh)', 'Implied EV/EBITDA', '10Y FCF ($B)']].copy()
+        display_df['USS - No Sale ($/sh)'] = display_df['USS - No Sale ($/sh)'].apply(lambda x: f"${x:.2f}")
+        display_df['Value to Nippon ($/sh)'] = display_df['Value to Nippon ($/sh)'].apply(lambda x: f"${x:.2f}")
+        display_df['Implied EV/EBITDA'] = display_df['Implied EV/EBITDA'].apply(lambda x: f"{x:.1f}x")
+        display_df['10Y FCF ($B)'] = display_df['10Y FCF ($B)'].apply(lambda x: f"${x:.1f}B")
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("Scenario comparison not yet calculated. Click button above to calculate.")
 
     # =========================================================================
     # PROBABILITY-WEIGHTED VALUATION
@@ -1994,7 +2665,7 @@ def main():
     an **expected value** that reflects the full range of potential outcomes.
     """)
 
-    with st.expander("ℹ️ Understanding Probability Weighting", expanded=False):
+    with st.expander("Understanding Probability Weighting", expanded=False):
         st.markdown("""
         **Why weight by probability?**
         - USS has experienced severe downturns 24% of years historically
@@ -2011,68 +2682,96 @@ def main():
         **Total: 100%**
         """)
 
-    # Calculate probability-weighted valuation
-    with st.spinner("Calculating probability-weighted valuation..."):
+    # Render button for on-demand calculation
+    calc_button_pw = render_calculation_button(
+        section_name="Probability-Weighted Valuation",
+        button_label="Calculate Expected Value",
+        session_key="calc_probability_weighted"
+    )
+
+    # Calculate if button clicked
+    if calc_button_pw:
+        progress_bar_pw = st.progress(0, text="Calculating probability-weighted valuation...")
         try:
             pw_results = calculate_probability_weighted_valuation(
-                custom_benchmarks=custom_benchmarks
+                custom_benchmarks=custom_benchmarks,
+                progress_bar=progress_bar_pw
             )
+            progress_bar_pw.empty()
 
-            # Display results
-            col1, col2, col3 = st.columns(3)
+            # Store results with timestamp
+            st.session_state.calc_probability_weighted = {
+                'results': pw_results,
+                'timestamp': datetime.now()
+            }
 
-            with col1:
-                st.metric(
-                    "Expected USS Value (Standalone)",
-                    f"${pw_results['weighted_uss_value_per_share']:.2f}/share",
-                    delta=f"{pw_results['uss_premium_to_offer']:+.1f}% vs $55 offer",
-                    delta_color="inverse"
-                )
+            # Persist to disk
+            cp.save_calculation_cache('calc_probability_weighted', st.session_state.calc_probability_weighted, current_hash)
 
-            with col2:
-                st.metric(
-                    "Expected Nippon Value",
-                    f"${pw_results['weighted_nippon_value_per_share']:.2f}/share",
-                    delta=f"{pw_results['nippon_discount_to_offer']:+.1f}% vs $55 offer"
-                )
-
-            with col3:
-                st.metric(
-                    "Expected 10-Year FCF",
-                    f"${pw_results['weighted_ten_year_fcf']/1000:.2f}B"
-                )
-
-            # Scenario breakdown table
-            st.markdown("### Scenario Breakdown")
-
-            # Build markdown table
-            md_rows = []
-            md_rows.append("| Scenario | Probability | USS Value/Share | Weighted Contribution | vs $55 Offer |")
-            md_rows.append("|----------|-------------|-----------------|----------------------|--------------|")
-
-            scenario_count = 0
-            for scenario_type, result in pw_results['scenario_results'].items():
-                uss_val = result['uss_value_per_share']
-                # Handle zero or near-zero values to avoid division by zero
-                if uss_val > 0.01:
-                    vs_offer_str = f"{(55.0/uss_val-1)*100:+.1f}%"
-                else:
-                    vs_offer_str = "N/A (equity wiped)"
-
-                weighted_contrib = uss_val * result['probability']
-                prob_pct = result['probability'] * 100
-                md_rows.append(f"| {result['name']} | {prob_pct:.0f}% | ${uss_val:.2f} | ${weighted_contrib:.2f} | {vs_offer_str} |")
-                scenario_count += 1
-
-            md_table = "\n".join(md_rows)
-            st.markdown(md_table)
-            st.caption(f"*{scenario_count} scenarios shown*")
+            st.rerun()
 
         except Exception as e:
+            progress_bar_pw.empty()
             st.error(f"Error calculating probability-weighted valuation: {str(e)}")
             import traceback
             with st.expander("Error Details"):
                 st.code(traceback.format_exc())
+
+    # Display results if available
+    if st.session_state.calc_probability_weighted is not None:
+        pw_results = st.session_state.calc_probability_weighted['results']
+
+        # Display results
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric(
+                "Expected USS Value (Standalone)",
+                f"${pw_results['weighted_uss_value_per_share']:.2f}/share",
+                delta=f"{pw_results['uss_premium_to_offer']:+.1f}% vs $55 offer",
+                delta_color="inverse"
+            )
+
+        with col2:
+            st.metric(
+                "Expected Nippon Value",
+                f"${pw_results['weighted_nippon_value_per_share']:.2f}/share",
+                delta=f"{pw_results['nippon_discount_to_offer']:+.1f}% vs $55 offer"
+            )
+
+        with col3:
+            st.metric(
+                "Expected 10-Year FCF",
+                f"${pw_results['weighted_ten_year_fcf']/1000:.2f}B"
+            )
+
+        # Scenario breakdown table
+        st.markdown("### Scenario Breakdown")
+
+        # Build markdown table
+        md_rows = []
+        md_rows.append("| Scenario | Probability | USS Value/Share | Weighted Contribution | vs $55 Offer |")
+        md_rows.append("|----------|-------------|-----------------|----------------------|--------------|")
+
+        scenario_count = 0
+        for scenario_type, result in pw_results['scenario_results'].items():
+            uss_val = result['uss_value_per_share']
+            # Handle zero or near-zero values to avoid division by zero
+            if uss_val > 0.01:
+                vs_offer_str = f"{(55.0/uss_val-1)*100:+.1f}%"
+            else:
+                vs_offer_str = "N/A (equity wiped)"
+
+            weighted_contrib = uss_val * result['probability']
+            prob_pct = result['probability'] * 100
+            md_rows.append(f"| {result['name']} | {prob_pct:.0f}% | ${uss_val:.2f} | ${weighted_contrib:.2f} | {vs_offer_str} |")
+            scenario_count += 1
+
+        md_table = "\n".join(md_rows)
+        st.markdown(md_table)
+        st.caption(f"*{scenario_count} scenarios shown*")
+    else:
+        st.info("Probability-weighted valuation not yet calculated. Click button above to calculate.")
 
     # =========================================================================
     # CAPITAL PROJECTS ANALYSIS
@@ -2380,10 +3079,24 @@ def main():
     # Build football field data
     football_field_data = []
 
-    # 1. Scenario-based ranges (use scenario comparison data)
+    # Calculate total steps for progress tracking
     presets = get_scenario_presets()
+    price_test_count = 5  # Number of price sensitivity tests
+    wacc_test_count = 4  # Number of WACC tests
+    exit_test_count = 4  # Number of exit multiple tests
+    total_steps = len(presets) + price_test_count + wacc_test_count + exit_test_count
+    current_step = 0
+
+    # Create progress bar for football field
+    progress_bar_ff = st.progress(0, text="Generating football field chart...")
+
+    # 1. Scenario-based ranges (use scenario comparison data)
     scenario_values = []
     for st_type, preset in presets.items():
+        current_step += 1
+        progress_pct = int((current_step / total_steps) * 100)
+        progress_bar_ff.progress(progress_pct, text=f"Calculating DCF scenario: {st_type.name} ({current_step}/{total_steps})")
+
         ef = execution_factor if st_type == ScenarioType.NIPPON_COMMITMENTS else 1.0
         temp_model = PriceVolumeModel(preset, execution_factor=ef, custom_benchmarks=custom_benchmarks)
         temp_analysis = temp_model.run_full_analysis()
@@ -2402,6 +3115,10 @@ def main():
     # 2. Steel Price Sensitivity (85% to 115% of benchmarks - realistic range)
     price_sens_values = []
     for pf in [0.85, 0.95, 1.00, 1.05, 1.15]:
+        current_step += 1
+        progress_pct = int((current_step / total_steps) * 100)
+        progress_bar_ff.progress(progress_pct, text=f"Testing steel price: {pf:.0%} of baseline ({current_step}/{total_steps})")
+
         test_price_scenario = SteelPriceScenario(
             name="Test", description="Test",
             hrc_us_factor=pf, crc_us_factor=pf, coated_us_factor=pf,
@@ -2442,6 +3159,10 @@ def main():
     # 3. WACC Sensitivity
     wacc_sens_values = []
     for w in [0.08, 0.10, 0.12, 0.14]:
+        current_step += 1
+        progress_pct = int((current_step / total_steps) * 100)
+        progress_bar_ff.progress(progress_pct, text=f"Testing WACC: {w:.1%} ({current_step}/{total_steps})")
+
         test_val = model.calculate_dcf(consolidated, w)
         wacc_sens_values.append(test_val['share_price'])
 
@@ -2455,6 +3176,10 @@ def main():
     # 4. Exit Multiple Sensitivity
     exit_sens_values = []
     for em in [3.5, 4.5, 5.5, 6.5]:
+        current_step += 1
+        progress_pct = int((current_step / total_steps) * 100)
+        progress_bar_ff.progress(progress_pct, text=f"Testing exit multiple: {em:.1f}x EBITDA ({current_step}/{total_steps})")
+
         # Manually calculate with different exit multiple
         temp_scenario = ModelScenario(
             name="Test", scenario_type=ScenarioType.CUSTOM, description="Test",
@@ -2579,6 +3304,10 @@ def main():
         xaxis=dict(range=[0, max(ff_df['High'].max() * 1.1, 120)]),
         bargap=0.3
     )
+
+    # Complete progress and clean up
+    progress_bar_ff.progress(100, text="Chart complete")
+    progress_bar_ff.empty()
 
     st.plotly_chart(fig_ff, use_container_width=True)
 
@@ -2786,14 +3515,28 @@ def main():
     - Green dashed line = \\$55 Nippon offer price (breakeven around 88% price factor)
     """)
 
-    col1, col2 = st.columns(2)
+    # Render button for on-demand calculation
+    calc_button_ps = render_calculation_button(
+        section_name="Steel Price Sensitivity",
+        button_label="Run Price Sensitivity",
+        session_key="calc_price_sensitivity"
+    )
 
-    with col1:
-        # Price factor sensitivity
-        price_factors = np.arange(0.6, 1.5, 0.1)
-        sensitivity_data = []
+    # Calculate if button clicked
+    if calc_button_ps:
+        col1, col2 = st.columns(2)
 
-        for pf in price_factors:
+        with col1:
+            # Price factor sensitivity
+            price_factors = np.arange(0.6, 1.5, 0.1)
+            sensitivity_data = []
+
+            # Create progress bar for price sensitivity
+            progress_bar_ps = st.progress(0, text="Running steel price sensitivity analysis...")
+
+            for i, pf in enumerate(price_factors, 1):
+                progress_pct = int((i / len(price_factors)) * 100)
+                progress_bar_ps.progress(progress_pct, text=f"Testing price level: {pf:.0%} of baseline ({i}/{len(price_factors)})")
             # Create modified scenario
             test_price_scenario = SteelPriceScenario(
                 name="Test",
@@ -2836,45 +3579,72 @@ def main():
                 'USS Value': test_analysis['val_uss']['share_price']
             })
 
-        sens_df = pd.DataFrame(sensitivity_data)
+            sens_df = pd.DataFrame(sensitivity_data)
 
-        fig = px.line(
-            sens_df,
-            x='Price Factor',
-            y='Nippon Value',
-            title='Share Value vs Steel Price Level',
-            markers=True
-        )
-        fig.add_hline(y=55, line_dash="dash", line_color="green", annotation_text="$55 Offer")
-        fig.add_hline(y=0, line_color="black", line_width=1)
-        fig.update_layout(yaxis_title='Equity Value ($/sh)')
-        st.plotly_chart(fig, use_container_width=True)
+            # Clear progress bar
+            progress_bar_ps.empty()
 
-    with col2:
-        # Volume and price projections
-        st.subheader("Price Projections by Segment")
+        with col2:
+            # Volume and price projections
+            st.subheader("Price Projections by Segment")
 
-        price_proj_data = []
-        for seg_name, df in segment_dfs.items():
-            for _, row in df.iterrows():
-                price_proj_data.append({
-                    'Year': row['Year'],
-                    'Segment': seg_name,
-                    'Price': row['Price_per_ton']
-                })
+            price_proj_data = []
+            for seg_name, df in segment_dfs.items():
+                for _, row in df.iterrows():
+                    price_proj_data.append({
+                        'Year': row['Year'],
+                        'Segment': seg_name,
+                        'Price': row['Price_per_ton']
+                    })
 
-        price_proj_df = pd.DataFrame(price_proj_data)
+            price_proj_df = pd.DataFrame(price_proj_data)
 
-        fig = px.line(
-            price_proj_df,
-            x='Year',
-            y='Price',
-            color='Segment',
-            title='Realized Price by Segment ($/ton)',
-            markers=True,
-            color_discrete_sequence=['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4']
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        # Store results with timestamp
+        st.session_state.calc_price_sensitivity = {
+            'sens_df': sens_df,
+            'price_proj_df': price_proj_df,
+            'timestamp': datetime.now()
+        }
+
+        # Persist to disk
+        cp.save_calculation_cache('calc_price_sensitivity', st.session_state.calc_price_sensitivity, current_hash)
+
+        st.rerun()
+
+    # Display results if available
+    if st.session_state.calc_price_sensitivity is not None:
+        sens_df = st.session_state.calc_price_sensitivity['sens_df']
+        price_proj_df = st.session_state.calc_price_sensitivity['price_proj_df']
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            fig = px.line(
+                sens_df,
+                x='Price Factor',
+                y='Nippon Value',
+                title='Share Value vs Steel Price Level',
+                markers=True
+            )
+            fig.add_hline(y=55, line_dash="dash", line_color="green", annotation_text="$55 Offer")
+            fig.add_hline(y=0, line_color="black", line_width=1)
+            fig.update_layout(yaxis_title='Equity Value ($/sh)')
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            st.subheader("Price Projections by Segment")
+            fig = px.line(
+                price_proj_df,
+                x='Year',
+                y='Price',
+                color='Segment',
+                title='Realized Price by Segment ($/ton)',
+                markers=True,
+                color_discrete_sequence=['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4']
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Steel price sensitivity not yet calculated. Click button above to calculate.")
 
     # =========================================================================
     # WACC SENSITIVITY
@@ -2893,41 +3663,79 @@ def main():
     - The gap between blue and red lines shows the "WACC advantage" Nippon gains from its lower cost of capital
     """)
 
-    wacc_range = np.arange(0.05, 0.14, 0.005)
-    wacc_sensitivity_data = []
-
-    for w in wacc_range:
-        val = model.calculate_dcf(consolidated, w)
-        wacc_sensitivity_data.append({
-            'WACC': w * 100,
-            'Equity Value': val['share_price']
-        })
-
-    wacc_sens_df = pd.DataFrame(wacc_sensitivity_data)
-
-    fig = px.line(
-        wacc_sens_df,
-        x='WACC',
-        y='Equity Value',
-        title='Equity Value per Share vs WACC',
-        markers=True
+    # Render button for on-demand calculation
+    calc_button_wacc = render_calculation_button(
+        section_name="WACC Sensitivity",
+        button_label="Run WACC Sensitivity",
+        session_key="calc_wacc_sensitivity"
     )
 
-    # Add reference lines
-    fig.add_hline(y=55, line_dash="dash", line_color="green",
-                  annotation_text="Nippon Offer ($55)")
-    fig.add_vline(x=scenario.uss_wacc*100, line_dash="dash", line_color="blue",
-                  annotation_text=f"USS WACC ({scenario.uss_wacc*100:.1f}%)")
-    fig.add_vline(x=usd_wacc*100, line_dash="dash", line_color="red",
-                  annotation_text=f"Nippon USD WACC ({usd_wacc*100:.2f}%)")
+    # Calculate if button clicked
+    if calc_button_wacc:
+        wacc_range = np.arange(0.05, 0.14, 0.005)
+        wacc_sensitivity_data = []
 
-    fig.update_layout(
-        xaxis_title='WACC (%)',
-        yaxis_title='Equity Value ($/sh)',
-        height=400
-    )
+        # Create progress bar for WACC sensitivity
+        progress_bar_wacc = st.progress(0, text="Running WACC sensitivity analysis...")
 
-    st.plotly_chart(fig, use_container_width=True)
+        for i, w in enumerate(wacc_range, 1):
+            progress_pct = int((i / len(wacc_range)) * 100)
+            progress_bar_wacc.progress(progress_pct, text=f"Testing WACC: {w:.1%} ({i}/{len(wacc_range)})")
+            val = model.calculate_dcf(consolidated, w)
+            wacc_sensitivity_data.append({
+                'WACC': w * 100,
+                'Equity Value': val['share_price']
+            })
+
+        wacc_sens_df = pd.DataFrame(wacc_sensitivity_data)
+
+        # Clear progress bar
+        progress_bar_wacc.empty()
+
+        # Store results with timestamp
+        st.session_state.calc_wacc_sensitivity = {
+            'wacc_sens_df': wacc_sens_df,
+            'uss_wacc': scenario.uss_wacc,
+            'usd_wacc': usd_wacc,
+            'timestamp': datetime.now()
+        }
+
+        # Persist to disk
+        cp.save_calculation_cache('calc_wacc_sensitivity', st.session_state.calc_wacc_sensitivity, current_hash)
+
+        st.rerun()
+
+    # Display results if available
+    if st.session_state.calc_wacc_sensitivity is not None:
+        wacc_sens_df = st.session_state.calc_wacc_sensitivity['wacc_sens_df']
+        stored_uss_wacc = st.session_state.calc_wacc_sensitivity['uss_wacc']
+        stored_usd_wacc = st.session_state.calc_wacc_sensitivity['usd_wacc']
+
+        fig = px.line(
+            wacc_sens_df,
+            x='WACC',
+            y='Equity Value',
+            title='Equity Value per Share vs WACC',
+            markers=True
+        )
+
+        # Add reference lines
+        fig.add_hline(y=55, line_dash="dash", line_color="green",
+                      annotation_text="Nippon Offer ($55)")
+        fig.add_vline(x=stored_uss_wacc*100, line_dash="dash", line_color="blue",
+                      annotation_text=f"USS WACC ({stored_uss_wacc*100:.1f}%)")
+        fig.add_vline(x=stored_usd_wacc*100, line_dash="dash", line_color="red",
+                      annotation_text=f"Nippon USD WACC ({stored_usd_wacc*100:.2f}%)")
+
+        fig.update_layout(
+            xaxis_title='WACC (%)',
+            yaxis_title='Equity Value ($/sh)',
+            height=400
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("WACC sensitivity not yet calculated. Click button above to calculate.")
 
     # =========================================================================
     # INTEREST RATE PARITY ADJUSTMENT

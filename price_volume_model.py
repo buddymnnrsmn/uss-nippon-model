@@ -140,6 +140,110 @@ class CapitalProject:
     volume_addition: Dict[int, float] = field(default_factory=dict)  # Additional tons
 
 
+# =============================================================================
+# SYNERGY AND TECHNOLOGY TRANSFER DATACLASSES
+# =============================================================================
+
+@dataclass
+class SynergyRampSchedule:
+    """Year-by-year synergy realization (0.0-1.0)"""
+    schedule: Dict[int, float] = field(default_factory=dict)
+
+    def get_realization(self, year: int) -> float:
+        """Get realization factor for a given year"""
+        return self.schedule.get(year, 0.0)
+
+
+@dataclass
+class OperatingSynergies:
+    """Cost synergies from combined operations"""
+    procurement_savings_annual: float = 0.0  # $M at run-rate
+    procurement_confidence: float = 0.80
+    logistics_savings_annual: float = 0.0
+    logistics_confidence: float = 0.75
+    overhead_savings_annual: float = 0.0
+    overhead_confidence: float = 0.85
+    ramp_schedule: SynergyRampSchedule = field(default_factory=SynergyRampSchedule)
+
+    def get_total_run_rate(self) -> float:
+        """Get probability-weighted total run-rate savings"""
+        return (
+            self.procurement_savings_annual * self.procurement_confidence +
+            self.logistics_savings_annual * self.logistics_confidence +
+            self.overhead_savings_annual * self.overhead_confidence
+        )
+
+
+@dataclass
+class TechnologyTransfer:
+    """Technology and operational improvements from Nippon know-how"""
+    yield_improvement_pct: float = 0.0       # e.g., 0.02 = 2% yield improvement
+    yield_margin_impact: float = 0.008       # Margin improvement per 1% yield gain
+    quality_price_premium_pct: float = 0.0   # Premium pricing from quality improvements
+    conversion_cost_reduction_pct: float = 0.0  # Reduction in conversion costs
+    segment_allocation: Dict[str, float] = field(default_factory=dict)  # Allocation by segment
+    ramp_schedule: SynergyRampSchedule = field(default_factory=SynergyRampSchedule)
+    confidence: float = 0.70
+
+
+@dataclass
+class RevenueSynergies:
+    """Revenue enhancement opportunities"""
+    cross_sell_revenue_annual: float = 0.0  # $M additional revenue at run-rate
+    cross_sell_margin: float = 0.15  # EBITDA margin on cross-sell revenue
+    cross_sell_confidence: float = 0.60
+    product_mix_revenue_uplift: float = 0.0  # $M from better product mix
+    product_mix_margin: float = 0.20  # Higher margin on improved mix
+    product_mix_confidence: float = 0.65
+    ramp_schedule: SynergyRampSchedule = field(default_factory=SynergyRampSchedule)
+
+    def get_run_rate_ebitda(self) -> float:
+        """Get probability-weighted EBITDA from revenue synergies at run-rate"""
+        return (
+            self.cross_sell_revenue_annual * self.cross_sell_margin * self.cross_sell_confidence +
+            self.product_mix_revenue_uplift * self.product_mix_margin * self.product_mix_confidence
+        )
+
+
+@dataclass
+class IntegrationCosts:
+    """One-time integration and restructuring costs"""
+    it_integration_cost: float = 0.0  # $M total IT integration
+    it_spend_schedule: Dict[int, float] = field(default_factory=dict)  # Year -> % of total
+    cultural_integration_cost: float = 0.0  # $M cultural programs, training
+    cultural_spend_schedule: Dict[int, float] = field(default_factory=dict)
+    restructuring_cost: float = 0.0  # $M severance, facility consolidation
+    restructuring_spend_schedule: Dict[int, float] = field(default_factory=dict)
+
+    def get_total_cost(self) -> float:
+        """Get total integration costs"""
+        return (
+            self.it_integration_cost +
+            self.cultural_integration_cost +
+            self.restructuring_cost
+        )
+
+    def get_cost_for_year(self, year: int) -> float:
+        """Get integration costs for a specific year"""
+        it_cost = self.it_integration_cost * self.it_spend_schedule.get(year, 0.0)
+        cultural_cost = self.cultural_integration_cost * self.cultural_spend_schedule.get(year, 0.0)
+        restructuring_cost = self.restructuring_cost * self.restructuring_spend_schedule.get(year, 0.0)
+        return it_cost + cultural_cost + restructuring_cost
+
+
+@dataclass
+class SynergyAssumptions:
+    """Complete synergy package for the merger"""
+    name: str = "Default"
+    description: str = ""
+    operating: OperatingSynergies = field(default_factory=OperatingSynergies)
+    technology: TechnologyTransfer = field(default_factory=TechnologyTransfer)
+    revenue: RevenueSynergies = field(default_factory=RevenueSynergies)
+    integration: IntegrationCosts = field(default_factory=IntegrationCosts)
+    enabled: bool = True
+    overall_execution_factor: float = 1.0  # Additional haircut for execution risk
+
+
 @dataclass
 class FinancingAssumptions:
     """Assumptions for how USS would finance large capital programs standalone"""
@@ -201,6 +305,9 @@ class ModelScenario:
 
     # Benchmark integration (optional)
     use_benchmark_multiples: bool = False  # Toggle benchmark-driven exit multiples
+
+    # Synergy assumptions (optional) - only applies to Nippon valuation
+    synergies: Optional[SynergyAssumptions] = None
 
 
 # =============================================================================
@@ -293,7 +400,7 @@ def get_base_price_scenario() -> SteelPriceScenario:
         hrc_us_factor=0.95,  # Slight pullback from 2023 elevated levels
         crc_us_factor=0.95,
         coated_us_factor=0.95,
-        hrc_eu_factor=0.92,
+        hrc_eu_factor=0.90,  # Aligned with 0.05 step
         octg_factor=0.95,
         annual_price_growth=0.005  # 0.5% - barely keeps pace with costs
     )
@@ -316,9 +423,9 @@ def get_wall_street_price_scenario() -> SteelPriceScenario:
     return SteelPriceScenario(
         name="Wall Street Consensus",
         description="Analyst consensus - modest price weakness then recovery",
-        hrc_us_factor=0.92,
-        crc_us_factor=0.92,
-        coated_us_factor=0.93,
+        hrc_us_factor=0.90,  # Aligned with 0.05 step
+        crc_us_factor=0.90,  # Aligned with 0.05 step
+        coated_us_factor=0.90,  # Aligned with 0.05 step
         hrc_eu_factor=0.90,
         octg_factor=0.95,
         annual_price_growth=0.025
@@ -358,27 +465,13 @@ def get_conservative_volume_scenario() -> VolumeScenario:
         name="Conservative Volumes",
         description="Demand weakness across segments",
         flat_rolled_volume_factor=0.95,
-        mini_mill_volume_factor=0.97,
-        usse_volume_factor=0.92,
+        mini_mill_volume_factor=0.95,  # Aligned with 0.05 step
+        usse_volume_factor=0.90,       # Aligned with 0.05 step
         tubular_volume_factor=0.90,
         flat_rolled_growth_adj=-0.01,
         mini_mill_growth_adj=0.01,
         usse_growth_adj=-0.01,
         tubular_growth_adj=0.0
-    )
-
-
-def get_management_price_scenario() -> SteelPriceScenario:
-    """Management Dec 2023 projections: HRC $750/ton in 2024, $700/ton thereafter"""
-    return SteelPriceScenario(
-        name="Management Dec 2023",
-        description="HRC $750/ton (2024), $700/ton (2025+) - per Barclays/Goldman fairness opinions",
-        hrc_us_factor=0.92,  # $680 base * 0.92 = ~$626 benchmark -> realized ~$750 after premiums
-        crc_us_factor=0.92,
-        coated_us_factor=0.92,
-        hrc_eu_factor=0.90,
-        octg_factor=0.95,
-        annual_price_growth=0.0  # Flat pricing assumption per management
     )
 
 
@@ -401,8 +494,8 @@ def get_severe_downturn_price_scenario() -> SteelPriceScenario:
     return SteelPriceScenario(
         name="Severe Downturn Pricing",
         description="Historical recession levels (2009, 2015, 2020)",
-        hrc_us_factor=0.68,      # -32% from benchmark
-        crc_us_factor=0.68,
+        hrc_us_factor=0.70,      # -30% from benchmark (aligned with 0.05 step)
+        crc_us_factor=0.70,      # Aligned with 0.05 step
         coated_us_factor=0.70,
         hrc_eu_factor=0.65,      # EU hit harder
         octg_factor=0.50,        # Oil crash correlation
@@ -431,8 +524,8 @@ def get_true_base_case_price_scenario() -> SteelPriceScenario:
     return SteelPriceScenario(
         name="Mid-Cycle Pricing",
         description="Historical median steel prices",
-        hrc_us_factor=0.88,      # Closer to historical average
-        crc_us_factor=0.88,
+        hrc_us_factor=0.90,      # Aligned with 0.05 step
+        crc_us_factor=0.90,      # Aligned with 0.05 step
         coated_us_factor=0.90,
         hrc_eu_factor=0.85,
         octg_factor=0.80,
@@ -445,8 +538,8 @@ def get_true_base_case_volume_scenario() -> VolumeScenario:
     return VolumeScenario(
         name="Mid-Cycle Volumes",
         description="Historical average utilization",
-        flat_rolled_volume_factor=0.92,  # Modest decline from 2023
-        mini_mill_volume_factor=0.98,
+        flat_rolled_volume_factor=0.90,  # Modest decline from 2023 (aligned with 0.05 step)
+        mini_mill_volume_factor=1.00,    # Aligned with 0.05 step
         usse_volume_factor=0.90,
         tubular_volume_factor=0.95,
         flat_rolled_growth_adj=-0.005,
@@ -535,9 +628,9 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             volume_scenario=VolumeScenario(
                 name="Above Average Volumes",
                 description="Modest growth, good market conditions",
-                flat_rolled_volume_factor=0.98,
+                flat_rolled_volume_factor=1.00,  # Aligned with 0.05 step
                 mini_mill_volume_factor=1.0,
-                usse_volume_factor=0.98,
+                usse_volume_factor=1.00,         # Aligned with 0.05 step
                 tubular_volume_factor=1.0,
                 flat_rolled_growth_adj=-0.01,
                 mini_mill_growth_adj=0.01,
@@ -667,7 +760,7 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
                 hrc_us_factor=0.95,
                 crc_us_factor=0.95,
                 coated_us_factor=0.95,
-                hrc_eu_factor=0.92,
+                hrc_eu_factor=0.90,  # Aligned with 0.05 step
                 octg_factor=0.95,
                 annual_price_growth=0.01
             ),
@@ -695,6 +788,173 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             include_projects=['BR2 Mini Mill', 'Gary Works BF', 'Mon Valley HSM',
                             'Greenfield Mini Mill', 'Mining Investment', 'Fairfield Works'],
             probability_weight=0.0  # Reference only, no probability weight
+        ),
+    }
+
+
+# =============================================================================
+# SYNERGY PRESETS
+# =============================================================================
+
+def get_synergy_presets() -> Dict[str, SynergyAssumptions]:
+    """Return pre-built synergy configurations
+
+    Standard ramp schedule: 0% → 20% → 50% → 80% → 100% (Y1-Y5)
+    Technology ramp (slower): 0% → 0% → 20% → 50% → 80% → 100% (Y1-Y6)
+    Integration cost schedule: 40% → 40% → 20% (Y1-Y3)
+
+    Industry benchmarks from steel M&A transactions:
+    - Operating synergies: 2-4% of combined cost base
+    - Technology transfer: 1-3% yield improvement typical
+    - Revenue synergies: Most difficult to achieve, 60-70% confidence
+    """
+
+    # Standard synergy ramp: 0% Y1 → 20% Y2 → 50% Y3 → 80% Y4 → 100% Y5
+    standard_ramp = SynergyRampSchedule(schedule={
+        2024: 0.0, 2025: 0.20, 2026: 0.50, 2027: 0.80, 2028: 1.0,
+        2029: 1.0, 2030: 1.0, 2031: 1.0, 2032: 1.0, 2033: 1.0
+    })
+
+    # Slower technology ramp: 0% Y1-Y2 → 20% Y3 → 50% Y4 → 80% Y5 → 100% Y6
+    technology_ramp = SynergyRampSchedule(schedule={
+        2024: 0.0, 2025: 0.0, 2026: 0.20, 2027: 0.50, 2028: 0.80,
+        2029: 1.0, 2030: 1.0, 2031: 1.0, 2032: 1.0, 2033: 1.0
+    })
+
+    # Integration cost schedule: 40% Y1, 40% Y2, 20% Y3
+    integration_schedule = {2024: 0.40, 2025: 0.40, 2026: 0.20}
+
+    return {
+        'none': SynergyAssumptions(
+            name="None",
+            description="No synergies modeled",
+            enabled=False
+        ),
+
+        'conservative': SynergyAssumptions(
+            name="Conservative",
+            description="Low-end synergy estimates with high confidence factors",
+            operating=OperatingSynergies(
+                procurement_savings_annual=50.0,  # $50M
+                procurement_confidence=0.85,
+                logistics_savings_annual=30.0,  # $30M
+                logistics_confidence=0.80,
+                overhead_savings_annual=40.0,  # $40M
+                overhead_confidence=0.90,
+                ramp_schedule=standard_ramp
+            ),
+            technology=TechnologyTransfer(
+                yield_improvement_pct=0.01,  # 1% yield improvement
+                yield_margin_impact=0.008,
+                quality_price_premium_pct=0.01,  # 1% price premium
+                conversion_cost_reduction_pct=0.02,  # 2% cost reduction
+                segment_allocation={'Flat-Rolled': 0.50, 'Mini Mill': 0.30, 'USSE': 0.15, 'Tubular': 0.05},
+                ramp_schedule=technology_ramp,
+                confidence=0.75
+            ),
+            revenue=RevenueSynergies(
+                cross_sell_revenue_annual=100.0,  # $100M
+                cross_sell_margin=0.15,
+                cross_sell_confidence=0.55,
+                product_mix_revenue_uplift=50.0,  # $50M
+                product_mix_margin=0.20,
+                product_mix_confidence=0.60,
+                ramp_schedule=standard_ramp
+            ),
+            integration=IntegrationCosts(
+                it_integration_cost=125.0,  # $125M
+                it_spend_schedule=integration_schedule,
+                cultural_integration_cost=50.0,  # $50M
+                cultural_spend_schedule=integration_schedule,
+                restructuring_cost=150.0,  # $150M
+                restructuring_spend_schedule=integration_schedule
+            ),
+            enabled=True,
+            overall_execution_factor=1.0
+        ),
+
+        'base_case': SynergyAssumptions(
+            name="Base Case",
+            description="Expected synergy realization based on industry benchmarks",
+            operating=OperatingSynergies(
+                procurement_savings_annual=100.0,  # $100M
+                procurement_confidence=0.80,
+                logistics_savings_annual=60.0,  # $60M
+                logistics_confidence=0.75,
+                overhead_savings_annual=80.0,  # $80M
+                overhead_confidence=0.85,
+                ramp_schedule=standard_ramp
+            ),
+            technology=TechnologyTransfer(
+                yield_improvement_pct=0.02,  # 2% yield improvement
+                yield_margin_impact=0.008,
+                quality_price_premium_pct=0.02,  # 2% price premium
+                conversion_cost_reduction_pct=0.04,  # 4% cost reduction
+                segment_allocation={'Flat-Rolled': 0.50, 'Mini Mill': 0.30, 'USSE': 0.15, 'Tubular': 0.05},
+                ramp_schedule=technology_ramp,
+                confidence=0.70
+            ),
+            revenue=RevenueSynergies(
+                cross_sell_revenue_annual=200.0,  # $200M
+                cross_sell_margin=0.15,
+                cross_sell_confidence=0.60,
+                product_mix_revenue_uplift=150.0,  # $150M
+                product_mix_margin=0.20,
+                product_mix_confidence=0.65,
+                ramp_schedule=standard_ramp
+            ),
+            integration=IntegrationCosts(
+                it_integration_cost=125.0,  # $125M
+                it_spend_schedule=integration_schedule,
+                cultural_integration_cost=50.0,  # $50M
+                cultural_spend_schedule=integration_schedule,
+                restructuring_cost=150.0,  # $150M
+                restructuring_spend_schedule=integration_schedule
+            ),
+            enabled=True,
+            overall_execution_factor=1.0
+        ),
+
+        'optimistic': SynergyAssumptions(
+            name="Optimistic",
+            description="Aggressive synergy targets assuming excellent execution",
+            operating=OperatingSynergies(
+                procurement_savings_annual=150.0,  # $150M
+                procurement_confidence=0.80,
+                logistics_savings_annual=100.0,  # $100M
+                logistics_confidence=0.75,
+                overhead_savings_annual=120.0,  # $120M
+                overhead_confidence=0.85,
+                ramp_schedule=standard_ramp
+            ),
+            technology=TechnologyTransfer(
+                yield_improvement_pct=0.03,  # 3% yield improvement
+                yield_margin_impact=0.008,
+                quality_price_premium_pct=0.04,  # 4% price premium
+                conversion_cost_reduction_pct=0.06,  # 6% cost reduction
+                segment_allocation={'Flat-Rolled': 0.50, 'Mini Mill': 0.30, 'USSE': 0.15, 'Tubular': 0.05},
+                ramp_schedule=technology_ramp,
+                confidence=0.65
+            ),
+            revenue=RevenueSynergies(
+                cross_sell_revenue_annual=400.0,  # $400M
+                cross_sell_margin=0.15,
+                cross_sell_confidence=0.60,
+                product_mix_revenue_uplift=300.0,  # $300M
+                product_mix_margin=0.20,
+                product_mix_confidence=0.65,
+                ramp_schedule=standard_ramp
+            ),
+            integration=IntegrationCosts(
+                it_integration_cost=175.0,  # $175M
+                it_spend_schedule=integration_schedule,
+                cultural_integration_cost=75.0,  # $75M
+                cultural_spend_schedule=integration_schedule,
+                restructuring_cost=200.0,  # $200M
+                restructuring_spend_schedule=integration_schedule
+            ),
+            enabled=True,
+            overall_execution_factor=1.0
         ),
     }
 
@@ -859,10 +1119,20 @@ class PriceVolumeModel:
                          Only applies to incremental projects (not BR2 which is committed)
     """
 
-    def __init__(self, scenario: ModelScenario, execution_factor: float = 1.0, custom_benchmarks: dict = None):
+    def __init__(self, scenario: ModelScenario, execution_factor: float = 1.0, custom_benchmarks: dict = None, progress_callback=None):
+        """
+        Initialize PriceVolumeModel
+
+        Args:
+            scenario: ModelScenario with all assumptions
+            execution_factor: Execution risk factor for Nippon Commitments (0.5-1.0)
+            custom_benchmarks: Optional custom benchmark prices dict
+            progress_callback: Optional function(percent, message) for progress updates
+        """
         self.scenario = scenario
         self.execution_factor = execution_factor
         self.custom_benchmarks = custom_benchmarks or BENCHMARK_PRICES_2023
+        self.progress_callback = progress_callback
         self.years = list(range(2024, 2034))
         self.segments = get_segment_configs()
         self.projects = get_capital_projects()
@@ -871,6 +1141,11 @@ class PriceVolumeModel:
         for proj_name in scenario.include_projects:
             if proj_name in self.projects:
                 self.projects[proj_name].enabled = True
+
+    def _report_progress(self, percent: int, message: str):
+        """Report progress via callback if provided."""
+        if self.progress_callback is not None:
+            self.progress_callback(percent, message)
 
     def get_benchmark_price(self, benchmark_type: str, year: int) -> float:
         """Calculate benchmark price for a given year"""
@@ -1024,12 +1299,20 @@ class PriceVolumeModel:
         return pd.DataFrame(results)
 
     def build_consolidated(self) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
-        """Build consolidated projection from all segments"""
+        """Build consolidated projection from all segments with progress tracking"""
         segment_dfs = {}
-        for segment in Segment:
+        segments_list = list(Segment)
+
+        for i, segment in enumerate(segments_list, 1):
+            # Report progress for each segment (10-40% range)
+            self._report_progress(
+                int(10 + (i / len(segments_list)) * 30),
+                f"Projecting {segment.value.replace('_', ' ').title()} segment..."
+            )
             segment_dfs[segment.value] = self.build_segment_projection(segment)
 
         # Consolidate
+        self._report_progress(38, "Consolidating segments...")
         consolidated = []
         metrics = ['Revenue', 'Total_EBITDA', 'DA', 'NOPAT', 'Gross_CF', 'Total_CapEx', 'Delta_WC', 'FCF']
 
@@ -1053,6 +1336,165 @@ class PriceVolumeModel:
             consolidated.append(row)
 
         return pd.DataFrame(consolidated), segment_dfs
+
+    def calculate_synergy_impact(self, year: int, consolidated_df: pd.DataFrame,
+                                  segment_dfs: Dict[str, pd.DataFrame]) -> Dict:
+        """Calculate synergy impact for a given year
+
+        Returns dict with:
+        - operating_synergy: $M EBITDA from operating synergies
+        - technology_synergy: $M EBITDA from technology transfer
+        - revenue_synergy: $M EBITDA from revenue synergies
+        - integration_cost: $M one-time integration costs
+        - total_synergy_ebitda: Net synergy EBITDA contribution
+        """
+        syn = self.scenario.synergies
+
+        # If synergies not enabled, return zeros
+        if syn is None or not syn.enabled:
+            return {
+                'operating_synergy': 0.0,
+                'technology_synergy': 0.0,
+                'revenue_synergy': 0.0,
+                'integration_cost': 0.0,
+                'total_synergy_ebitda': 0.0
+            }
+
+        exec_factor = syn.overall_execution_factor
+
+        # Operating synergies
+        op = syn.operating
+        op_ramp = op.ramp_schedule.get_realization(year)
+        operating_synergy = (
+            op.procurement_savings_annual * op.procurement_confidence +
+            op.logistics_savings_annual * op.logistics_confidence +
+            op.overhead_savings_annual * op.overhead_confidence
+        ) * op_ramp * exec_factor
+
+        # Technology transfer synergies
+        tech = syn.technology
+        tech_ramp = tech.ramp_schedule.get_realization(year)
+
+        # Calculate technology EBITDA impact based on segment revenues
+        technology_synergy = 0.0
+        year_data = consolidated_df[consolidated_df['Year'] == year]
+        if len(year_data) > 0:
+            total_revenue = year_data['Revenue'].values[0]
+            current_ebitda = year_data['Total_EBITDA'].values[0]
+
+            # Yield improvement: 1% yield gain = ~0.8% margin improvement (industry rule of thumb)
+            # 2% yield improvement = 1.6% margin = $240M on $15B revenue
+            yield_ebitda_boost = total_revenue * tech.yield_improvement_pct * tech.yield_margin_impact
+
+            # Quality price premium: premium on revenue flows through at ~50% margin
+            # 2% price premium on $15B = $300M revenue -> $150M EBITDA
+            quality_ebitda_boost = total_revenue * tech.quality_price_premium_pct * 0.5
+
+            # Conversion cost reduction: applied to cost base (~85% of revenue at 15% margin)
+            # 4% reduction on $12.75B cost base = $510M -> but EBITDA impact is the savings
+            cost_base = total_revenue - current_ebitda
+            conversion_savings = cost_base * tech.conversion_cost_reduction_pct * 0.2  # 20% flowthrough to EBITDA
+
+            # Combined technology synergy
+            technology_synergy = (yield_ebitda_boost + quality_ebitda_boost + conversion_savings) * tech.confidence * tech_ramp * exec_factor
+
+        # Revenue synergies
+        rev = syn.revenue
+        rev_ramp = rev.ramp_schedule.get_realization(year)
+        revenue_synergy = (
+            rev.cross_sell_revenue_annual * rev.cross_sell_margin * rev.cross_sell_confidence +
+            rev.product_mix_revenue_uplift * rev.product_mix_margin * rev.product_mix_confidence
+        ) * rev_ramp * exec_factor
+
+        # Integration costs (one-time, deducted from EBITDA)
+        integration_cost = syn.integration.get_cost_for_year(year)
+
+        # Net synergy EBITDA
+        total_synergy_ebitda = operating_synergy + technology_synergy + revenue_synergy - integration_cost
+
+        return {
+            'operating_synergy': operating_synergy,
+            'technology_synergy': technology_synergy,
+            'revenue_synergy': revenue_synergy,
+            'integration_cost': integration_cost,
+            'total_synergy_ebitda': total_synergy_ebitda
+        }
+
+    def build_synergy_schedule(self, consolidated_df: pd.DataFrame,
+                                segment_dfs: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+        """Build year-by-year synergy schedule
+
+        Returns DataFrame with columns:
+        - Year
+        - Operating_Synergy: $M from procurement, logistics, overhead
+        - Technology_Synergy: $M from yield, quality, conversion improvements
+        - Revenue_Synergy: $M from cross-sell and product mix
+        - Integration_Cost: $M one-time costs
+        - Total_Synergy_EBITDA: Net synergy contribution
+        - Cumulative_Synergy: Running total
+        """
+        results = []
+        cumulative = 0.0
+
+        for year in self.years:
+            impact = self.calculate_synergy_impact(year, consolidated_df, segment_dfs)
+            cumulative += impact['total_synergy_ebitda']
+
+            results.append({
+                'Year': year,
+                'Operating_Synergy': impact['operating_synergy'],
+                'Technology_Synergy': impact['technology_synergy'],
+                'Revenue_Synergy': impact['revenue_synergy'],
+                'Integration_Cost': impact['integration_cost'],
+                'Total_Synergy_EBITDA': impact['total_synergy_ebitda'],
+                'Cumulative_Synergy': cumulative
+            })
+
+        return pd.DataFrame(results)
+
+    def calculate_synergy_value(self, synergy_schedule: pd.DataFrame, wacc: float) -> Dict:
+        """Calculate NPV of synergies
+
+        Args:
+            synergy_schedule: DataFrame from build_synergy_schedule
+            wacc: Discount rate to use (typically Nippon USD WACC)
+
+        Returns:
+            Dict with synergy valuation metrics
+        """
+        if synergy_schedule is None or len(synergy_schedule) == 0:
+            return {
+                'npv_synergies': 0.0,
+                'run_rate_synergies': 0.0,
+                'total_integration_costs': 0.0,
+                'synergy_value_per_share': 0.0
+            }
+
+        # Get FCF from synergies (EBITDA less taxes, assume 16.9% cash tax)
+        synergy_fcf = synergy_schedule['Total_Synergy_EBITDA'].values * (1 - 0.169)
+
+        # Discount synergy FCF
+        n_years = len(synergy_fcf)
+        discount_factors = [(1 / (1 + wacc)) ** (i + 1) for i in range(n_years)]
+        pv_synergies = sum(f * d for f, d in zip(synergy_fcf, discount_factors))
+
+        # Terminal value of run-rate synergies (at year 10 run-rate)
+        terminal_synergy = synergy_fcf[-1] * (1 + self.scenario.terminal_growth)
+        tv_synergy = terminal_synergy / (wacc - self.scenario.terminal_growth) if wacc > self.scenario.terminal_growth else 0
+        pv_tv_synergy = tv_synergy * discount_factors[-1]
+
+        npv_synergies = pv_synergies + pv_tv_synergy
+
+        # Summary metrics
+        run_rate = synergy_schedule['Total_Synergy_EBITDA'].iloc[-1]
+        total_integration = synergy_schedule['Integration_Cost'].sum()
+
+        return {
+            'npv_synergies': npv_synergies,
+            'run_rate_synergies': run_rate,
+            'total_integration_costs': total_integration,
+            'synergy_value_per_share': npv_synergies / 225.0  # Assuming 225M shares
+        }
 
     def calculate_irp_wacc(self) -> Tuple[float, float]:
         """Calculate JPY WACC and IRP-adjusted USD WACC
@@ -1297,7 +1739,7 @@ class PriceVolumeModel:
         }
 
     def run_full_analysis(self) -> Dict:
-        """Run complete analysis and return all results
+        """Run complete analysis and return all results with progress tracking
 
         Key insight: USS standalone ("USS - No Sale") valuation must account for the cost
         of financing large capital projects. Nippon can fund $14B easily; USS cannot.
@@ -1306,28 +1748,84 @@ class PriceVolumeModel:
         - Calculate financing gap (CapEx beyond FCF capacity)
         - Apply debt financing impact (higher interest expense, higher WACC)
         - Apply equity financing impact (share dilution)
+        - NO synergies (USS cannot capture synergies alone)
 
         For Nippon view:
         - No financing adjustment (Nippon has balance sheet capacity)
         - Use IRP-adjusted WACC (lower cost of capital)
+        - ADD synergies if configured (synergies apply ONLY to Nippon valuation)
         """
-        # Build projections
+        # Step 1: Build Projections (0-40%)
+        self._report_progress(0, "Building segment projections...")
         consolidated, segment_dfs = self.build_consolidated()
+        self._report_progress(40, "Projections complete")
 
-        # Calculate WACCs
+        # Step 2: Calculate WACCs (40-45%)
+        self._report_progress(42, "Calculating WACC...")
         jpy_wacc, usd_wacc = self.calculate_irp_wacc()
+        self._report_progress(45, "WACC calculated")
 
-        # Calculate financing impact for USS standalone
+        # Step 3: Financing Impact (45-55%)
+        self._report_progress(47, "Analyzing financing requirements...")
         financing_impact = self.calculate_financing_impact(consolidated)
+        self._report_progress(55, "Financing analysis complete")
 
-        # Run valuations
-        # USS standalone: apply financing impact (debt + equity dilution)
+        # Step 4: USS DCF (55-65%)
+        self._report_progress(57, "Running USS valuation...")
         val_uss = self.calculate_dcf(consolidated, self.scenario.uss_wacc, financing_impact)
+        self._report_progress(65, "USS valuation complete")
 
-        # Nippon view: no financing impact (they can fund it), use lower IRP-adjusted WACC
-        val_nippon = self.calculate_dcf(consolidated, usd_wacc, None)
+        # Steps 5-6: Synergies (65-80%)
+        synergy_schedule = None
+        synergy_value = None
 
-        return {
+        if self.scenario.synergies is not None and self.scenario.synergies.enabled:
+            self._report_progress(67, "Building synergy schedule...")
+            synergy_schedule = self.build_synergy_schedule(consolidated, segment_dfs)
+            self._report_progress(72, "Calculating synergy value...")
+            synergy_value = self.calculate_synergy_value(synergy_schedule, usd_wacc)
+            self._report_progress(75, "Adjusting for synergies...")
+
+            # Create synergy-adjusted consolidated for Nippon valuation
+            # Add synergy EBITDA to consolidated, recalculate FCF
+            consolidated_with_synergies = consolidated.copy()
+            for idx, row in consolidated_with_synergies.iterrows():
+                year = row['Year']
+                synergy_row = synergy_schedule[synergy_schedule['Year'] == year]
+                if len(synergy_row) > 0:
+                    synergy_ebitda = synergy_row['Total_Synergy_EBITDA'].values[0]
+                    consolidated_with_synergies.at[idx, 'Total_EBITDA'] += synergy_ebitda
+                    # Recalculate downstream metrics
+                    new_ebitda = consolidated_with_synergies.at[idx, 'Total_EBITDA']
+                    da = consolidated_with_synergies.at[idx, 'DA']
+                    new_ebit = new_ebitda - da
+                    new_nopat = new_ebit * (1 - 0.169)  # 16.9% cash tax rate
+                    new_gross_cf = new_nopat + da
+                    capex = consolidated_with_synergies.at[idx, 'Total_CapEx']
+                    delta_wc = consolidated_with_synergies.at[idx, 'Delta_WC']
+                    new_fcf = new_gross_cf - capex + delta_wc
+
+                    consolidated_with_synergies.at[idx, 'NOPAT'] = new_nopat
+                    consolidated_with_synergies.at[idx, 'Gross_CF'] = new_gross_cf
+                    consolidated_with_synergies.at[idx, 'FCF'] = new_fcf
+                    consolidated_with_synergies.at[idx, 'EBITDA_Margin'] = new_ebitda / row['Revenue'] if row['Revenue'] > 0 else 0
+
+            # Step 7: Nippon DCF with synergies (80-95%)
+            self._report_progress(80, "Synergies incorporated")
+            self._report_progress(82, "Running Nippon valuation...")
+            val_nippon = self.calculate_dcf(consolidated_with_synergies, usd_wacc, None)
+            self._report_progress(95, "Nippon valuation complete")
+        else:
+            # Nippon view without synergies
+            self._report_progress(80, "Skipping synergies")
+            self._report_progress(82, "Running Nippon valuation...")
+            val_nippon = self.calculate_dcf(consolidated, usd_wacc, None)
+            self._report_progress(95, "Nippon valuation complete")
+
+        # Step 8: Assembly (95-100%)
+        self._report_progress(97, "Assembling results...")
+
+        results = {
             'scenario': self.scenario,
             'consolidated': consolidated,
             'segment_dfs': segment_dfs,
@@ -1336,8 +1834,13 @@ class PriceVolumeModel:
             'val_uss': val_uss,
             'val_nippon': val_nippon,
             'wacc_advantage': self.scenario.uss_wacc - usd_wacc,
-            'financing_impact': financing_impact
+            'financing_impact': financing_impact,
+            'synergy_schedule': synergy_schedule,
+            'synergy_value': synergy_value
         }
+
+        self._report_progress(100, "Analysis complete")
+        return results
 
 
 # =============================================================================
@@ -1346,13 +1849,15 @@ class PriceVolumeModel:
 
 def compare_scenarios(scenario_types: List[ScenarioType] = None,
                       execution_factor: float = 1.0,
-                      custom_benchmarks: dict = None) -> pd.DataFrame:
+                      custom_benchmarks: dict = None,
+                      progress_bar=None) -> pd.DataFrame:
     """Run and compare multiple scenarios
 
     Args:
         scenario_types: List of scenarios to compare (default: all except CUSTOM)
         execution_factor: Execution factor to apply to Nippon Commitments scenario (0.5-1.0)
         custom_benchmarks: Optional custom benchmark prices dict (default: use BENCHMARK_PRICES_2023)
+        progress_bar: Optional Streamlit progress bar for tracking
     """
 
     if scenario_types is None:
@@ -1362,8 +1867,13 @@ def compare_scenarios(scenario_types: List[ScenarioType] = None,
     presets = get_scenario_presets()
     results = []
 
-    for st in scenario_types:
+    for i, st in enumerate(scenario_types, 1):
         if st in presets:
+            # Update progress bar if provided
+            if progress_bar is not None:
+                progress_pct = int((i / len(scenario_types)) * 100)
+                progress_bar.progress(progress_pct, text=f"Calculating scenario: {st.name} ({i}/{len(scenario_types)})")
+
             # Apply execution factor only to Nippon Commitments scenario
             ef = execution_factor if st == ScenarioType.NIPPON_COMMITMENTS else 1.0
             model = PriceVolumeModel(presets[st], execution_factor=ef, custom_benchmarks=custom_benchmarks)
@@ -1391,7 +1901,8 @@ def compare_scenarios(scenario_types: List[ScenarioType] = None,
 def calculate_probability_weighted_valuation(
     scenarios: Dict[ScenarioType, ModelScenario] = None,
     exclude_scenarios: List[ScenarioType] = None,
-    custom_benchmarks: dict = None
+    custom_benchmarks: dict = None,
+    progress_bar=None
 ) -> Dict[str, any]:
     """
     Calculate probability-weighted expected value across scenarios
@@ -1400,6 +1911,7 @@ def calculate_probability_weighted_valuation(
         scenarios: Dict of scenarios to evaluate (default: all presets)
         exclude_scenarios: Scenarios to exclude (default: CUSTOM, WALL_STREET, NIPPON_COMMITMENTS)
         custom_benchmarks: Optional custom benchmark prices dict
+        progress_bar: Optional Streamlit progress bar for tracking
 
     Returns:
         Dict with weighted metrics and scenario breakdown
@@ -1430,7 +1942,11 @@ def calculate_probability_weighted_valuation(
 
     # Run each scenario
     results = {}
-    for scenario_type, scenario in weighted_scenarios.items():
+    for i, (scenario_type, scenario) in enumerate(weighted_scenarios.items(), 1):
+        if progress_bar is not None:
+            progress_pct = int((i / len(weighted_scenarios)) * 100)
+            progress_bar.progress(progress_pct, text=f"Calculating scenario: {scenario.name} ({i}/{len(weighted_scenarios)})")
+
         model = PriceVolumeModel(scenario, custom_benchmarks=custom_benchmarks)
         analysis = model.run_full_analysis()
         results[scenario_type] = {
