@@ -214,12 +214,12 @@ def render_sidebar():
 
     # Show scenario description
     scenario_descriptions = {
-        "Severe Downturn - Historical Crisis": "Recession scenario (0.68x prices, -20% volumes, 13.5% WACC) - Historical frequency: 24%",
+        "Severe Downturn - Historical Crisis": "Recession scenario (0.70x prices, -20% volumes, 13.5% WACC) - Historical frequency: 24%",
         "Downside - Weak Markets": "Below-average cycle (0.85x prices, 12% WACC) - Historical frequency: 30%",
-        "Base Case - Mid-Cycle": "Historical median performance (0.88x prices, 10.9% WACC) - Historical frequency: 30%",
+        "Base Case - Mid-Cycle": "Historical median performance (0.90x prices, 10.9% WACC) - Historical frequency: 30%",
         "Above Average - Strong Cycle": "Good markets like 2017-18 (0.95x prices, 10.9% WACC) - Historical frequency: 10%",
-        "Wall Street - Analyst Views": "Barclays/Goldman DCF assumptions (0.92x prices, 12.5% WACC)",
-        "Optimistic - Peak Cycle": "2021-22 boom conditions (mgmt projections) - Historical frequency: 5%",
+        "Wall Street - Analyst Views": "Barclays/Goldman DCF assumptions (0.90x prices, 12.5% WACC, target: $39-52/share)",
+        "Optimistic - Peak Cycle": "2021-22 boom conditions (0.92x prices, 2% growth) - Historical frequency: 5%",
         "Nippon Investment Case": "$14B capital program, all 6 projects, no plant closures through 2035",
         "Custom": "Manually adjust all parameters below."
     }

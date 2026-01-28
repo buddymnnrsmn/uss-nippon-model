@@ -445,6 +445,19 @@ def get_management_price_scenario() -> SteelPriceScenario:
     )
 
 
+def get_optimistic_price_scenario() -> SteelPriceScenario:
+    return SteelPriceScenario(
+        name="Peak Cycle Pricing",
+        description="2021-2022 boom: elevated prices with modest growth",
+        hrc_us_factor=0.92,
+        crc_us_factor=0.92,
+        coated_us_factor=0.92,
+        hrc_eu_factor=0.95,
+        octg_factor=1.0,
+        annual_price_growth=0.02
+    )
+
+
 def get_base_volume_scenario() -> VolumeScenario:
     return VolumeScenario(
         name="Base Case Volumes",
@@ -674,7 +687,7 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             name="Wall Street Consensus",
             scenario_type=ScenarioType.WALL_STREET,
             description="Barclays/Goldman DCF: 11.5-13.5% WACC, $39-52/share range",
-            price_scenario=get_management_price_scenario(),
+            price_scenario=get_wall_street_price_scenario(),
             volume_scenario=get_base_volume_scenario(),
             uss_wacc=0.125,
             terminal_growth=0.01,
@@ -693,7 +706,7 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             name="Optimistic (Peak Cycle)",
             scenario_type=ScenarioType.OPTIMISTIC,
             description="2021-2022 conditions: peak pricing and margins",
-            price_scenario=get_management_price_scenario(),
+            price_scenario=get_optimistic_price_scenario(),
             volume_scenario=VolumeScenario(
                 name="Peak Cycle Volumes",
                 description="Strong demand across all segments",
@@ -724,7 +737,7 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
             name="Optimistic (Peak Cycle)",
             scenario_type=ScenarioType.OPTIMISTIC,
             description="2021-2022 conditions: peak pricing and margins",
-            price_scenario=get_management_price_scenario(),
+            price_scenario=get_optimistic_price_scenario(),
             volume_scenario=VolumeScenario(
                 name="Peak Cycle Volumes",
                 description="Strong demand across all segments",
