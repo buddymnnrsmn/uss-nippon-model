@@ -1273,7 +1273,7 @@ def main():
             # Load steel operational metrics (capacity, shipments, utilization)
             steel_ops = {}
             try:
-                steel_ops_df = pd.read_csv('local/extracted_steel_metrics.csv')
+                steel_ops_df = pd.read_csv('data/extracted_steel_metrics.csv')
                 for _, row in steel_ops_df.iterrows():
                     ticker = row.get('Ticker', '')
                     if ticker:

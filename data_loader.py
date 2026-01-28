@@ -24,8 +24,8 @@ class USSteelDataLoader:
     def __init__(self, data_dir: str = "reference_materials"):
         self.data_dir = Path(data_dir)
         self.financials_file = self.data_dir / "United States Steel Corporation Financials.xls"
-        # Use the 12/31/2023 vintage comps file
-        self.comps_file = self.data_dir / "steel_comps" / "Company Comparable Analysis uss.xls"
+        # Use the 12/31/2023 vintage comps file (in data/ for git tracking)
+        self.comps_file = Path("data") / "Company Comparable Analysis uss.xls"
         self.ma_file = self.data_dir / "United States Steel Corporation Comparable M A Transactions.xls"
 
         # Cache for loaded data
