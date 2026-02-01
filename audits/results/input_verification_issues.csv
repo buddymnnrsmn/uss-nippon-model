@@ -1,9 +1,0 @@
-Severity,Category,Item,Model,Source,Variance %,Notes
-High,Balance Sheet,Total_Debt,4222.0,3138.0,-25.675035528185692,Model value appears to include pension + leases. Source shows pure debt: LT Debt $3093M + Current portion $45M = $3138M
-High,Balance Sheet,Cash_and_Equivalents,3013.9,755.0,-74.94940110819867,Model may include investments. Source: Cash & Equivalents = $755M. Cash + ST Investments = $755M
-High,Balance Sheet,Pension_Liability,126.0,735.0,483.3333333333333,Source shows Debt Equiv. of Unfunded Proj. Benefit Obligation: $735M. Total Pension & Other Post-Retire Benefits: $1101M
-High,Balance Sheet,Operating_Leases,117.0,1024.0,775.2136752136752,Source shows Debt Equivalent Oper. Leases: $1024M
-High,Balance Sheet,Equity_Investments,761.0,502.0,-34.03416557161629,Source shows Long-term Investments: $502M (Equity Method Investments)
-High,Balance Sheet,Shares_Outstanding,225.0,255.36,13.493333333333341,Source: Weighted Avg. Diluted Shares Out. (actual): 255360000 = 255.36M. Model uses 225M.
-High,Balance Sheet,Total_Assets,,9167.0,,Reference: Total Assets $9167M
-High,Balance Sheet,Total_Equity,,2437.0,,Reference: Total Equity $2437M (Common $2436M + Minority $1M)

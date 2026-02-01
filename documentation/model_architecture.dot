@@ -1,0 +1,226 @@
+digraph ModelArchitecture {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=10];
+    edge [fontname="Helvetica", fontsize=9];
+
+    // Title
+    labelloc="t";
+    label="USS/Nippon Financial Model - Data Flow Architecture";
+    fontsize=16;
+
+    // Styling
+    compound=true;
+
+    // ===================
+    // USER INPUT LAYER
+    // ===================
+    subgraph cluster_inputs {
+        label="User Inputs (Dashboard Sidebar)";
+        style=filled;
+        fillcolor="#e8f4f8";
+
+        scenario_dropdown [label="Scenario\nDropdown" shape=box style=rounded];
+        price_sliders [label="Price Factor\nSliders" shape=box style=rounded];
+        volume_sliders [label="Volume Factor\nSliders" shape=box style=rounded];
+        wacc_inputs [label="WACC/IRP\nParameters" shape=box style=rounded];
+        project_checks [label="Project\nCheckboxes" shape=box style=rounded];
+        exec_slider [label="Execution\nFactor" shape=box style=rounded];
+    }
+
+    // ===================
+    // DATACLASS LAYER
+    // ===================
+    subgraph cluster_dataclasses {
+        label="Configuration Dataclasses";
+        style=filled;
+        fillcolor="#fff3cd";
+
+        // Price scenario
+        subgraph cluster_price_scenario {
+            label="SteelPriceScenario";
+            style=filled;
+            fillcolor="#ffeeba";
+
+            ps_hrc [label="hrc_us_factor: 0.95" shape=box fontsize=8];
+            ps_crc [label="crc_us_factor: 0.95" shape=box fontsize=8];
+            ps_coated [label="coated_us_factor: 0.95" shape=box fontsize=8];
+            ps_eu [label="hrc_eu_factor: 0.92" shape=box fontsize=8];
+            ps_octg [label="octg_factor: 0.95" shape=box fontsize=8];
+            ps_growth [label="annual_price_growth: 0.5%" shape=box fontsize=8];
+        }
+
+        // Volume scenario
+        subgraph cluster_volume_scenario {
+            label="VolumeScenario";
+            style=filled;
+            fillcolor="#ffeeba";
+
+            vs_fr [label="flat_rolled_factor: 0.98" shape=box fontsize=8];
+            vs_mm [label="mini_mill_factor: 1.0" shape=box fontsize=8];
+            vs_usse [label="usse_factor: 0.98" shape=box fontsize=8];
+            vs_tub [label="tubular_factor: 1.0" shape=box fontsize=8];
+            vs_growth [label="growth_adjustments" shape=box fontsize=8];
+        }
+
+        // Model scenario (container)
+        subgraph cluster_model_scenario {
+            label="ModelScenario (Container)";
+            style=filled;
+            fillcolor="#fff3cd";
+            color="#856404";
+            penwidth=2;
+
+            ms_wacc [label="uss_wacc: 10.9%" shape=box fontsize=8];
+            ms_term [label="terminal_growth: 1%" shape=box fontsize=8];
+            ms_exit [label="exit_multiple: 4.5x" shape=box fontsize=8];
+            ms_irp [label="IRP: us_10yr, japan_10yr\nerp, credit_spread" shape=box fontsize=8];
+            ms_projects [label="include_projects:\n['BR2 Mini Mill']" shape=box fontsize=8];
+            ms_financing [label="FinancingAssumptions" shape=box fontsize=8];
+        }
+    }
+
+    // ===================
+    // BASE DATA LAYER
+    // ===================
+    subgraph cluster_base_data {
+        label="Base Data (2023 Actuals - Hardcoded)";
+        style=filled;
+        fillcolor="#d4edda";
+
+        // Segment configs
+        subgraph cluster_segments {
+            label="SegmentVolumePrice (×4)";
+            style=filled;
+            fillcolor="#c3e6cb";
+
+            seg_fr [label="Flat-Rolled\n8,706kt @ $1,030\n12% margin, 51% premium" shape=box fontsize=8];
+            seg_mm [label="Mini Mill\n2,424kt @ $875\n20% margin, 29% premium" shape=box fontsize=8];
+            seg_usse [label="USSE\n3,899kt @ $873\n14% margin, 41% premium" shape=box fontsize=8];
+            seg_tub [label="Tubular\n478kt @ $3,137\n15% margin, 12% premium" shape=box fontsize=8];
+        }
+
+        // Capital projects
+        subgraph cluster_projects {
+            label="CapitalProject (×6)";
+            style=filled;
+            fillcolor="#c3e6cb";
+
+            proj_br2 [label="BR2 Mini Mill\n$1.3B capex\n$560M EBITDA" shape=box fontsize=8];
+            proj_gary [label="Gary Works BF\n$3.1B capex\n$402M EBITDA" shape=box fontsize=8];
+            proj_mon [label="Mon Valley HSM\n$1.0B capex\n$130M EBITDA" shape=box fontsize=8];
+            proj_other [label="+ 3 more projects..." shape=box fontsize=8 style=dashed];
+        }
+
+        // Benchmarks
+        benchmarks [label="BENCHMARK_PRICES_2023\nHRC: $680, CRC: $850\nCoated: $950, OCTG: $2,800" shape=box fontsize=8];
+    }
+
+    // ===================
+    // MODEL ENGINE
+    // ===================
+    subgraph cluster_model {
+        label="PriceVolumeModel (Engine)";
+        style=filled;
+        fillcolor="#cce5ff";
+
+        init [label="__init__()\nLoad scenario + configs" shape=box style=rounded];
+
+        subgraph cluster_segment_calc {
+            label="Per Segment × Per Year";
+            style=filled;
+            fillcolor="#b8daff";
+
+            calc_vol [label="calculate_segment_volume()\nBase × Factor × Growth + Projects" shape=box];
+            calc_price [label="calculate_segment_price()\nBenchmark × Factor × Premium" shape=box];
+            calc_margin [label="calculate_segment_margin()\nBase + (ΔPrice/100) × Sensitivity" shape=box];
+            build_seg [label="build_segment_projection()\nRevenue, EBITDA, FCF" shape=box];
+        }
+
+        build_consol [label="build_consolidated()\nSum 4 segments" shape=box];
+        calc_irp [label="calculate_irp_wacc()\nJPY → USD conversion" shape=box];
+        calc_fin [label="calculate_financing_impact()\nDebt + equity dilution" shape=box];
+        calc_dcf [label="calculate_dcf()\nPV(FCF) + Terminal Value" shape=box];
+        run_full [label="run_full_analysis()\nOrchestrate all" shape=box style=rounded];
+    }
+
+    // ===================
+    // OUTPUT LAYER
+    // ===================
+    subgraph cluster_output {
+        label="Output";
+        style=filled;
+        fillcolor="#f8d7da";
+
+        val_uss [label="USS Standalone\n$50/share\n@ 10.9% WACC" shape=box];
+        val_nippon [label="Nippon Value\n$63/share\n@ 7.5% WACC" shape=box];
+        consolidated [label="10-Year\nProjection\nDataFrame" shape=box];
+        segment_dfs [label="Segment\nDataFrames\n(×4)" shape=box];
+    }
+
+    // ===================
+    // EDGES - User Inputs to Dataclasses
+    // ===================
+    scenario_dropdown -> ms_wacc [lhead=cluster_model_scenario];
+    price_sliders -> ps_hrc [lhead=cluster_price_scenario];
+    volume_sliders -> vs_fr [lhead=cluster_volume_scenario];
+    wacc_inputs -> ms_irp;
+    project_checks -> ms_projects;
+    exec_slider -> init [label="execution_factor" style=dashed];
+
+    // ===================
+    // EDGES - Dataclasses compose into ModelScenario
+    // ===================
+    ps_growth -> ms_wacc [style=dashed label="price_scenario" ltail=cluster_price_scenario lhead=cluster_model_scenario];
+    vs_growth -> ms_wacc [style=dashed label="volume_scenario" ltail=cluster_volume_scenario lhead=cluster_model_scenario];
+
+    // ===================
+    // EDGES - Into Model Init
+    // ===================
+    ms_projects -> init [ltail=cluster_model_scenario label="scenario"];
+    seg_tub -> init [ltail=cluster_segments label="get_segment_configs()"];
+    proj_other -> init [ltail=cluster_projects label="get_capital_projects()"];
+    benchmarks -> init [label="BENCHMARK_PRICES_2023"];
+
+    // ===================
+    // EDGES - Calculation Flow
+    // ===================
+    init -> calc_vol;
+    calc_vol -> calc_price;
+    calc_price -> calc_margin;
+    calc_margin -> build_seg;
+    build_seg -> build_consol;
+    build_consol -> calc_irp;
+    build_consol -> calc_fin;
+    calc_irp -> calc_dcf;
+    calc_fin -> calc_dcf;
+    build_consol -> calc_dcf;
+    calc_dcf -> run_full;
+
+    // ===================
+    // EDGES - To Output
+    // ===================
+    run_full -> val_uss;
+    run_full -> val_nippon;
+    run_full -> consolidated;
+    run_full -> segment_dfs;
+
+    // ===================
+    // EDGES - What feeds calculations (dotted lines showing data flow)
+    // ===================
+    seg_mm -> calc_vol [style=dotted color=gray label="base_shipments\nvolume_growth" fontsize=7];
+    vs_mm -> calc_vol [style=dotted color=gray label="factor\ngrowth_adj" fontsize=7];
+    proj_br2 -> calc_vol [style=dotted color=gray label="volume_addition" fontsize=7];
+
+    benchmarks -> calc_price [style=dotted color=gray];
+    ps_hrc -> calc_price [style=dotted color=gray label="factor\nannual_growth" fontsize=7];
+    seg_mm -> calc_price [style=dotted color=gray label="premium" fontsize=7];
+
+    seg_mm -> calc_margin [style=dotted color=gray label="base_margin\nsensitivity" fontsize=7];
+
+    ms_irp -> calc_irp [style=dotted color=gray];
+    ms_financing -> calc_fin [style=dotted color=gray];
+    ms_wacc -> calc_dcf [style=dotted color=gray];
+    ms_term -> calc_dcf [style=dotted color=gray];
+    ms_exit -> calc_dcf [style=dotted color=gray];
+}

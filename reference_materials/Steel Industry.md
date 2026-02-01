@@ -1,8 +1,0 @@
-# Summary
-
-The global steel industry faces significant challenges, including overcapacity pressures and the need for technological transformation to achieve decarbonization. The industry's base case scenario projects continued overcapacity, with utilization rates expected to decline to 70% by 2027, and modest annual demand growth in developed markets. The industry is also characterized by low EBITDA margins of 8-10%, which are unsustainable and prevent adequate cash generation for green transitions. Additionally, the industry faces an existential crisis from massive overcapacity, with record exports triggering protective trade measures worldwide. The industry produced 1,882.6 million tons in 2024 and is projected to reach 721 million tons of overcapacity by 2027. China's record exports have triggered protective trade measures worldwide as the industry confronts the costly imperative of decarbonization, with current annual emissions requiring fundamental technological transformation. The industry has invested significantly in decarbonization projects, with major commitments from several companies and government support reaching unprecedented levels. However, reality has proven far more challenging than projections, with some companies postponing investments due to unfavorable economics and insufficient market demand for premium-priced green steel.
-# Internet Resources
-
-https://steelindustry.news/
-
-https://worldsteel.org/about-steel/

@@ -34,7 +34,8 @@ Thumbs.db
 # Local data folder (WRDS credentials and cached data)
 local/
 
-documentation/
+# Cache directory
+cache/
 
 # Large reference data files (SEC filings, RTFs)
 reference_materials/steel_comps/

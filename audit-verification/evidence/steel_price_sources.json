@@ -1,0 +1,30 @@
+[
+  {
+    "name": "CME HRC Futures (Settlement Prices)",
+    "url": "https://www.cmegroup.com/markets/metals/ferrous/hrc-steel.settlements.html",
+    "description": "Historical settlement prices for HRC futures (free)",
+    "data_type": "US HRC Midwest",
+    "instructions": "Download CSV from website, calculate 2023 average"
+  },
+  {
+    "name": "SteelBenchmarker",
+    "url": "http://www.steelbenchmarker.com/files/history.pdf",
+    "description": "Historical composite steel prices (free monthly data)",
+    "data_type": "Composite steel price index",
+    "instructions": "Check PDF for 2023 monthly averages"
+  },
+  {
+    "name": "World Steel Association",
+    "url": "https://worldsteel.org/steel-topics/statistics/prices/",
+    "description": "Global steel price trends (limited free data)",
+    "data_type": "Multiple products",
+    "instructions": "Review public charts, may need to estimate"
+  },
+  {
+    "name": "FRED Economic Data (PPI Steel)",
+    "url": "https://fred.stlouisfed.org/series/WPU101",
+    "description": "Producer Price Index for steel mill products",
+    "data_type": "PPI Index (not direct prices)",
+    "instructions": "Download CSV, use as relative indicator"
+  }
+]

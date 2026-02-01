@@ -1,0 +1,24 @@
+Test ID,Description,Category,Result,Notes
+IV-11,Flat-Rolled premium calibration,Input Validation,PASS,"Expected: 51.5%, Actual: 51.5%"
+IV-12,Mini Mill premium calibration,Input Validation,PASS,"Expected: 28.7%, Actual: 28.7%"
+IV-13,USSE premium calibration,Input Validation,PASS,"Expected: 40.8%, Actual: 40.8%"
+IV-14,Tubular premium calibration,Input Validation,PASS,"Expected: 12.0%, Actual: 12.0%"
+CV-01,Revenue = Volume × Price (2024),Calculation,PASS,"Expected: $12,906M, Calculated: $12,906M"
+CV-03,NOPAT = EBIT × (1 - 16.9%),Calculation,PASS,EBIT: $447M → NOPAT: $371M
+CV-05,FCF = Gross CF - CapEx + ΔWC,Calculation,PASS,"Expected: $-1,096M, Actual: $-1,096M"
+CV-07,Terminal growth < WACC,Calculation,PASS,g=1.0% < WACC=10.9%
+CV-10,IRP WACC conversion formula,Calculation,PASS,JPY 3.94% → USD 7.55%
+CV-11,Segment revenues sum to consolidated (all years),Consolidation,PASS,Max error across all years: $0.00M
+CV-12,Segment EBITDA sum to consolidated (all years),Consolidation,PASS,Max error across all years: $0.00M
+CV-14,Segment FCF sum to consolidated (all years),Consolidation,PASS,Max error across all years: $0.00M
+LC-02,Higher WACC → lower valuation,Logic,PASS,"8% WACC: $54.50, 14% WACC: $26.82"
+LC-09,Avg EBITDA margin 10-20% (industry range),Logic,PASS,Average margin: 13.8% (industry: 10-20%)
+LC-10,FCF/EBITDA conversion 40-60%,Logic,PASS,Conversion: 47.2% (industry: 40-60%)
+LC-07,Mini Mill margins > Flat-Rolled margins,Logic,PASS,"Mini Mill: 17.5%, Flat-Rolled: 9.6%"
+ST-02,Volume changes have linear impact on FCF,Sensitivity,PASS,"Base FCF: $9,301M, -10% vol: $9,059M (-2.6%)"
+ST-20,Negative margins floor at 2%,Boundary,PASS,Margin at $515/ton: 2.0% (floor: 2%)
+ST-19,High margins cap at 30%,Boundary,PASS,Margin at $2060/ton: 30.0% (cap: 30%)
+FI-01,BR2-only scenario has zero financing impact,Financing,PASS,Financing gap: $0M (expected: $0M)
+FI-02,NSA scenario triggers financing impact,Financing,PASS,"NSA financing gap: $3,561M"
+FI-08,Nippon valuation excludes financing impact,Financing,PASS,Nippon view has no financing penalty (deep balance sheet)
+LC-15,Scenario valuations rank correctly,Scenario,PASS,Downside: $27.14 < Base: $58.22 < Optimistic: $146.58

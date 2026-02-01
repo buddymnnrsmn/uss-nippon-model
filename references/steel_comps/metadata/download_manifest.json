@@ -1,0 +1,140 @@
+{
+  "download_date": "2026-01-27",
+  "total_companies": 11,
+  "successful_downloads": 11,
+  "failed_downloads": 0,
+  "companies": [
+    {
+      "company_name": "Cleveland-Cliffs Inc.",
+      "ticker": "CLF",
+      "cik": "0000764065",
+      "filing_type": "10-K",
+      "fiscal_year_end": "2023-12-31",
+      "accounting_standard": "GAAP",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/sec_filings/CLF_10-K_FY2023.htm",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/764065/000076406524000038/clf-20231231.htm",
+      "download_status": "success",
+      "notes": "Filed 2024-02-08, 3,542,519 bytes"
+    },
+    {
+      "company_name": "Nucor Corporation",
+      "ticker": "NUE",
+      "cik": "0000073309",
+      "filing_type": "10-K",
+      "fiscal_year_end": "2023-12-31",
+      "accounting_standard": "GAAP",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/sec_filings/NUE_10-K_FY2023.htm",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/73309/000095017024021195/nue-20231231.htm",
+      "download_status": "success",
+      "notes": "Filed 2024-02-27, 4,371,466 bytes"
+    },
+    {
+      "company_name": "Steel Dynamics, Inc.",
+      "ticker": "STLD",
+      "cik": "0001022671",
+      "filing_type": "10-K",
+      "fiscal_year_end": "2023-12-31",
+      "accounting_standard": "GAAP",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/sec_filings/STLD_10-K_FY2023.htm",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1022671/000155837024002152/stld-20231231x10k.htm",
+      "download_status": "success",
+      "notes": "Filed 2024-02-29, 3,525,538 bytes"
+    },
+    {
+      "company_name": "Olympic Steel, Inc.",
+      "ticker": "ZEUS",
+      "cik": "0000917470",
+      "filing_type": "10-K",
+      "fiscal_year_end": "2023-12-31",
+      "accounting_standard": "GAAP",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/sec_filings/ZEUS_10-K_FY2023.htm",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/917470/000143774924005372/zeus20231231_10k.htm",
+      "download_status": "success",
+      "notes": "Filed 2024-02-23, 2,024,197 bytes"
+    },
+    {
+      "company_name": "Commercial Metals Company",
+      "ticker": "CMC",
+      "cik": "0000022444",
+      "filing_type": "10-K",
+      "fiscal_year_end": "2023-08-31",
+      "accounting_standard": "GAAP",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/sec_filings/CMC_10-K_FY2023.htm",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/22444/000002244423000126/cmc-20230831.htm",
+      "download_status": "success",
+      "notes": "Filed 2023-10-12, non-calendar fiscal year (Aug 31), 2,548,158 bytes"
+    },
+    {
+      "company_name": "ArcelorMittal S.A.",
+      "ticker": "MT",
+      "cik": "0001243429",
+      "filing_type": "20-F",
+      "fiscal_year_end": "2023-12-31",
+      "accounting_standard": "IFRS",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/sec_filings/MT_20-F_FY2023.htm",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1243429/000124342924000005/mt-20231231.htm",
+      "download_status": "success",
+      "notes": "Filed 2024-02-28, 10,357,469 bytes"
+    },
+    {
+      "company_name": "POSCO Holdings Inc.",
+      "ticker": "PKX",
+      "cik": "0000889132",
+      "filing_type": "20-F",
+      "fiscal_year_end": "2023-12-31",
+      "accounting_standard": "IFRS",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/sec_filings/PKX_20-F_FY2023.htm",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/889132/000119312524119728/d721789d20f.htm",
+      "download_status": "success",
+      "notes": "Filed 2024-04-29, 12,146,879 bytes"
+    },
+    {
+      "company_name": "Ternium S.A.",
+      "ticker": "TX",
+      "cik": "0001342874",
+      "filing_type": "20-F",
+      "fiscal_year_end": "2023-12-31",
+      "accounting_standard": "IFRS",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/sec_filings/TX_20-F_FY2023.htm",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1342874/000134287424000018/tx-20231231.htm",
+      "download_status": "success",
+      "notes": "Filed 2024-03-28, 5,853,888 bytes"
+    },
+    {
+      "company_name": "Gerdau S.A.",
+      "ticker": "GGB",
+      "cik": "0001073404",
+      "filing_type": "20-F",
+      "fiscal_year_end": "2023-12-31",
+      "accounting_standard": "IFRS",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/sec_filings/GGB_20-F_FY2023.htm",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1073404/000110465924040516/ggb-20231231x20f.htm",
+      "download_status": "success",
+      "notes": "Filed 2024-03-28, 8,907,920 bytes"
+    },
+    {
+      "company_name": "Nippon Steel Corporation",
+      "ticker": "NPSCY",
+      "cik": null,
+      "filing_type": "Annual Securities Report",
+      "fiscal_year_end": "2024-03-31",
+      "accounting_standard": "IFRS",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/manual_downloads/NPSCY_AnnualSecuritiesReport_FY2024.pdf",
+      "source_url": "https://www.nipponsteel.com/en/ir/library/pdf/securitiesreport_2023.pdf",
+      "download_status": "success",
+      "notes": "99th Term (Apr 2023 - Mar 2024), 5,450,252 bytes. Non-SEC filer, downloaded from company IR site."
+    },
+    {
+      "company_name": "BlueScope Steel Limited",
+      "ticker": "BLSFY",
+      "cik": null,
+      "filing_type": "Annual Report",
+      "fiscal_year_end": "2023-06-30",
+      "accounting_standard": "IFRS",
+      "file_path": "/workspaces/claude-in-docker/FinancialModel/reference_materials/steel_comps/manual_downloads/BLSFY_AnnualReport_FY2023.pdf",
+      "source_url": "https://www.bluescope.com/content/dam/bluescope/corporate/bluescope-com/investor/documents/2023_bluescope_fy_report_annual_report.pdf",
+      "download_status": "success",
+      "notes": "FY2023 (Jul 2022 - Jun 2023), 13,132,746 bytes. Non-SEC filer, ASX-listed, downloaded from company IR site."
+    }
+  ]
+}

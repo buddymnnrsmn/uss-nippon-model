@@ -1,0 +1,46 @@
+Project_Name,Model_Total_CapEx_M,Source_Total_CapEx_M,Model_Peak_EBITDA_M,Source_Peak_EBITDA_M,Model_Capacity_Addition_tons,Source_Capacity_Addition_tons,Source_Document,Page_Number,CapEx_Variance_Pct,Status,Notes
+BR2_Mini_Mill,2197,,560,,3000000,,,,,Phase 2 expansion - already committed
+Gary_Works_BF,3100,,402,,,,,,,Blast furnace reline and modernization
+Mon_Valley_HSM,1000,,130,,,,,,,Hot strip mill upgrade
+Greenfield_Mini_Mill,1000,,274,,1500000,,,,,New EAF facility location TBD
+Mining_Investment,800,,80,,,,,,,Keetac and Minntac expansion
+Fairfield_Works,500,,60,,,,,,,Tubular segment modernization
+
+# PROJECT TIMING (fill in from source documents)
+# Project_Name,Start_Year,Peak_CapEx_Year,First_Production_Year,Full_Ramp_Year,Source_Document,Page,Notes
+# BR2_Mini_Mill,,,,,,"Already under construction as of 2023"
+# Gary_Works_BF,,,,,,
+# Mon_Valley_HSM,,,,,,
+# Greenfield_Mini_Mill,,,,,,
+# Mining_Investment,,,,,,
+# Fairfield_Works,,,,,,
+
+# NSA COMMITMENT SUMMARY
+# Total_NSA_Investment_Required,14000,,NSA Filing,,"Sum of all 6 projects should equal $14B"
+# Incremental_EBITDA_Target,2500,,NSA Filing,,"NSA committed to $2.5B incremental EBITDA by 2035"
+# Timeline,2024-2035,,NSA Filing,,"No plant closures through 2035 per NSA"
+# Enforcement_Mechanism,,,NSA Filing,,"Golden Share provisions"
+
+# INSTRUCTIONS:
+# 1. Fill Source columns with data from NSA filing, investor presentations, or press releases
+# 2. CapEx in $ millions, Capacity in tons (NOT thousands of tons)
+# 3. Source_Document: e.g., "NSA Filing Dec 2023", "USS Investor Presentation Q4 2023"
+# 4. CapEx_Variance_Pct: (Source_Total_CapEx - Model_Total_CapEx) / Model_Total_CapEx
+# 5. Status: OK (< 10% variance), REVIEW (10-20%), FLAG (> 20%)
+# 6. Notes: Explain differences, note if costs are preliminary estimates
+
+# VALIDATION CHECKS:
+# 1. Sum of all project CapEx should be ~$9.4B in model (without BR2 ~$7.2B)
+# 2. BR2 is already committed/funded, included in all scenarios
+# 3. Other 5 projects are "NSA Mandated" - only in that scenario
+# 4. Total NSA commitment from filing should be $14B (may include items not in model)
+
+# KNOWN DIFFERENCES:
+# - Model may not include working capital requirements
+# - Model may not include some minor ancillary projects
+# - Timing differences can affect NPV calculations
+
+# ACCEPTABLE VARIANCE:
+# - ± 10% on CapEx is acceptable (projects are estimates)
+# - ± 20% on EBITDA is acceptable (long-term projections uncertain)
+# - Capacity additions should match exactly if disclosed

@@ -1,0 +1,65 @@
+{
+  "sec_filings": [
+    {
+      "item": "USS 2023 10-K",
+      "status": "pending",
+      "priority": "high"
+    },
+    {
+      "item": "USS 2024 Proxy Statement (DEF 14A)",
+      "status": "pending",
+      "priority": "high"
+    },
+    {
+      "item": "USS Q4 2023 8-K (earnings)",
+      "status": "pending",
+      "priority": "medium"
+    }
+  ],
+  "steel_prices": [
+    {
+      "item": "CME HRC Futures 2023 data",
+      "status": "pending",
+      "priority": "high"
+    },
+    {
+      "item": "SteelBenchmarker 2023 averages",
+      "status": "pending",
+      "priority": "medium"
+    },
+    {
+      "item": "FRED PPI Steel data",
+      "status": "pending",
+      "priority": "low"
+    }
+  ],
+  "company_data": [
+    {
+      "item": "USS Q4 2023 earnings presentation",
+      "status": "pending",
+      "priority": "high"
+    },
+    {
+      "item": "BR2 Phase 2 press release",
+      "status": "pending",
+      "priority": "medium"
+    },
+    {
+      "item": "NSA announcement press release",
+      "status": "pending",
+      "priority": "high"
+    }
+  ],
+  "analyst_data": [
+    {
+      "item": "Barclays fairness opinion (in proxy)",
+      "status": "pending",
+      "priority": "high"
+    },
+    {
+      "item": "Goldman fairness opinion (in proxy)",
+      "status": "pending",
+      "priority": "high"
+    }
+  ]
+}

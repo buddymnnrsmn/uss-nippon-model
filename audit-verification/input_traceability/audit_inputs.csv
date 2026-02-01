@@ -1,0 +1,17 @@
+Item,Excel_Value,PDF_Value,Difference,Status
+Revenue,18053.0,18057,-4.0,MATCH
+Revenue 2022,21065.0,21065,0.0,MATCH
+Cost of Goods Sold 2023,15749.0,15803,-54.0,MATCH
+Cost of Goods Sold 2022,16712.0,18028,-1316.0,DIFF
+SG&A 2023,,501,,MISSING
+Depreciation 2023,916.0,757,159.0,DIFF
+Operating Income 2023,1003.0,1015,-12.0,MATCH
+Net Income 2023,895.0,895,0.0,MATCH
+Total Current Assets,,6582,,MISSING
+PP&E Net 2023,,10393,,MISSING
+Total Assets 2023,,19141,,MISSING
+Total Current Liab 2023,,3468,,MISSING
+Long-term Debt 2023,,4080,,MISSING
+Total Liabilities 2023,,11376,,MISSING
+Cash from Ops 2023,2100.0,1829,271.0,DIFF
+CapEx 2023,-2576.0,2090,-4666.0,DIFF

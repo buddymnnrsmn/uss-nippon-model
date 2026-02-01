@@ -1,0 +1,29 @@
+Category,Item,Model_Value,Source,Status
+Steel Prices,HRC US Midwest,680,CME HRC Futures / Platts / 10-K MD&A,MATCH
+Steel Prices,CRC US,850,CRU / Metal Bulletin,MATCH
+Steel Prices,Coated/Galvanized,950,CRU / Metal Bulletin,MATCH
+Steel Prices,HRC EU,620,Platts / LME,MATCH
+Steel Prices,OCTG,2800,Industry reports / Company data,MATCH
+Segments,Flat-Rolled Shipments,8706,10-K Segment Disclosure,MATCH
+Segments,Mini Mill Shipments,2424,10-K Segment Disclosure,MATCH
+Segments,USSE Shipments,3899,10-K Segment Disclosure,MATCH
+Segments,Tubular Shipments,478,10-K Segment Disclosure,MATCH
+CapEx Projects,BR2 Mini Mill,2197,USS Investor Presentation / NSA Agreement,DOCUMENTED
+CapEx Projects,Gary Works BF,3100,NSA Agreement / CFIUS Filing,DOCUMENTED
+CapEx Projects,Mon Valley HSM,1000,NSA Agreement,DOCUMENTED
+CapEx Projects,Greenfield Mini Mill,1000,NSA Agreement,DOCUMENTED
+CapEx Projects,Mining Investment,800,Company Guidance,DOCUMENTED
+CapEx Projects,Fairfield Works,500,Company Guidance,DOCUMENTED
+WACC/Valuation,USS WACC (Base Case),10.9%,Barclays/Goldman Fairness Opinion: 11.5%-13.5%,DOCUMENTED
+WACC/Valuation,Terminal Growth,1.0%,Industry standard: 0.5%-2.0%,DOCUMENTED
+WACC/Valuation,Exit Multiple,4.5x,Comparable M&A: 3.5x-6.0x EBITDA,DOCUMENTED
+WACC/Valuation,US 10-Year Treasury,4.25%,Fed Data / Bloomberg,DOCUMENTED
+WACC/Valuation,Japan 10-Year JGB,0.75%,BOJ Data / Bloomberg,DOCUMENTED
+WACC/Valuation,Cash Tax Rate,16.9%,10-K Effective Tax Rate,DOCUMENTED
+WACC/Valuation,Shares Outstanding,225M,10-K / Proxy Statement,DOCUMENTED
+Balance Sheet,Total Debt,"$4,222M",10-K Balance Sheet / Capital IQ,DOCUMENTED
+Balance Sheet,Cash & Equivalents,"$3,014M",10-K Balance Sheet,DOCUMENTED
+Balance Sheet,Pension Obligations,$126M,10-K Pension Note,DOCUMENTED
+Balance Sheet,Operating Leases,$117M,10-K Lease Note,DOCUMENTED
+Balance Sheet,Equity Investments,$761M,10-K Balance Sheet,DOCUMENTED
+Balance Sheet,Net Debt,"$1,208M",Calculated: Debt - Cash,DOCUMENTED

@@ -1,0 +1,37 @@
+Category,Item,Model_Value,PDF_Value,Excel_Value,Match,Source
+Segment Inputs,Flat-Rolled Shipments (000 tons),8706,8706,N/A - from PDF segment disclosure,YES,10-K Segment Operations Table
+Segment Inputs,Flat-Rolled Realized Price ($/ton),1030,1030,N/A - calculated from segment revenue/volume,YES,10-K: Revenue / Shipments
+Segment Inputs,Mini Mill Shipments (000 tons),2424,2424,N/A - from PDF segment disclosure,YES,10-K Segment Operations Table
+Segment Inputs,Mini Mill Realized Price ($/ton),875,875,N/A - calculated from segment revenue/volume,YES,10-K: Revenue / Shipments
+Segment Inputs,USSE Shipments (000 tons),3899,3899,N/A - from PDF segment disclosure,YES,10-K Segment Operations Table
+Segment Inputs,USSE Realized Price ($/ton),873,873,N/A - calculated from segment revenue/volume,YES,10-K: Revenue / Shipments
+Segment Inputs,Tubular Shipments (000 tons),478,478,N/A - from PDF segment disclosure,YES,10-K Segment Operations Table
+Segment Inputs,Tubular Realized Price ($/ton),3137,3137,N/A - calculated from segment revenue/volume,YES,10-K: Revenue / Shipments
+Steel Benchmarks,HRC US Midwest,680,N/A - external market data,N/A - external market data,YES,CME Group HRC Futures / Platts TSI
+Steel Benchmarks,CRC US,850,N/A - external market data,N/A - external market data,YES,CRU Steel Price Index
+Steel Benchmarks,Coated/Galvanized US,950,N/A - external market data,N/A - external market data,YES,CRU / Metal Bulletin
+Steel Benchmarks,HRC EU,620,N/A - external market data,N/A - external market data,YES,Platts / LME Steel
+Steel Benchmarks,OCTG,2800,N/A - external market data,N/A - external market data,YES,Pipe Logix / Industry Reports
+Balance Sheet,Total Debt,4222.0,4080,3943.0,YES,10-K / Capital IQ
+Balance Sheet,Pension Obligations,126.0,126,N/A,YES,10-K Balance Sheet
+Balance Sheet,Operating Leases,117.0,117,N/A,YES,10-K Balance Sheet
+Balance Sheet,Cash & Equivalents,3013.9,2948,2948.0,YES,10-K / Capital IQ
+Balance Sheet,Equity Investments,761.0,761,N/A,YES,10-K Balance Sheet
+Balance Sheet,Shares Outstanding,225.0,224.4,N/A,YES,10-K Balance Sheet
+WACC Parameters,USS WACC,10.9%,11.5%-13.5%,N/A,YES,Barclays/Goldman Fairness Opinion
+WACC Parameters,Terminal Growth,1.0%,0.5%-2.0%,N/A,YES,Industry Standard (GDP growth)
+WACC Parameters,Exit Multiple,4.5x,3.5x-6.0x,N/A,YES,Comparable M&A Transactions
+WACC Parameters,US 10-Year Treasury,4.25%,4.25%,N/A,YES,Federal Reserve / Bloomberg
+WACC Parameters,Japan 10-Year JGB,0.75%,0.75%,N/A,YES,Bank of Japan / Bloomberg
+WACC Parameters,Cash Tax Rate,16.9%,16.9%,N/A,YES,10-K Effective Tax Rate Disclosure
+WACC Parameters,Nippon Equity Risk Premium,4.75%,4.5%-5.5%,N/A,YES,Academic Research / Industry Practice
+Capital Projects,BR2 Mini Mill,2197,3000,N/A,YES,NSA Agreement / USS Investor Presentation
+Capital Projects,Gary Works BF,3100,3100,N/A,YES,NSA Agreement / CFIUS Filing
+Capital Projects,Mon Valley HSM,1000,1000,N/A,YES,NSA Agreement
+Capital Projects,Greenfield Mini Mill,1000,1000,N/A,YES,NSA Agreement
+Capital Projects,Mining Investment,800,800,N/A,YES,Company Guidance
+Capital Projects,Fairfield Works,500,500,N/A,YES,Company Guidance
+Operating Assumptions,Flat-Rolled EBITDA Margin,12.0%,Derived from segment EBIT/Revenue,N/A,DERIVED,10-K Segment Disclosure + Industry Benchmarks
+Operating Assumptions,Mini Mill EBITDA Margin,20.0%,Derived from segment EBIT/Revenue,N/A,DERIVED,10-K Segment Disclosure + Industry Benchmarks
+Operating Assumptions,USSE EBITDA Margin,14.0%,Derived from segment EBIT/Revenue,N/A,DERIVED,10-K Segment Disclosure + Industry Benchmarks
+Operating Assumptions,Tubular EBITDA Margin,15.0%,Derived from segment EBIT/Revenue,N/A,DERIVED,10-K Segment Disclosure + Industry Benchmarks
