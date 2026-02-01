@@ -170,6 +170,12 @@ class ModelExporter:
         if self.analysis.get('synergy_schedule') is not None:
             self._create_synergy_sheet(wb)
 
+        # Add peer analysis sheet with graceful failure handling
+        try:
+            self._create_peer_analysis_sheet(wb)
+        except Exception as e:
+            print(f"Warning: Could not create peer analysis sheet: {e}")
+
         # Remove default empty sheet if it exists
         if 'Sheet' in wb.sheetnames and len(wb.sheetnames) > 1:
             del wb['Sheet']
@@ -211,6 +217,12 @@ class ModelExporter:
         # Add synergy sheet if synergies are enabled
         if self.analysis.get('synergy_schedule') is not None:
             self._create_synergy_sheet(wb)
+
+        # Add peer analysis sheet with graceful failure handling
+        try:
+            self._create_peer_analysis_sheet(wb)
+        except Exception as e:
+            print(f"Warning: Could not create peer analysis sheet: {e}")
 
         # Add multi-scenario sheets
         self._create_scenario_comparison_sheet(wb, scenario_types)
@@ -1186,6 +1198,270 @@ class ModelExporter:
         ws.column_dimensions['D'].width = 12
         for col in range(5, len(headers) + 2):
             ws.column_dimensions[get_column_letter(col)].width = 12
+
+    def _create_peer_analysis_sheet(self, wb: Workbook):
+        """Create Multi-Year Peer Analysis sheet with CAGR comparisons"""
+        ws = wb.create_sheet("Multi-Year Peer Analysis")
+
+        try:
+            # Import benchmark data
+            import sys
+            from pathlib import Path
+            scripts_dir = Path(__file__).parent
+            if str(scripts_dir) not in sys.path:
+                sys.path.insert(0, str(scripts_dir))
+            from benchmark_data import BenchmarkData
+
+            benchmark = BenchmarkData()
+
+            # Title
+            ws['A1'] = "MULTI-YEAR PEER ANALYSIS"
+            ws['A1'].font = self.styler.title_font
+            ws['A2'] = "USS vs Steel Industry Peers - CAGR Comparison (2019-2024)"
+            ws['A2'].font = self.styler.subtitle_font
+            ws['A3'] = f"Generated: {self.timestamp}"
+
+            row = 5
+
+            # =========================================================================
+            # SECTION 1: Historical Values (2019-2024)
+            # =========================================================================
+            self.styler.style_section_header(ws, row, "SECTION 1: HISTORICAL VALUES (2019-2024)", 1, 8)
+            row += 2
+
+            # Get USS timeseries
+            uss_ts = benchmark.get_uss_timeseries(['revenue', 'ebitda', 'net_income', 'capex'], 2019, 2024)
+
+            if not uss_ts.empty:
+                metrics = ['revenue', 'ebitda', 'net_income', 'capex']
+                years = sorted(uss_ts['year'].unique())
+
+                for metric in metrics:
+                    # Metric header
+                    ws.cell(row=row, column=1, value=f"{metric.replace('_', ' ').title()} ($M)")
+                    ws.cell(row=row, column=1).font = Font(bold=True)
+                    row += 1
+
+                    # Column headers: Company, then years
+                    headers = ['Company'] + [str(y) for y in years]
+                    for col, header in enumerate(headers, 1):
+                        ws.cell(row=row, column=col, value=header)
+                    self.styler.style_header_row(ws, row, 1, len(headers))
+                    row += 1
+
+                    # USS row (highlighted)
+                    ws.cell(row=row, column=1, value="USS (X)")
+                    ws.cell(row=row, column=1).fill = PatternFill(start_color="FFE699", end_color="FFE699", fill_type="solid")
+                    for col, year in enumerate(years, 2):
+                        year_data = uss_ts[uss_ts['year'] == year]
+                        if not year_data.empty and metric in year_data.columns:
+                            value = year_data[metric].iloc[0]
+                            if pd.notna(value):
+                                ws.cell(row=row, column=col, value=round(value, 0))
+                                ws.cell(row=row, column=col).number_format = '#,##0'
+                        ws.cell(row=row, column=col).fill = PatternFill(start_color="FFE699", end_color="FFE699", fill_type="solid")
+                    row += 1
+
+                    # Peer rows
+                    peer_ts = benchmark.get_peer_timeseries(metric, 2019, 2024)
+                    if not peer_ts.empty:
+                        for ticker in sorted(peer_ts['ticker'].unique()):
+                            ticker_data = peer_ts[peer_ts['ticker'] == ticker]
+                            company_name = ticker_data['company_name'].iloc[0] if 'company_name' in ticker_data.columns else ticker
+                            ws.cell(row=row, column=1, value=f"{ticker}")
+                            for col, year in enumerate(years, 2):
+                                year_data = ticker_data[ticker_data['year'] == year]
+                                if not year_data.empty:
+                                    value = year_data['value'].iloc[0]
+                                    if pd.notna(value):
+                                        ws.cell(row=row, column=col, value=round(value, 0))
+                                        ws.cell(row=row, column=col).number_format = '#,##0'
+                            row += 1
+
+                    row += 1  # Space between metrics
+
+            # =========================================================================
+            # SECTION 2: Point-in-Time CAGRs (3-Year, 5-Year)
+            # =========================================================================
+            row += 1
+            self.styler.style_section_header(ws, row, "SECTION 2: POINT-IN-TIME CAGR ANALYSIS", 1, 8)
+            row += 2
+
+            # Get growth analysis
+            growth_stats = benchmark.get_multiyear_growth_analysis()
+
+            if growth_stats:
+                # Headers
+                headers = ['Metric', 'Period', 'Years', 'USS CAGR', 'Peer Median', 'Peer Min', 'Peer Max', 'USS Percentile', 'Peer Count']
+                for col, header in enumerate(headers, 1):
+                    ws.cell(row=row, column=col, value=header)
+                self.styler.style_header_row(ws, row, 1, len(headers))
+                row += 1
+
+                # Data rows
+                for gs in growth_stats:
+                    ws.cell(row=row, column=1, value=gs.metric.replace('_', ' ').title())
+                    ws.cell(row=row, column=2, value=f"{gs.period_years}-Year")
+                    ws.cell(row=row, column=3, value=f"{gs.start_year}-{gs.end_year}")
+
+                    # USS CAGR with conditional formatting
+                    if gs.uss_cagr is not None:
+                        ws.cell(row=row, column=4, value=gs.uss_cagr)
+                        ws.cell(row=row, column=4).number_format = '0.0%'
+                        if gs.uss_cagr >= 0:
+                            ws.cell(row=row, column=4).fill = self.styler.positive_fill
+                        else:
+                            ws.cell(row=row, column=4).fill = self.styler.negative_fill
+                    else:
+                        ws.cell(row=row, column=4, value="N/A")
+
+                    # Peer stats
+                    ws.cell(row=row, column=5, value=gs.peer_median)
+                    ws.cell(row=row, column=5).number_format = '0.0%'
+                    ws.cell(row=row, column=6, value=gs.peer_min)
+                    ws.cell(row=row, column=6).number_format = '0.0%'
+                    ws.cell(row=row, column=7, value=gs.peer_max)
+                    ws.cell(row=row, column=7).number_format = '0.0%'
+
+                    # USS Percentile with conditional formatting
+                    if gs.uss_percentile is not None:
+                        ws.cell(row=row, column=8, value=f"{gs.uss_percentile:.0f}th")
+                        if gs.uss_percentile >= 75:
+                            ws.cell(row=row, column=8).fill = self.styler.positive_fill
+                        elif gs.uss_percentile >= 25:
+                            ws.cell(row=row, column=8).fill = self.styler.derived_fill
+                        else:
+                            ws.cell(row=row, column=8).fill = self.styler.negative_fill
+                    else:
+                        ws.cell(row=row, column=8, value="N/A")
+
+                    ws.cell(row=row, column=9, value=gs.peer_count)
+                    row += 1
+
+            # =========================================================================
+            # SECTION 3: Rolling Period CAGRs
+            # =========================================================================
+            row += 2
+            self.styler.style_section_header(ws, row, "SECTION 3: ROLLING 3-YEAR CAGR BY PERIOD", 1, 8)
+            row += 2
+
+            rolling_data = benchmark.get_rolling_period_analysis(['revenue', 'net_income'], 3)
+
+            if not rolling_data.empty:
+                for metric in ['revenue', 'net_income']:
+                    metric_data = rolling_data[rolling_data['metric'] == metric]
+                    if metric_data.empty:
+                        continue
+
+                    ws.cell(row=row, column=1, value=f"{metric.replace('_', ' ').title()}")
+                    ws.cell(row=row, column=1).font = Font(bold=True)
+                    row += 1
+
+                    # Pivot the data
+                    pivot = metric_data.pivot_table(
+                        index='ticker', columns='period_label', values='cagr', aggfunc='first'
+                    )
+
+                    # Headers
+                    headers = ['Company'] + list(pivot.columns)
+                    for col, header in enumerate(headers, 1):
+                        ws.cell(row=row, column=col, value=header)
+                    self.styler.style_header_row(ws, row, 1, len(headers))
+                    row += 1
+
+                    # Sort with USS at top
+                    if 'X' in pivot.index:
+                        index_order = ['X'] + [i for i in sorted(pivot.index) if i != 'X']
+                        pivot = pivot.reindex(index_order)
+
+                    # Data rows
+                    for ticker in pivot.index:
+                        is_uss = ticker == 'X'
+                        ws.cell(row=row, column=1, value="USS (X)" if is_uss else ticker)
+                        if is_uss:
+                            ws.cell(row=row, column=1).fill = PatternFill(start_color="FFE699", end_color="FFE699", fill_type="solid")
+
+                        for col, period in enumerate(pivot.columns, 2):
+                            value = pivot.loc[ticker, period]
+                            if pd.notna(value):
+                                ws.cell(row=row, column=col, value=value)
+                                ws.cell(row=row, column=col).number_format = '0.0%'
+                                if value >= 0:
+                                    ws.cell(row=row, column=col).fill = self.styler.positive_fill
+                                else:
+                                    ws.cell(row=row, column=col).fill = self.styler.negative_fill
+                            else:
+                                ws.cell(row=row, column=col, value="N/A")
+
+                            if is_uss:
+                                ws.cell(row=row, column=col).fill = PatternFill(start_color="FFE699", end_color="FFE699", fill_type="solid")
+                        row += 1
+
+                    row += 1
+
+            # =========================================================================
+            # SECTION 4: USS Long-Term Historical
+            # =========================================================================
+            row += 1
+            self.styler.style_section_header(ws, row, "SECTION 4: USS LONG-TERM HISTORICAL (DECADE CAGRs)", 1, 8)
+            row += 2
+
+            ws.cell(row=row, column=1, value="Note: Peer data only available from 2019. This section shows USS-only performance.")
+            ws.cell(row=row, column=1).font = Font(italic=True, color="666666")
+            row += 2
+
+            longterm_data = benchmark.get_uss_longterm_historical()
+
+            if not longterm_data.empty:
+                # Headers
+                headers = ['Metric', 'Decade', 'Start Year', 'End Year', 'Start Value ($M)', 'End Value ($M)', 'CAGR', 'Years']
+                for col, header in enumerate(headers, 1):
+                    ws.cell(row=row, column=col, value=header)
+                self.styler.style_header_row(ws, row, 1, len(headers))
+                row += 1
+
+                for _, lt_row in longterm_data.iterrows():
+                    ws.cell(row=row, column=1, value=lt_row['metric'].replace('_', ' ').title())
+                    ws.cell(row=row, column=2, value=lt_row['decade'])
+                    ws.cell(row=row, column=3, value=int(lt_row['start_year']))
+                    ws.cell(row=row, column=4, value=int(lt_row['end_year']))
+
+                    if pd.notna(lt_row['start_value']):
+                        ws.cell(row=row, column=5, value=round(lt_row['start_value'], 0))
+                        ws.cell(row=row, column=5).number_format = '#,##0'
+                    else:
+                        ws.cell(row=row, column=5, value="N/A")
+
+                    if pd.notna(lt_row['end_value']):
+                        ws.cell(row=row, column=6, value=round(lt_row['end_value'], 0))
+                        ws.cell(row=row, column=6).number_format = '#,##0'
+                    else:
+                        ws.cell(row=row, column=6, value="N/A")
+
+                    if pd.notna(lt_row['cagr']):
+                        ws.cell(row=row, column=7, value=lt_row['cagr'])
+                        ws.cell(row=row, column=7).number_format = '0.0%'
+                        if lt_row['cagr'] >= 0:
+                            ws.cell(row=row, column=7).fill = self.styler.positive_fill
+                        else:
+                            ws.cell(row=row, column=7).fill = self.styler.negative_fill
+                    else:
+                        ws.cell(row=row, column=7, value="N/A")
+
+                    ws.cell(row=row, column=8, value=int(lt_row['years']))
+                    row += 1
+
+            # Adjust column widths
+            ws.column_dimensions['A'].width = 20
+            ws.column_dimensions['B'].width = 12
+            ws.column_dimensions['C'].width = 12
+            for col in range(4, 10):
+                ws.column_dimensions[get_column_letter(col)].width = 14
+
+        except Exception as e:
+            # Graceful degradation if benchmark data is unavailable
+            ws['A5'] = f"Error loading peer analysis data: {str(e)}"
+            ws['A6'] = "This section requires benchmark_data.py and peer_fundamentals.csv"
 
     def _create_scenario_comparison_sheet(self, wb: Workbook, scenario_types: List[ScenarioType] = None):
         """Create scenario comparison sheet"""

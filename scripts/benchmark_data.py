@@ -11,7 +11,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 from dataclasses import dataclass
 
-from data_loader import USSteelDataLoader
+# Handle import from different contexts (scripts dir vs parent dir)
+try:
+    from data_loader import USSteelDataLoader
+except ModuleNotFoundError:
+    from scripts.data_loader import USSteelDataLoader
 
 
 @dataclass
@@ -34,6 +38,41 @@ class BenchmarkStats:
             'q3': self.q3,
             'max': self.max,
             'count': self.count
+        }
+
+
+@dataclass
+class GrowthStats:
+    """Multi-year growth analysis statistics for CAGR comparison."""
+    metric: str
+    period_years: int
+    start_year: int
+    end_year: int
+    uss_cagr: Optional[float]
+    peer_min: float
+    peer_q1: float
+    peer_median: float
+    peer_mean: float
+    peer_q3: float
+    peer_max: float
+    peer_count: int
+    uss_percentile: Optional[float]
+
+    def to_dict(self) -> Dict:
+        return {
+            'metric': self.metric,
+            'period_years': self.period_years,
+            'start_year': self.start_year,
+            'end_year': self.end_year,
+            'uss_cagr': self.uss_cagr,
+            'peer_min': self.peer_min,
+            'peer_q1': self.peer_q1,
+            'peer_median': self.peer_median,
+            'peer_mean': self.peer_mean,
+            'peer_q3': self.peer_q3,
+            'peer_max': self.peer_max,
+            'peer_count': self.peer_count,
+            'uss_percentile': self.uss_percentile
         }
 
 
@@ -78,14 +117,22 @@ class BenchmarkData:
     # Primary US comps (for weighted analysis)
     PRIMARY_COMPS = ['STLD', 'NUE', 'CLF']
 
-    def __init__(self, data_dir: str = "reference_materials"):
+    def __init__(self, data_dir: str = None):
         """
         Initialize BenchmarkData with data sources.
 
         Args:
-            data_dir: Directory containing Capital IQ Excel files
+            data_dir: Directory containing Capital IQ Excel files (default: project_root/references)
         """
-        self.loader = USSteelDataLoader(data_dir)
+        # Resolve data_dir relative to project root if not absolute
+        if data_dir is None:
+            project_root = Path(__file__).parent.parent
+            data_dir = project_root / "references"
+        elif not Path(data_dir).is_absolute():
+            project_root = Path(__file__).parent.parent
+            data_dir = project_root / data_dir
+
+        self.loader = USSteelDataLoader(str(data_dir))
         self._cache: Dict = {}
 
     def _get_comps_data(self) -> Dict[str, pd.DataFrame]:
@@ -708,6 +755,504 @@ class BenchmarkData:
             'peer_count': len(peer_values),
             'vs_median': 'above' if uss_value > peer_values.median() else 'below'
         }
+
+    # =========================================================================
+    # Multi-Year Growth & Profitability Analysis
+    # =========================================================================
+
+    # Metric mapping for WRDS fundamentals
+    WRDS_METRIC_MAPPING = {
+        'revenue': 'revenue',
+        'ebitda': 'ebitda',
+        'net_income': 'net_income',
+        'capex': 'capex',
+        'depreciation': 'depreciation',
+        'total_assets': 'total_assets',
+    }
+
+    # High confidence metrics (93.5%+ coverage)
+    HIGH_CONFIDENCE_METRICS = ['net_income', 'capex', 'depreciation', 'total_assets']
+
+    # Medium confidence metrics (53.3% coverage) - BSL excluded
+    MEDIUM_CONFIDENCE_METRICS = ['revenue', 'ebitda']
+
+    def _get_wrds_fundamentals(self) -> pd.DataFrame:
+        """Load peer fundamentals from WRDS cache.
+
+        Returns:
+            DataFrame with peer company fundamentals indexed by ticker and year.
+        """
+        if 'wrds_fundamentals' in self._cache:
+            return self._cache['wrds_fundamentals']
+
+        # Try to load from cache file
+        wrds_path = Path(__file__).parent.parent / 'local' / 'wrds_cache' / 'peer_fundamentals.csv'
+
+        if not wrds_path.exists():
+            return pd.DataFrame()
+
+        try:
+            df = pd.read_csv(wrds_path)
+
+            # Parse datadate and extract year
+            df['datadate'] = pd.to_datetime(df['datadate'])
+            df['year'] = df['datadate'].dt.year
+
+            # Remove duplicate rows (some tickers have two records per year)
+            # Keep the one with more data (non-null revenue)
+            df = df.sort_values(['ticker', 'year', 'revenue'], ascending=[True, True, False])
+            df = df.drop_duplicates(subset=['ticker', 'year'], keep='first')
+
+            self._cache['wrds_fundamentals'] = df
+            return df
+
+        except Exception as e:
+            print(f"Error loading WRDS fundamentals: {e}")
+            return pd.DataFrame()
+
+    @staticmethod
+    def calculate_cagr(start_value: float, end_value: float, periods: int) -> Optional[float]:
+        """Calculate Compound Annual Growth Rate.
+
+        Args:
+            start_value: Value at start of period
+            end_value: Value at end of period
+            periods: Number of years between start and end
+
+        Returns:
+            CAGR as decimal (e.g., 0.05 for 5%), or None if calculation impossible
+        """
+        if start_value is None or end_value is None or periods <= 0:
+            return None
+        if pd.isna(start_value) or pd.isna(end_value):
+            return None
+        if start_value <= 0 or end_value <= 0:
+            # Can't calculate CAGR for negative or zero values
+            return None
+
+        try:
+            cagr = (end_value / start_value) ** (1 / periods) - 1
+            return cagr
+        except (ZeroDivisionError, ValueError):
+            return None
+
+    def _get_uss_financial_data(self) -> pd.DataFrame:
+        """Load USS historical financial data from Excel.
+
+        Returns:
+            DataFrame with USS financials by year
+        """
+        if 'uss_financials' in self._cache:
+            return self._cache['uss_financials']
+
+        uss_path = Path(__file__).parent.parent / 'audit-verification' / 'evidence' / 'USS Financial Statements.xlsx'
+
+        if not uss_path.exists():
+            return pd.DataFrame()
+
+        try:
+            # Read income statement
+            income_df = pd.read_excel(uss_path, sheet_name='US Steel_Income Statement', header=None)
+
+            # Find the header row (row 12 has years)
+            # Years are in columns 1-35 (1990-2024)
+            header_row = 12
+            years = []
+            year_cols = {}
+
+            for col in range(1, 36):
+                val = income_df.iloc[header_row, col]
+                if pd.notna(val) and 'FY' in str(val):
+                    year = int(str(val).split()[0])
+                    years.append(year)
+                    year_cols[year] = col
+
+            # Extract key metrics by row
+            def get_row_values(df, row_pattern, year_cols):
+                """Extract values for a row matching pattern."""
+                for idx in range(len(df)):
+                    cell = df.iloc[idx, 0]
+                    if pd.notna(cell) and row_pattern in str(cell):
+                        values = {}
+                        for year, col in year_cols.items():
+                            val = df.iloc[idx, col]
+                            if pd.notna(val):
+                                try:
+                                    values[year] = float(val)
+                                except (ValueError, TypeError):
+                                    pass
+                        return values
+                return {}
+
+            # Get income statement metrics (values in thousands)
+            revenue_vals = get_row_values(income_df, 'Total Revenue', year_cols)
+            net_income_vals = get_row_values(income_df, 'Net Income to Company', year_cols)
+            da_vals = get_row_values(income_df, 'Depreciation & Amort.', year_cols)
+            operating_income_vals = get_row_values(income_df, 'Operating Income', year_cols)
+
+            # Read cash flow statement for capex
+            cf_df = pd.read_excel(uss_path, sheet_name='US Steel_Cash Flow', header=None)
+            capex_vals = get_row_values(cf_df, 'Capital Expenditure', year_cols)
+
+            # Read balance sheet for total assets
+            bs_df = pd.read_excel(uss_path, sheet_name='US Steel_Balance Sheet', header=None)
+            assets_vals = get_row_values(bs_df, 'Total Assets', year_cols)
+
+            # Build DataFrame - convert from thousands to millions
+            records = []
+            for year in sorted(set(revenue_vals.keys()) | set(net_income_vals.keys())):
+                record = {
+                    'year': year,
+                    'revenue': revenue_vals.get(year, np.nan) / 1000 if year in revenue_vals else np.nan,
+                    'net_income': net_income_vals.get(year, np.nan) / 1000 if year in net_income_vals else np.nan,
+                    'depreciation': da_vals.get(year, np.nan) / 1000 if year in da_vals else np.nan,
+                    'operating_income': operating_income_vals.get(year, np.nan) / 1000 if year in operating_income_vals else np.nan,
+                    'capex': abs(capex_vals.get(year, np.nan)) / 1000 if year in capex_vals else np.nan,
+                    'total_assets': assets_vals.get(year, np.nan) / 1000 if year in assets_vals else np.nan,
+                }
+                # Calculate EBITDA = Operating Income + D&A
+                if not pd.isna(record['operating_income']) and not pd.isna(record['depreciation']):
+                    record['ebitda'] = record['operating_income'] + record['depreciation']
+                else:
+                    record['ebitda'] = np.nan
+                records.append(record)
+
+            result = pd.DataFrame(records)
+            self._cache['uss_financials'] = result
+            return result
+
+        except Exception as e:
+            print(f"Error loading USS financials: {e}")
+            return pd.DataFrame()
+
+    def get_uss_timeseries(self, metrics: List[str], start_year: int = 2019,
+                          end_year: int = 2024) -> pd.DataFrame:
+        """Extract USS historical timeseries for specified metrics.
+
+        Args:
+            metrics: List of metric names (revenue, ebitda, net_income, capex, etc.)
+            start_year: Start year for timeseries
+            end_year: End year for timeseries
+
+        Returns:
+            DataFrame with year and metric columns
+        """
+        uss_df = self._get_uss_financial_data()
+
+        if uss_df.empty:
+            return pd.DataFrame()
+
+        # Filter to requested year range
+        mask = (uss_df['year'] >= start_year) & (uss_df['year'] <= end_year)
+        result = uss_df.loc[mask, ['year'] + [m for m in metrics if m in uss_df.columns]].copy()
+
+        return result.reset_index(drop=True)
+
+    def get_multiyear_growth_analysis(self, metrics: List[str] = None,
+                                      periods: List[int] = None) -> List[GrowthStats]:
+        """Main engine: Calculate USS vs peer CAGRs for multiple metrics and periods.
+
+        Args:
+            metrics: List of metrics to analyze (default: all available)
+            periods: List of period lengths in years (default: [3, 5])
+
+        Returns:
+            List of GrowthStats objects with CAGR comparisons
+        """
+        if metrics is None:
+            metrics = ['revenue', 'ebitda', 'net_income', 'capex', 'depreciation', 'total_assets']
+        if periods is None:
+            periods = [3, 5]
+
+        # Load data sources
+        wrds_df = self._get_wrds_fundamentals()
+        uss_df = self._get_uss_financial_data()
+
+        if wrds_df.empty or uss_df.empty:
+            return []
+
+        results = []
+        end_year = 2024  # Most recent year
+
+        for period in periods:
+            start_year = end_year - period
+
+            for metric in metrics:
+                # Skip BSL for revenue/ebitda (no data)
+                if metric in self.MEDIUM_CONFIDENCE_METRICS:
+                    peer_data = wrds_df[wrds_df['ticker'] != 'BSL']
+                else:
+                    peer_data = wrds_df
+
+                # Calculate USS CAGR
+                uss_start = uss_df[uss_df['year'] == start_year]
+                uss_end = uss_df[uss_df['year'] == end_year]
+
+                uss_cagr = None
+                if not uss_start.empty and not uss_end.empty:
+                    start_val = uss_start[metric].iloc[0] if metric in uss_start.columns else None
+                    end_val = uss_end[metric].iloc[0] if metric in uss_end.columns else None
+                    uss_cagr = self.calculate_cagr(start_val, end_val, period)
+
+                # Calculate peer CAGRs
+                peer_cagrs = []
+                for ticker in peer_data['ticker'].unique():
+                    ticker_data = peer_data[peer_data['ticker'] == ticker]
+                    t_start = ticker_data[ticker_data['year'] == start_year]
+                    t_end = ticker_data[ticker_data['year'] == end_year]
+
+                    if not t_start.empty and not t_end.empty:
+                        start_val = t_start[metric].iloc[0] if metric in t_start.columns else None
+                        end_val = t_end[metric].iloc[0] if metric in t_end.columns else None
+                        cagr = self.calculate_cagr(start_val, end_val, period)
+                        if cagr is not None:
+                            peer_cagrs.append(cagr)
+
+                if not peer_cagrs:
+                    continue
+
+                peer_series = pd.Series(peer_cagrs)
+
+                # Calculate USS percentile
+                uss_percentile = None
+                if uss_cagr is not None:
+                    below_count = (peer_series < uss_cagr).sum()
+                    uss_percentile = below_count / len(peer_series) * 100
+
+                growth_stats = GrowthStats(
+                    metric=metric,
+                    period_years=period,
+                    start_year=start_year,
+                    end_year=end_year,
+                    uss_cagr=uss_cagr,
+                    peer_min=peer_series.min(),
+                    peer_q1=peer_series.quantile(0.25),
+                    peer_median=peer_series.median(),
+                    peer_mean=peer_series.mean(),
+                    peer_q3=peer_series.quantile(0.75),
+                    peer_max=peer_series.max(),
+                    peer_count=len(peer_series),
+                    uss_percentile=uss_percentile
+                )
+                results.append(growth_stats)
+
+        return results
+
+    def get_peer_timeseries(self, metric: str, start_year: int = 2019,
+                            end_year: int = 2024) -> pd.DataFrame:
+        """Get long-format peer data for trend charts.
+
+        Args:
+            metric: Metric name to extract
+            start_year: Start year for timeseries
+            end_year: End year for timeseries
+
+        Returns:
+            DataFrame in long format with columns: ticker, company_name, year, value
+        """
+        wrds_df = self._get_wrds_fundamentals()
+
+        if wrds_df.empty or metric not in wrds_df.columns:
+            return pd.DataFrame()
+
+        # Filter years and metric
+        mask = (wrds_df['year'] >= start_year) & (wrds_df['year'] <= end_year)
+        if metric in self.MEDIUM_CONFIDENCE_METRICS:
+            mask = mask & (wrds_df['ticker'] != 'BSL')
+
+        result = wrds_df.loc[mask, ['ticker', 'company_name', 'year', metric]].copy()
+        result = result.rename(columns={metric: 'value'})
+        result = result.dropna(subset=['value'])
+
+        return result.reset_index(drop=True)
+
+    def get_rolling_period_analysis(self, metrics: List[str] = None,
+                                    window_years: int = 3) -> pd.DataFrame:
+        """Calculate rolling CAGRs (e.g., 2019-21, 2020-22, 2021-23, 2022-24).
+
+        Args:
+            metrics: List of metrics to analyze
+            window_years: Rolling window size in years
+
+        Returns:
+            DataFrame with columns: ticker, metric, period_start, period_end, cagr
+        """
+        if metrics is None:
+            metrics = ['revenue', 'ebitda', 'net_income', 'capex']
+
+        wrds_df = self._get_wrds_fundamentals()
+        uss_df = self._get_uss_financial_data()
+
+        if wrds_df.empty:
+            return pd.DataFrame()
+
+        records = []
+        available_years = sorted(wrds_df['year'].unique())
+
+        # Generate rolling periods
+        for start_year in available_years:
+            end_year = start_year + window_years
+            if end_year > max(available_years):
+                break
+
+            for metric in metrics:
+                # Skip BSL for medium confidence metrics
+                if metric in self.MEDIUM_CONFIDENCE_METRICS:
+                    peer_data = wrds_df[wrds_df['ticker'] != 'BSL']
+                else:
+                    peer_data = wrds_df
+
+                # Calculate for each peer
+                for ticker in peer_data['ticker'].unique():
+                    ticker_data = peer_data[peer_data['ticker'] == ticker]
+                    t_start = ticker_data[ticker_data['year'] == start_year]
+                    t_end = ticker_data[ticker_data['year'] == end_year]
+
+                    if not t_start.empty and not t_end.empty:
+                        start_val = t_start[metric].iloc[0] if metric in t_start.columns else None
+                        end_val = t_end[metric].iloc[0] if metric in t_end.columns else None
+                        cagr = self.calculate_cagr(start_val, end_val, window_years)
+                        if cagr is not None:
+                            company_name = t_start['company_name'].iloc[0] if 'company_name' in t_start.columns else ticker
+                            records.append({
+                                'ticker': ticker,
+                                'company_name': company_name,
+                                'metric': metric,
+                                'period_start': start_year,
+                                'period_end': end_year,
+                                'period_label': f"{start_year}-{str(end_year)[2:]}",
+                                'cagr': cagr
+                            })
+
+                # Calculate for USS
+                if not uss_df.empty and metric in uss_df.columns:
+                    uss_start = uss_df[uss_df['year'] == start_year]
+                    uss_end = uss_df[uss_df['year'] == end_year]
+
+                    if not uss_start.empty and not uss_end.empty:
+                        start_val = uss_start[metric].iloc[0]
+                        end_val = uss_end[metric].iloc[0]
+                        cagr = self.calculate_cagr(start_val, end_val, window_years)
+                        if cagr is not None:
+                            records.append({
+                                'ticker': 'X',
+                                'company_name': 'United States Steel',
+                                'metric': metric,
+                                'period_start': start_year,
+                                'period_end': end_year,
+                                'period_label': f"{start_year}-{str(end_year)[2:]}",
+                                'cagr': cagr
+                            })
+
+        return pd.DataFrame(records)
+
+    def get_uss_longterm_historical(self, metrics: List[str] = None) -> pd.DataFrame:
+        """Get USS-only decade CAGRs from 1990s to 2020s.
+
+        Args:
+            metrics: List of metrics to analyze
+
+        Returns:
+            DataFrame with decade CAGRs for USS only
+        """
+        if metrics is None:
+            metrics = ['revenue', 'ebitda', 'net_income', 'capex', 'total_assets']
+
+        uss_df = self._get_uss_financial_data()
+
+        if uss_df.empty:
+            return pd.DataFrame()
+
+        # Define decades
+        decades = [
+            ('1990s', 1990, 1999),
+            ('2000s', 2000, 2009),
+            ('2010s', 2010, 2019),
+            ('2020s', 2020, 2024),  # Partial decade
+        ]
+
+        records = []
+        for decade_name, start_year, end_year in decades:
+            # Find actual available years in this decade
+            decade_data = uss_df[(uss_df['year'] >= start_year) & (uss_df['year'] <= end_year)]
+
+            if decade_data.empty or len(decade_data) < 2:
+                continue
+
+            actual_start = decade_data['year'].min()
+            actual_end = decade_data['year'].max()
+            period = actual_end - actual_start
+
+            if period <= 0:
+                continue
+
+            for metric in metrics:
+                if metric not in decade_data.columns:
+                    continue
+
+                start_row = decade_data[decade_data['year'] == actual_start]
+                end_row = decade_data[decade_data['year'] == actual_end]
+
+                if start_row.empty or end_row.empty:
+                    continue
+
+                start_val = start_row[metric].iloc[0]
+                end_val = end_row[metric].iloc[0]
+                cagr = self.calculate_cagr(start_val, end_val, period)
+
+                records.append({
+                    'decade': decade_name,
+                    'metric': metric,
+                    'start_year': actual_start,
+                    'end_year': actual_end,
+                    'start_value': start_val,
+                    'end_value': end_val,
+                    'cagr': cagr,
+                    'years': period
+                })
+
+        return pd.DataFrame(records)
+
+    def get_growth_summary_table(self) -> pd.DataFrame:
+        """Generate a summary table of growth statistics for dashboard display.
+
+        Returns:
+            DataFrame formatted for display with percentile color coding info
+        """
+        growth_stats = self.get_multiyear_growth_analysis()
+
+        if not growth_stats:
+            return pd.DataFrame()
+
+        records = []
+        for gs in growth_stats:
+            # Determine color coding based on percentile
+            if gs.uss_percentile is not None:
+                if gs.uss_percentile >= 75:
+                    color_code = 'green'
+                elif gs.uss_percentile >= 25:
+                    color_code = 'yellow'
+                else:
+                    color_code = 'red'
+            else:
+                color_code = 'gray'
+
+            # Format CAGR values as percentages
+            records.append({
+                'Metric': gs.metric.replace('_', ' ').title(),
+                'Period': f"{gs.period_years}-Year",
+                'Years': f"{gs.start_year}-{gs.end_year}",
+                'USS CAGR': f"{gs.uss_cagr:.1%}" if gs.uss_cagr is not None else 'N/A',
+                'Peer Median': f"{gs.peer_median:.1%}",
+                'Peer Range': f"[{gs.peer_min:.1%}, {gs.peer_max:.1%}]",
+                'USS Percentile': f"{gs.uss_percentile:.0f}th" if gs.uss_percentile is not None else 'N/A',
+                'Peer Count': gs.peer_count,
+                '_color_code': color_code,
+                '_uss_cagr_raw': gs.uss_cagr,
+                '_peer_median_raw': gs.peer_median,
+            })
+
+        return pd.DataFrame(records)
 
 
 # =============================================================================

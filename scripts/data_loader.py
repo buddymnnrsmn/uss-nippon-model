@@ -21,7 +21,7 @@ logging.getLogger('xlrd').setLevel(logging.ERROR)
 class USSteelDataLoader:
     """Loads and parses U.S. Steel financial data from Capital IQ exports."""
 
-    def __init__(self, data_dir: str = "reference_materials"):
+    def __init__(self, data_dir: str = "references"):
         self.data_dir = Path(data_dir)
         self.financials_file = self.data_dir / "United States Steel Corporation Financials.xls"
         self.comps_file = self.data_dir / "Company Comparable Analysis United States Steel Corporation.xls"
@@ -428,7 +428,7 @@ class USSteelDataLoader:
 # Standalone functions for quick access
 # =============================================================================
 
-def load_financials(data_dir: str = "reference_materials") -> Dict[str, pd.DataFrame]:
+def load_financials(data_dir: str = "references") -> Dict[str, pd.DataFrame]:
     """Quick load of all financial statement data."""
     loader = USSteelDataLoader(data_dir)
     return {
@@ -441,7 +441,7 @@ def load_financials(data_dir: str = "reference_materials") -> Dict[str, pd.DataF
     }
 
 
-def load_comps(data_dir: str = "reference_materials") -> Dict[str, pd.DataFrame]:
+def load_comps(data_dir: str = "references") -> Dict[str, pd.DataFrame]:
     """Quick load of comparable company and M&A data."""
     loader = USSteelDataLoader(data_dir)
     ma_trans, ma_summary = loader.load_ma_transactions()

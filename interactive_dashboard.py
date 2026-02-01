@@ -1063,7 +1063,7 @@ def main():
     )
 
     if st.sidebar.button("Generate Excel Export", type="primary"):
-        from export_model import ModelExporter, FormulaModelExporter, get_export_filename
+        from scripts.export_model import ModelExporter, FormulaModelExporter, get_export_filename
 
         with st.sidebar.spinner("Generating Excel file..."):
             if export_type == "Interactive Model (Formulas)":
@@ -1680,7 +1680,7 @@ def main():
 
     # Import benchmark data with error handling
     try:
-        from benchmark_data import BenchmarkData
+        from scripts.benchmark_data import BenchmarkData
         benchmark = BenchmarkData()
         benchmark_available = True
     except Exception as e:
@@ -2106,6 +2106,377 @@ def main():
 
         except Exception as e:
             st.warning(f"Could not calculate percentile rankings: {e}")
+
+    # =========================================================================
+    # MULTI-YEAR GROWTH & PROFITABILITY ANALYSIS
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Multi-Year Growth & Profitability Analysis", anchor="multi-year-growth")
+
+    st.markdown("""
+    Comprehensive CAGR (Compound Annual Growth Rate) analysis comparing USS vs steel industry peers
+    across 2019-2024, with USS long-term historical view back to the 1990s.
+    """)
+
+    # Ensure benchmark is available for this section
+    if not benchmark_available:
+        st.warning("Benchmark data not available for growth analysis")
+    else:
+        try:
+            # Subsection A: CAGR Comparison Bar Charts
+            st.subheader("A. CAGR Comparison: USS vs Peers")
+
+            # Metric and period selectors
+            growth_col1, growth_col2 = st.columns(2)
+
+            with growth_col1:
+                cagr_metric = st.selectbox(
+                    "Select Metric",
+                    options=['revenue', 'ebitda', 'net_income', 'capex', 'depreciation', 'total_assets'],
+                    format_func=lambda x: x.replace('_', ' ').title(),
+                    key='cagr_metric'
+                )
+
+            with growth_col2:
+                cagr_period = st.radio(
+                    "Select Period",
+                    options=[3, 5],
+                    format_func=lambda x: f"{x}-Year CAGR",
+                    horizontal=True,
+                    key='cagr_period'
+                )
+
+            # Get growth analysis data
+            growth_stats = benchmark.get_multiyear_growth_analysis([cagr_metric], [cagr_period])
+
+            if growth_stats:
+                gs = growth_stats[0]
+
+                # Get individual company CAGRs for bar chart
+                rolling_data = benchmark.get_rolling_period_analysis([cagr_metric], cagr_period)
+
+                # Filter to the specific period that matches our analysis
+                end_year = 2024
+                start_year = end_year - cagr_period
+                period_label = f"{start_year}-{str(end_year)[2:]}"
+
+                period_data = rolling_data[rolling_data['period_label'] == period_label]
+
+                if not period_data.empty:
+                    # Sort by CAGR
+                    period_data_sorted = period_data.sort_values('cagr', ascending=False)
+
+                    # Create bar chart
+                    fig_cagr = go.Figure()
+
+                    # Color USS differently
+                    colors = ['#EF553B' if t == 'X' else '#636EFA' for t in period_data_sorted['ticker']]
+
+                    # Format labels
+                    labels = []
+                    for _, row in period_data_sorted.iterrows():
+                        if row['ticker'] == 'X':
+                            labels.append('USS (X)')
+                        else:
+                            labels.append(row['ticker'])
+
+                    fig_cagr.add_trace(go.Bar(
+                        x=labels,
+                        y=period_data_sorted['cagr'] * 100,  # Convert to percentage
+                        marker_color=colors,
+                        text=[f"{v*100:.1f}%" for v in period_data_sorted['cagr']],
+                        textposition='outside'
+                    ))
+
+                    # Add peer median line
+                    peer_cagrs = period_data_sorted[period_data_sorted['ticker'] != 'X']['cagr']
+                    if not peer_cagrs.empty:
+                        peer_median = peer_cagrs.median() * 100
+                        fig_cagr.add_hline(
+                            y=peer_median, line_dash="dash", line_color="green",
+                            annotation_text=f"Peer Median: {peer_median:.1f}%"
+                        )
+
+                    fig_cagr.update_layout(
+                        title=f"{cagr_metric.replace('_', ' ').title()} {cagr_period}-Year CAGR ({start_year}-{end_year})",
+                        yaxis_title="CAGR (%)",
+                        xaxis_title="Company",
+                        showlegend=False,
+                        height=450
+                    )
+
+                    st.plotly_chart(fig_cagr, use_container_width=True)
+
+                    # Show summary stats
+                    stats_col1, stats_col2, stats_col3, stats_col4 = st.columns(4)
+
+                    with stats_col1:
+                        uss_cagr_pct = gs.uss_cagr * 100 if gs.uss_cagr is not None else None
+                        st.metric(
+                            "USS CAGR",
+                            f"{uss_cagr_pct:.1f}%" if uss_cagr_pct is not None else "N/A"
+                        )
+
+                    with stats_col2:
+                        st.metric("Peer Median", f"{gs.peer_median * 100:.1f}%")
+
+                    with stats_col3:
+                        st.metric("Peer Range", f"[{gs.peer_min * 100:.1f}%, {gs.peer_max * 100:.1f}%]")
+
+                    with stats_col4:
+                        if gs.uss_percentile is not None:
+                            pctl_color = "#00CC96" if gs.uss_percentile >= 50 else "#EF553B"
+                            st.markdown(f"""
+                            <div style="text-align: center; padding-top: 5px;">
+                                <div style="font-size: 12px; color: #666;">USS Percentile</div>
+                                <div style="font-size: 24px; font-weight: bold; color: {pctl_color};">{gs.uss_percentile:.0f}th</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.metric("USS Percentile", "N/A")
+                else:
+                    st.info(f"No data available for {cagr_period}-year period")
+            else:
+                st.info("Growth analysis data not available")
+
+            # Subsection B: Historical Trend Lines (2019-2024)
+            st.subheader("B. Historical Trend Lines (2019-2024)")
+
+            trend_col1, trend_col2 = st.columns([1, 2])
+
+            with trend_col1:
+                trend_metric = st.selectbox(
+                    "Select Metric for Trend",
+                    options=['revenue', 'ebitda', 'net_income', 'capex'],
+                    format_func=lambda x: x.replace('_', ' ').title(),
+                    key='trend_metric'
+                )
+
+                # Get available peers
+                peer_ts = benchmark.get_peer_timeseries(trend_metric, 2019, 2024)
+                available_peers = peer_ts['ticker'].unique().tolist() if not peer_ts.empty else []
+
+                # Default selection: primary US comps + a couple others
+                default_peers = ['NUE', 'CLF', 'STLD', 'MT']
+                default_selection = [p for p in default_peers if p in available_peers]
+
+                selected_peers = st.multiselect(
+                    "Select Peers to Compare",
+                    options=available_peers,
+                    default=default_selection[:4],
+                    key='trend_peers'
+                )
+
+            with trend_col2:
+                if selected_peers:
+                    # Get USS timeseries
+                    uss_ts = benchmark.get_uss_timeseries([trend_metric], 2019, 2024)
+
+                    # Get peer timeseries filtered
+                    peer_ts_filtered = peer_ts[peer_ts['ticker'].isin(selected_peers)]
+
+                    fig_trend = go.Figure()
+
+                    # Add USS line (highlighted)
+                    if not uss_ts.empty:
+                        fig_trend.add_trace(go.Scatter(
+                            x=uss_ts['year'],
+                            y=uss_ts[trend_metric],
+                            mode='lines+markers',
+                            name='USS (X)',
+                            line=dict(color='#EF553B', width=3),
+                            marker=dict(size=8)
+                        ))
+
+                    # Add peer lines
+                    colors = ['#636EFA', '#00CC96', '#AB63FA', '#FFA15A', '#19D3F3', '#FF6692', '#B6E880']
+                    for i, ticker in enumerate(selected_peers):
+                        ticker_data = peer_ts_filtered[peer_ts_filtered['ticker'] == ticker]
+                        if not ticker_data.empty:
+                            fig_trend.add_trace(go.Scatter(
+                                x=ticker_data['year'],
+                                y=ticker_data['value'],
+                                mode='lines+markers',
+                                name=ticker,
+                                line=dict(color=colors[i % len(colors)], width=2),
+                                marker=dict(size=6)
+                            ))
+
+                    fig_trend.update_layout(
+                        title=f"{trend_metric.replace('_', ' ').title()} Trend (2019-2024)",
+                        xaxis_title="Year",
+                        yaxis_title=f"{trend_metric.replace('_', ' ').title()} ($M)",
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        height=400
+                    )
+
+                    st.plotly_chart(fig_trend, use_container_width=True)
+                else:
+                    st.info("Select at least one peer to compare")
+
+            # Subsection C: Rolling Period Analysis
+            st.subheader("C. Rolling Period CAGR Analysis")
+
+            rolling_window = st.radio(
+                "Rolling Window",
+                options=[3, 5],
+                format_func=lambda x: f"{x}-Year Rolling CAGR",
+                horizontal=True,
+                key='rolling_window'
+            )
+
+            rolling_metric = st.selectbox(
+                "Metric",
+                options=['revenue', 'ebitda', 'net_income', 'capex'],
+                format_func=lambda x: x.replace('_', ' ').title(),
+                key='rolling_metric'
+            )
+
+            rolling_data = benchmark.get_rolling_period_analysis([rolling_metric], rolling_window)
+
+            if not rolling_data.empty:
+                # Pivot for heatmap-style view
+                rolling_pivot = rolling_data.pivot_table(
+                    index='ticker', columns='period_label', values='cagr', aggfunc='first'
+                )
+
+                # Sort with USS at top
+                if 'X' in rolling_pivot.index:
+                    other_idx = [i for i in rolling_pivot.index if i != 'X']
+                    rolling_pivot = rolling_pivot.reindex(['X'] + sorted(other_idx))
+
+                # Create heatmap
+                fig_rolling = go.Figure(data=go.Heatmap(
+                    z=rolling_pivot.values * 100,
+                    x=rolling_pivot.columns.tolist(),
+                    y=rolling_pivot.index.tolist(),
+                    colorscale='RdYlGn',
+                    zmid=0,
+                    text=[[f"{v*100:.1f}%" if not pd.isna(v) else "N/A" for v in row] for row in rolling_pivot.values],
+                    texttemplate="%{text}",
+                    textfont={"size": 10},
+                    colorbar=dict(title="CAGR (%)")
+                ))
+
+                fig_rolling.update_layout(
+                    title=f"Rolling {rolling_window}-Year {rolling_metric.replace('_', ' ').title()} CAGR by Company",
+                    xaxis_title="Period",
+                    yaxis_title="Company",
+                    height=max(300, len(rolling_pivot) * 35 + 100)
+                )
+
+                st.plotly_chart(fig_rolling, use_container_width=True)
+            else:
+                st.info("Rolling period data not available")
+
+            # Subsection D: USS Long-Term Historical (1990s-2020s)
+            st.subheader("D. USS Long-Term Historical Performance")
+
+            st.markdown("""
+            *Note: Peer data only available from 2019. This section shows USS-only decade performance.*
+            """)
+
+            longterm_data = benchmark.get_uss_longterm_historical(['revenue', 'ebitda', 'net_income', 'capex'])
+
+            if not longterm_data.empty:
+                longterm_metric = st.selectbox(
+                    "Select Metric",
+                    options=['revenue', 'ebitda', 'net_income', 'capex'],
+                    format_func=lambda x: x.replace('_', ' ').title(),
+                    key='longterm_metric'
+                )
+
+                metric_data = longterm_data[longterm_data['metric'] == longterm_metric]
+
+                if not metric_data.empty:
+                    # Filter out rows with NaN CAGR
+                    metric_data_clean = metric_data.dropna(subset=['cagr'])
+
+                    if not metric_data_clean.empty:
+                        fig_longterm = go.Figure()
+
+                        # Color bars based on positive/negative
+                        colors = ['#00CC96' if c >= 0 else '#EF553B' for c in metric_data_clean['cagr']]
+
+                        fig_longterm.add_trace(go.Bar(
+                            x=metric_data_clean['decade'],
+                            y=metric_data_clean['cagr'] * 100,
+                            marker_color=colors,
+                            text=[f"{c*100:.1f}%" for c in metric_data_clean['cagr']],
+                            textposition='outside'
+                        ))
+
+                        fig_longterm.add_hline(y=0, line_color="gray", line_dash="solid")
+
+                        fig_longterm.update_layout(
+                            title=f"USS {longterm_metric.replace('_', ' ').title()} CAGR by Decade",
+                            xaxis_title="Decade",
+                            yaxis_title="CAGR (%)",
+                            showlegend=False,
+                            height=400
+                        )
+
+                        st.plotly_chart(fig_longterm, use_container_width=True)
+
+                        # Show data table
+                        display_cols = ['decade', 'start_year', 'end_year', 'start_value', 'end_value', 'cagr', 'years']
+                        display_df = metric_data[display_cols].copy()
+                        display_df['cagr'] = display_df['cagr'].apply(lambda x: f"{x:.1%}" if pd.notna(x) else "N/A")
+                        display_df['start_value'] = display_df['start_value'].apply(lambda x: f"${x:,.0f}M" if pd.notna(x) else "N/A")
+                        display_df['end_value'] = display_df['end_value'].apply(lambda x: f"${x:,.0f}M" if pd.notna(x) else "N/A")
+                        display_df.columns = ['Decade', 'Start Year', 'End Year', 'Start Value', 'End Value', 'CAGR', 'Years']
+
+                        st.dataframe(display_df, use_container_width=True, hide_index=True)
+                    else:
+                        st.info(f"No valid CAGR data available for {longterm_metric.replace('_', ' ').title()} (may have negative values)")
+                else:
+                    st.info("Long-term data not available for this metric")
+            else:
+                st.info("USS long-term historical data not available")
+
+            # Subsection E: Growth Summary Table
+            st.subheader("E. Growth Analysis Summary")
+
+            summary_df = benchmark.get_growth_summary_table()
+
+            if not summary_df.empty:
+                # Add styling based on percentile
+                def style_percentile(val):
+                    if 'N/A' in str(val):
+                        return 'background-color: #f0f0f0'
+                    pctl = int(val.replace('th', ''))
+                    if pctl >= 75:
+                        return 'background-color: #c6efce; color: #006100'
+                    elif pctl >= 25:
+                        return 'background-color: #ffeb9c; color: #9c5700'
+                    else:
+                        return 'background-color: #ffc7ce; color: #9c0006'
+
+                # Display columns (exclude internal columns)
+                display_cols = ['Metric', 'Period', 'Years', 'USS CAGR', 'Peer Median', 'Peer Range', 'USS Percentile', 'Peer Count']
+
+                # Apply styling
+                styled_df = summary_df[display_cols].style.applymap(
+                    style_percentile, subset=['USS Percentile']
+                )
+
+                st.dataframe(styled_df, use_container_width=True, hide_index=True)
+
+                # Legend
+                st.markdown("""
+                **Legend:**
+                - 🟢 Green: USS in top 25% of peers (≥75th percentile)
+                - 🟡 Yellow: USS in middle 50% of peers (25th-75th percentile)
+                - 🔴 Red: USS in bottom 25% of peers (<25th percentile)
+                """)
+            else:
+                st.info("Growth summary data not available")
+
+        except Exception as e:
+            st.error(f"Error loading Multi-Year Growth Analysis: {e}")
+            import traceback
+            st.text(traceback.format_exc())
 
     # =========================================================================
     # SENSITIVITY THRESHOLDS ("WHAT BREAKS THE DEAL")
