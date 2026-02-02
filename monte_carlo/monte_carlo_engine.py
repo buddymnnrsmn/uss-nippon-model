@@ -191,10 +191,15 @@ class MonteCarloEngine:
                 dist_type='lognormal',
                 params={
                     'mean': np.log(0.95),
-                    'std': 0.18,
+                    'std': 0.16,  # Slightly lower volatility than HRC (value-added product)
                 }
             ),
             base_value=0.95,
+            correlations={
+                'hrc_price_factor': 0.95,  # High correlation with HRC
+                'coated_price_factor': 0.92,  # High correlation with other value-added
+                'flat_rolled_volume': 0.35,  # Moderate demand linkage
+            }
         )
 
         variables['coated_price_factor'] = InputVariable(
@@ -205,10 +210,15 @@ class MonteCarloEngine:
                 dist_type='lognormal',
                 params={
                     'mean': np.log(0.95),
-                    'std': 0.17,
+                    'std': 0.15,  # Lower volatility (more stable premium product)
                 }
             ),
             base_value=0.95,
+            correlations={
+                'hrc_price_factor': 0.93,  # High correlation with HRC
+                'crc_price_factor': 0.92,  # High correlation with CRC
+                'flat_rolled_volume': 0.30,  # Moderate demand linkage
+            }
         )
 
         variables['octg_price_factor'] = InputVariable(
@@ -565,36 +575,32 @@ class MonteCarloEngine:
                 model = PriceVolumeModel(scenario)
                 analysis = model.run_full_analysis()
 
-                # Extract key results
+                # Extract key results (using correct key names from model output)
                 results.append({
                     'iteration': i,
-                    'uss_enterprise_value': analysis['val_uss']['enterprise_value'],
-                    'uss_equity_value': analysis['val_uss']['equity_value'],
+                    'uss_enterprise_value': analysis['val_uss']['ev_blended'],
                     'uss_share_price': analysis['val_uss']['share_price'],
-                    'nippon_enterprise_value': analysis['val_nippon']['enterprise_value'],
-                    'nippon_equity_value': analysis['val_nippon']['equity_value'],
+                    'nippon_enterprise_value': analysis['val_nippon']['ev_blended'],
                     'nippon_share_price': analysis['val_nippon']['share_price'],
                     'total_fcf_10y': analysis['consolidated']['FCF'].sum(),
                     'avg_ebitda': analysis['consolidated']['Total_EBITDA'].mean(),
                     'avg_ebitda_margin': analysis['consolidated']['EBITDA_Margin'].mean(),
-                    'terminal_value': analysis['val_uss']['terminal_value'],
+                    'terminal_ebitda': analysis['val_uss']['terminal_ebitda'],
                 })
             except Exception as e:
                 if verbose:
                     print(f"  Warning: Iteration {i} failed: {e}")
-                # Record NaN for failed iterations
+                # Record NaN for failed iterations (matching column structure above)
                 results.append({
                     'iteration': i,
                     'uss_enterprise_value': np.nan,
-                    'uss_equity_value': np.nan,
                     'uss_share_price': np.nan,
                     'nippon_enterprise_value': np.nan,
-                    'nippon_equity_value': np.nan,
                     'nippon_share_price': np.nan,
                     'total_fcf_10y': np.nan,
                     'avg_ebitda': np.nan,
                     'avg_ebitda_margin': np.nan,
-                    'terminal_value': np.nan,
+                    'terminal_ebitda': np.nan,
                 })
 
         self.simulation_results = pd.DataFrame(results)
@@ -658,18 +664,42 @@ class MonteCarloEngine:
         else:
             execution_factor = 0.75
 
-        # Build scenario
+        # Build scenario with all required IRP parameters
+        # Use base scenario IRP values if available, otherwise use defaults
+        base_us_10yr = self.base_scenario.us_10yr if self.base_scenario else 0.0425
+        base_japan_10yr = self.base_scenario.japan_10yr if self.base_scenario else 0.0075
+        base_erp = self.base_scenario.nippon_equity_risk_premium if self.base_scenario else 0.0475
+        base_credit_spread = self.base_scenario.nippon_credit_spread if self.base_scenario else 0.0075
+        base_debt_ratio = self.base_scenario.nippon_debt_ratio if self.base_scenario else 0.35
+        base_tax_rate = self.base_scenario.nippon_tax_rate if self.base_scenario else 0.30
+
+        # Apply Japan rate sample if available
+        japan_10yr = sample.get('japan_risk_free', base_japan_10yr * 100) / 100
+
+        # Handle include_projects - use base scenario projects if not specified
+        if include_projects is None:
+            if self.base_scenario:
+                include_projects = list(self.base_scenario.include_projects)
+            else:
+                include_projects = []
+
         scenario = ModelScenario(
-            scenario_type=ScenarioType.CUSTOM,
             name="Monte Carlo Sample",
+            scenario_type=ScenarioType.CUSTOM,
             description="Sampled from probability distributions",
             price_scenario=price_scenario,
             volume_scenario=volume_scenario,
             uss_wacc=sample['uss_wacc'] / 100,  # Convert from % to decimal
             terminal_growth=sample['terminal_growth'] / 100,
             exit_multiple=sample['exit_multiple'],
+            us_10yr=base_us_10yr,
+            japan_10yr=japan_10yr,
+            nippon_equity_risk_premium=base_erp,
+            nippon_credit_spread=base_credit_spread,
+            nippon_debt_ratio=base_debt_ratio,
+            nippon_tax_rate=base_tax_rate,
             include_projects=include_projects,
-            synergy_assumptions=None,  # Could add synergy sampling
+            synergies=None,  # Could add synergy sampling
         )
 
         return scenario
@@ -684,7 +714,11 @@ class MonteCarloEngine:
         # Focus on Nippon view (IRP-adjusted WACC)
         values = results['nippon_share_price'].values
 
-        stats = {
+        # Calculate distribution shape metrics first (before shadowing scipy.stats)
+        skewness = stats.skew(values)
+        kurtosis = stats.kurtosis(values)
+
+        summary = {
             # Central tendency
             'mean': np.mean(values),
             'median': np.median(values),
@@ -722,8 +756,8 @@ class MonteCarloEngine:
             'prob_above_100': np.mean(values > 100),
 
             # Distribution shape
-            'skewness': stats.skew(values),
-            'kurtosis': stats.kurtosis(values),
+            'skewness': skewness,
+            'kurtosis': kurtosis,
 
             # Confidence intervals
             'ci_80_lower': np.percentile(values, 10),
@@ -734,8 +768,8 @@ class MonteCarloEngine:
             'ci_95_upper': np.percentile(values, 97.5),
         }
 
-        self.summary_stats = stats
-        return stats
+        self.summary_stats = summary
+        return summary
 
     def _estimate_mode(self, values: np.ndarray, n_bins: int = 50) -> float:
         """Estimate mode using histogram"""

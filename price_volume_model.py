@@ -79,7 +79,7 @@ class SegmentVolumePrice:
     # Price assumptions
     price_growth_rate: float  # Annual price inflation
     price_premium_to_benchmark: float  # Premium/discount to benchmark
-    benchmark_type: str  # Which benchmark to reference
+    benchmark_type: str  # Primary benchmark (for backward compatibility)
 
     # Cost structure
     ebitda_margin_at_base_price: float  # EBITDA margin at 2023 price level
@@ -91,6 +91,12 @@ class SegmentVolumePrice:
     dso: float
     dih: float
     dpo: float
+
+    # Product mix for weighted-average pricing (based on 2023 10-K revenue data)
+    # Keys: 'hrc_us', 'crc_us', 'coated_us', 'hrc_eu', 'octg'
+    # Values: weight (0.0-1.0), must sum to 1.0
+    # Optional - if empty, falls back to benchmark_type
+    product_mix: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -979,11 +985,13 @@ def get_synergy_presets() -> Dict[str, SynergyAssumptions]:
 def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
     """Return base segment configurations from Excel data
 
-    Premium calibrations based on 2023 actual realized prices vs benchmarks:
-    - Flat-Rolled: $1,030 realized vs $680 HRC = 51% premium (product mix: CRC, coated)
-    - Mini Mill: $875 realized vs $680 HRC = 29% premium
-    - USSE: $873 realized vs $620 EU HRC = 41% premium
-    - Tubular: $3,137 realized vs $2,800 OCTG = 12% premium
+    Product mix weights from USS 2023 10-K revenue by product type:
+    - Flat-Rolled: HRC 21%, CRC 40%, Coated 39% (was 100% HRC)
+    - Mini Mill: HRC 55%, CRC 16%, Coated 29% (was 100% HRC)
+    - USSE: HRC 51%, CRC 8%, Coated 40% (uses EU benchmarks)
+    - Tubular: 100% OCTG (unchanged)
+
+    Premium calibrations recalculated for weighted-average benchmark pricing.
     """
 
     return {
@@ -995,8 +1003,10 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.85,
             base_price_2023=1030,  # $/ton realized
             price_growth_rate=0.02,
-            price_premium_to_benchmark=0.515,  # Calibrated: $1030/$680 - 1
-            benchmark_type='hrc_us',
+            price_premium_to_benchmark=0.207,  # Calibrated: $1030 / $853.30 weighted benchmark - 1
+            benchmark_type='hrc_us',  # Fallback (not used when product_mix is set)
+            # 2023 10-K: HRC $1,926M (21%), CRC $3,568M (40%), Coated $3,484M (39%)
+            product_mix={'hrc_us': 0.21, 'crc_us': 0.40, 'coated_us': 0.39},
             ebitda_margin_at_base_price=0.12,  # Mgmt: 16% blended margin at mid-cycle
             margin_sensitivity_to_price=0.04,  # 4% margin change per $100 price
             da_pct_of_revenue=0.055,
@@ -1012,8 +1022,10 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.95,
             base_price_2023=875,
             price_growth_rate=0.02,
-            price_premium_to_benchmark=0.287,  # Calibrated: $875/$680 - 1
-            benchmark_type='hrc_us',
+            price_premium_to_benchmark=0.114,  # Calibrated: $875 / $785.50 weighted benchmark - 1
+            benchmark_type='hrc_us',  # Fallback (not used when product_mix is set)
+            # 2023 10-K: HRC $1,215M (55%), CRC $365M (16%), Coated $639M (29%)
+            product_mix={'hrc_us': 0.55, 'crc_us': 0.16, 'coated_us': 0.29},
             ebitda_margin_at_base_price=0.20,  # Mini mills are highly profitable
             margin_sensitivity_to_price=0.05,  # 5% margin change per $100 price
             da_pct_of_revenue=0.045,
@@ -1029,8 +1041,11 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.90,
             base_price_2023=873,
             price_growth_rate=0.01,
-            price_premium_to_benchmark=0.408,  # Calibrated: $873/$620 - 1
-            benchmark_type='hrc_eu',
+            price_premium_to_benchmark=0.142,  # Calibrated: $873 / $764.20 weighted benchmark - 1
+            benchmark_type='hrc_eu',  # Fallback (not used when product_mix is set)
+            # 2023 10-K: HRC $1,637M (51%), CRC $269M (8%), Coated $1,278M (40%)
+            # Note: USSE uses EU benchmark prices
+            product_mix={'hrc_eu': 0.51, 'crc_us': 0.08, 'coated_us': 0.40},
             ebitda_margin_at_base_price=0.14,  # European ops have decent margins
             margin_sensitivity_to_price=0.04,  # 4% margin change per $100 price
             da_pct_of_revenue=0.050,
@@ -1048,6 +1063,8 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             price_growth_rate=0.02,
             price_premium_to_benchmark=0.120,  # Calibrated: $3137/$2800 - 1
             benchmark_type='octg',
+            # Tubular is 100% OCTG products
+            product_mix={'octg': 1.0},
             ebitda_margin_at_base_price=0.15,  # OCTG margins are strong
             margin_sensitivity_to_price=0.02,  # 2% margin change per $100 price
             da_pct_of_revenue=0.060,
@@ -1183,9 +1200,23 @@ class PriceVolumeModel:
         return price
 
     def calculate_segment_price(self, segment: Segment, year: int) -> float:
-        """Calculate realized price for a segment in a given year"""
+        """Calculate realized price for a segment in a given year.
+
+        Uses weighted-average pricing based on actual product mix if available,
+        otherwise falls back to single benchmark_type for backward compatibility.
+        """
         seg = self.segments[segment]
-        benchmark_price = self.get_benchmark_price(seg.benchmark_type, year)
+
+        # Use weighted-average pricing if product_mix is defined
+        if seg.product_mix:
+            weighted_price = 0.0
+            for benchmark_type, weight in seg.product_mix.items():
+                benchmark_price = self.get_benchmark_price(benchmark_type, year)
+                weighted_price += benchmark_price * weight
+            benchmark_price = weighted_price
+        else:
+            # Fallback to single benchmark for backward compatibility
+            benchmark_price = self.get_benchmark_price(seg.benchmark_type, year)
 
         # Apply segment premium and specific growth
         realized_price = benchmark_price * (1 + seg.price_premium_to_benchmark)
