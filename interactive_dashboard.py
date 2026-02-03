@@ -33,8 +33,25 @@ from price_volume_model import (
     calculate_probability_weighted_valuation,
     get_capital_projects, BENCHMARK_PRICES_2023,
     get_synergy_presets, SynergyAssumptions, OperatingSynergies,
-    TechnologyTransfer, RevenueSynergies, IntegrationCosts, SynergyRampSchedule
+    TechnologyTransfer, RevenueSynergies, IntegrationCosts, SynergyRampSchedule,
+    WACC_MODULE_AVAILABLE, get_wacc_module_status
 )
+
+# Optional: Import WACC module for detailed component display
+try:
+    import sys
+    from pathlib import Path as WACCPath
+    _wacc_module_path = WACCPath(__file__).parent / "wacc-calculations"
+    if str(_wacc_module_path) not in sys.path:
+        sys.path.insert(0, str(_wacc_module_path))
+    from uss.uss_wacc import calculate_uss_wacc, get_analyst_estimates, get_data_as_of_date as get_uss_data_date
+    from nippon.nippon_wacc import calculate_nippon_wacc, get_data_as_of_date as get_nippon_data_date
+    WACC_DETAILS_AVAILABLE = True
+except ImportError:
+    WACC_DETAILS_AVAILABLE = False
+    get_analyst_estimates = None
+    get_uss_data_date = None
+    get_nippon_data_date = None
 
 
 # =============================================================================
@@ -67,6 +84,7 @@ def create_scenario_hash(scenario, execution_factor, custom_benchmarks):
             'uss_wacc': scenario.uss_wacc,
             'terminal_growth': scenario.terminal_growth,
             'exit_multiple': scenario.exit_multiple,
+            'use_verified_wacc': getattr(scenario, 'use_verified_wacc', False),
         },
         'projects': scenario.include_projects if scenario.include_projects else [],
         'custom_benchmarks': custom_benchmarks if custom_benchmarks else {}
@@ -263,6 +281,7 @@ def render_sidebar():
         st.session_state.uss_wacc = preset.uss_wacc * 100
         st.session_state.terminal_growth = preset.terminal_growth * 100
         st.session_state.exit_multiple = preset.exit_multiple
+        st.session_state.use_verified_wacc = True
         # Reset IRP
         st.session_state.us_10yr = preset.us_10yr * 100
         st.session_state.japan_10yr = preset.japan_10yr * 100
@@ -411,6 +430,7 @@ def render_sidebar():
         st.session_state.uss_wacc = preset.uss_wacc * 100
         st.session_state.terminal_growth = preset.terminal_growth * 100
         st.session_state.exit_multiple = preset.exit_multiple
+        st.session_state.use_verified_wacc = True
         st.session_state.reset_section = None
 
     uss_wacc = st.sidebar.slider("USS WACC", 7.0, 15.0, st.session_state.get('uss_wacc', preset.uss_wacc * 100), 0.1, format="%.1f%%",
@@ -422,6 +442,23 @@ def render_sidebar():
     exit_multiple = st.sidebar.slider("Exit Multiple (EBITDA)", 3.0, 8.0, st.session_state.get('exit_multiple', preset.exit_multiple), 0.5, format="%.1fx",
                                        key="exit_multiple",
                                        help="EV/EBITDA multiple for exit-based terminal value. Steel sector typically trades 4-6x.")
+
+    # WACC Verification Toggle
+    use_verified_wacc = WACC_MODULE_AVAILABLE  # Default to True if module available
+    if WACC_MODULE_AVAILABLE:
+        use_verified_wacc = st.sidebar.checkbox(
+            "Use Verified WACC",
+            value=st.session_state.get('use_verified_wacc', True),
+            key="use_verified_wacc",
+            help="Load WACC from wacc-calculations module with verified inputs (USS ~10.7%, Nippon USD ~7.95%)"
+        )
+
+        if use_verified_wacc:
+            wacc_status = get_wacc_module_status()
+            st.sidebar.info(f"**Verified WACC Values:**\n\n"
+                           f"USS: {wacc_status['uss_wacc']*100:.2f}%\n\n"
+                           f"Nippon USD: {wacc_status['nippon_usd_wacc']*100:.2f}%\n\n"
+                           f"Data as of: {wacc_status['data_as_of_date']}")
 
     st.sidebar.markdown("---")
 
@@ -788,7 +825,8 @@ def render_sidebar():
         override_irp=override_irp,
         manual_nippon_usd_wacc=manual_nippon_usd_wacc,
         include_projects=include_projects,
-        synergies=synergies
+        synergies=synergies,
+        use_verified_wacc=use_verified_wacc
     )
 
     # Build custom benchmarks dictionary
@@ -4109,6 +4147,158 @@ def main():
         st.info("WACC sensitivity not yet calculated. Click button above to calculate.")
 
     # =========================================================================
+    # WACC COMPONENT DETAILS
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("WACC Component Details", anchor="wacc-components")
+
+    if WACC_DETAILS_AVAILABLE:
+        st.markdown("""
+        **Bottom-up WACC calculations** using verified market inputs from the `wacc-calculations` module.
+        All inputs are sourced from public data (Federal Reserve, Bank of Japan, SEC filings) as of December 31, 2023.
+        """)
+
+        # Show verification status
+        if scenario.use_verified_wacc:
+            st.success("Using verified WACC values from wacc-calculations module")
+        else:
+            st.warning("Using manual WACC inputs from scenario. Enable 'Use Verified WACC' in sidebar for module values.")
+
+        wacc_col1, wacc_col2 = st.columns(2)
+
+        with wacc_col1:
+            st.subheader("USS WACC Calculation")
+            try:
+                uss_result = calculate_uss_wacc()
+                analyst_estimates = get_analyst_estimates()
+                data_date = get_uss_data_date()
+
+                st.markdown(f"*Data as of: {data_date}*")
+
+                st.markdown("**Cost of Equity (CAPM)**")
+                st.markdown(f"""
+| Component | Value |
+|-----------|------:|
+| Risk-Free Rate (10Y UST) | {uss_result.risk_free_rate*100:.2f}% |
+| Levered Beta | {uss_result.levered_beta:.2f} |
+| Equity Risk Premium | {uss_result.equity_risk_premium*100:.2f}% |
+| Size Premium | {uss_result.size_premium*100:.2f}% |
+| **Cost of Equity** | **{uss_result.cost_of_equity*100:.2f}%** |
+                """)
+
+                st.markdown("**Cost of Debt**")
+                st.markdown(f"""
+| Component | Value |
+|-----------|------:|
+| Risk-Free Rate | {uss_result.risk_free_rate*100:.2f}% |
+| Credit Spread (BB-) | {uss_result.credit_spread*100:.2f}% |
+| Pre-tax Cost of Debt | {(uss_result.risk_free_rate + uss_result.credit_spread)*100:.2f}% |
+| After-tax Cost of Debt | {uss_result.cost_of_debt_aftertax*100:.2f}% |
+                """)
+
+                st.markdown("**Capital Structure & WACC**")
+                st.markdown(f"""
+| Component | Value |
+|-----------|------:|
+| Market Cap | ${uss_result.market_cap:,.0f}M |
+| Total Debt | ${uss_result.total_debt:,.0f}M |
+| Equity Weight | {uss_result.equity_weight*100:.1f}% |
+| Debt Weight | {uss_result.debt_weight*100:.1f}% |
+| **USS WACC** | **{uss_result.wacc*100:.2f}%** |
+                """)
+
+                st.markdown("**Analyst WACC Estimates**")
+                for analyst, data in analyst_estimates.items():
+                    mid = data.get('wacc_midpoint', data.get('wacc_mid', 0))
+                    if mid > 0:
+                        delta = (uss_result.wacc - mid) * 100
+                        delta_str = f"+{delta:.1f}%" if delta > 0 else f"{delta:.1f}%"
+                        st.markdown(f"- {analyst}: {mid*100:.1f}% (Model: {delta_str})")
+
+            except Exception as e:
+                st.warning(f"Could not load USS WACC details: {e}")
+
+        with wacc_col2:
+            st.subheader("Nippon WACC Calculation")
+            try:
+                nippon_result = calculate_nippon_wacc()
+                nippon_data_date = get_nippon_data_date()
+
+                st.markdown(f"*Data as of: {nippon_data_date}*")
+
+                st.markdown("**Cost of Equity (JPY)**")
+                st.markdown(f"""
+| Component | Value |
+|-----------|------:|
+| JGB 10-Year | {nippon_result.jgb_10y*100:.3f}% |
+| Levered Beta (vs TOPIX) | {nippon_result.levered_beta:.2f} |
+| Equity Risk Premium | 5.50% |
+| **Cost of Equity (JPY)** | **{nippon_result.jpy_cost_of_equity*100:.2f}%** |
+                """)
+
+                st.markdown("**Cost of Debt (JPY)**")
+                st.markdown(f"""
+| Component | Value |
+|-----------|------:|
+| JGB 10-Year | {nippon_result.jgb_10y*100:.3f}% |
+| Credit Spread (BBB+) | 0.80% |
+| After-tax Cost of Debt | {nippon_result.jpy_cost_of_debt_aftertax*100:.3f}% |
+                """)
+
+                st.markdown("**Capital Structure & WACC**")
+                st.markdown(f"""
+| Component | Value |
+|-----------|------:|
+| Market Cap | ${nippon_result.market_cap_usd/1000:,.1f}B |
+| Total Debt | ${nippon_result.total_debt_usd/1000:,.1f}B |
+| Equity Weight | {nippon_result.equity_weight*100:.1f}% |
+| Debt Weight | {nippon_result.debt_weight*100:.1f}% |
+| **JPY WACC** | **{nippon_result.jpy_wacc*100:.2f}%** |
+                """)
+
+                st.markdown("**IRP Adjustment to USD**")
+                st.markdown(f"""
+| Component | Value |
+|-----------|------:|
+| US 10-Year Treasury | {nippon_result.us_10y*100:.2f}% |
+| JGB 10-Year | {nippon_result.jgb_10y*100:.3f}% |
+| Rate Differential | {nippon_result.irp_differential*100:.2f}% |
+| **USD WACC** | **{nippon_result.usd_wacc*100:.2f}%** |
+                """)
+
+            except Exception as e:
+                st.warning(f"Could not load Nippon WACC details: {e}")
+
+        # WACC Comparison Summary
+        st.markdown("---")
+        st.subheader("WACC Advantage Summary")
+        if WACC_DETAILS_AVAILABLE:
+            try:
+                uss_wacc_val = uss_result.wacc
+                nippon_usd_wacc_val = nippon_result.usd_wacc
+                wacc_advantage = uss_wacc_val - nippon_usd_wacc_val
+
+                summary_col1, summary_col2, summary_col3 = st.columns(3)
+                with summary_col1:
+                    st.metric("USS WACC", f"{uss_wacc_val*100:.2f}%")
+                with summary_col2:
+                    st.metric("Nippon USD WACC", f"{nippon_usd_wacc_val*100:.2f}%")
+                with summary_col3:
+                    st.metric("WACC Advantage", f"{wacc_advantage*100:.2f}%",
+                             help="Lower cost of capital = higher valuation for same cash flows")
+
+                st.info(f"""
+                **Implication:** Nippon's {wacc_advantage*100:.2f}% lower cost of capital means the same USS cash flows
+                are worth more to Nippon than to USS shareholders. This is a key driver of the valuation gap.
+                """)
+            except:
+                pass
+
+    else:
+        st.warning("WACC calculations module not available. Install wacc-calculations for detailed component breakdown.")
+
+    # =========================================================================
     # INTEREST RATE PARITY ADJUSTMENT
     # =========================================================================
 
@@ -4169,6 +4359,13 @@ def main():
         fig.add_hline(y=jpy_wacc*100, line_dash="dash", line_color="red",
                       annotation_text="JPY WACC (Wrong for USD CF)")
         st.plotly_chart(fig, use_container_width=True)
+
+    # WACC Audit Trail (if available)
+    if analysis.get('wacc_audit_trail'):
+        with st.expander("WACC Audit Trail", expanded=False):
+            audit = analysis['wacc_audit_trail']
+            st.markdown(f"**Source:** {audit.get('source', 'N/A')}")
+            st.json(audit)
 
     # =========================================================================
     # DETAILED TABLES

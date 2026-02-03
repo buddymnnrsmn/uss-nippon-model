@@ -20,6 +20,96 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 
+# =============================================================================
+# OPTIONAL WACC MODULE INTEGRATION
+# =============================================================================
+
+# Try to import the wacc-calculations module for verified WACC inputs
+# Falls back gracefully if module is not available
+try:
+    import sys
+    from pathlib import Path
+    # Add wacc-calculations to path for imports
+    _wacc_module_path = Path(__file__).parent / "wacc-calculations"
+    if str(_wacc_module_path) not in sys.path:
+        sys.path.insert(0, str(_wacc_module_path))
+
+    from uss.uss_wacc import calculate_uss_wacc, USSWACCResult
+    from nippon.nippon_wacc import calculate_nippon_wacc, NipponWACCResult
+    WACC_MODULE_AVAILABLE = True
+except ImportError:
+    WACC_MODULE_AVAILABLE = False
+    USSWACCResult = None
+    NipponWACCResult = None
+
+
+def get_verified_uss_wacc() -> Tuple[Optional[float], Optional[dict]]:
+    """
+    Load verified USS WACC from wacc-calculations module.
+
+    Returns:
+        Tuple of (wacc_value, audit_dict) if module available,
+        (None, None) otherwise.
+    """
+    if not WACC_MODULE_AVAILABLE:
+        return None, None
+
+    try:
+        result = calculate_uss_wacc()
+        audit_trail = result.get_audit_trail()
+        return result.wacc, audit_trail
+    except Exception as e:
+        print(f"Warning: Failed to load verified USS WACC: {e}")
+        return None, None
+
+
+def get_verified_nippon_wacc() -> Tuple[Optional[float], Optional[float], Optional[dict]]:
+    """
+    Load verified Nippon WACC from wacc-calculations module.
+
+    Returns:
+        Tuple of (jpy_wacc, usd_wacc, audit_dict) if module available,
+        (None, None, None) otherwise.
+    """
+    if not WACC_MODULE_AVAILABLE:
+        return None, None, None
+
+    try:
+        result = calculate_nippon_wacc()
+        audit_trail = result.get_audit_trail()
+        return result.jpy_wacc, result.usd_wacc, audit_trail
+    except Exception as e:
+        print(f"Warning: Failed to load verified Nippon WACC: {e}")
+        return None, None, None
+
+
+def get_wacc_module_status() -> dict:
+    """
+    Get status of WACC module integration.
+
+    Returns dict with module availability and current values.
+    """
+    status = {
+        'available': WACC_MODULE_AVAILABLE,
+        'uss_wacc': None,
+        'nippon_jpy_wacc': None,
+        'nippon_usd_wacc': None,
+        'data_as_of_date': None,
+    }
+
+    if WACC_MODULE_AVAILABLE:
+        uss_wacc, uss_audit = get_verified_uss_wacc()
+        jpy_wacc, usd_wacc, nippon_audit = get_verified_nippon_wacc()
+
+        status['uss_wacc'] = uss_wacc
+        status['nippon_jpy_wacc'] = jpy_wacc
+        status['nippon_usd_wacc'] = usd_wacc
+
+        if uss_audit:
+            status['data_as_of_date'] = uss_audit.get('data_as_of_date')
+
+    return status
+
 
 # =============================================================================
 # ENUMS AND CONSTANTS
@@ -314,6 +404,10 @@ class ModelScenario:
 
     # Synergy assumptions (optional) - only applies to Nippon valuation
     synergies: Optional[SynergyAssumptions] = None
+
+    # WACC Module Integration (optional)
+    use_verified_wacc: bool = True  # If True, load WACC from wacc-calculations module (default)
+    wacc_audit_trail: Optional[dict] = None  # Audit trail from WACC module (populated at runtime)
 
 
 # =============================================================================
@@ -1540,17 +1634,47 @@ class PriceVolumeModel:
             'synergy_value_per_share': npv_synergies / 225.0  # Assuming 225M shares
         }
 
-    def calculate_irp_wacc(self) -> Tuple[float, float]:
+    def calculate_irp_wacc(self) -> Tuple[float, float, Optional[dict]]:
         """Calculate JPY WACC and IRP-adjusted USD WACC
 
         Now properly linked to JGB rate:
         - Cost of Equity = JGB + Equity Risk Premium
         - Cost of Debt = JGB + Credit Spread
 
+        If use_verified_wacc is True, loads WACC from wacc-calculations module.
         If override_irp is True, uses manual_nippon_usd_wacc instead of IRP formula.
+
+        Returns:
+            Tuple of (jpy_wacc, usd_wacc, audit_trail)
+            audit_trail is populated when use_verified_wacc=True
         """
         s = self.scenario
+        audit_trail = None
 
+        # Option 1: Use verified WACC from wacc-calculations module
+        if s.use_verified_wacc and WACC_MODULE_AVAILABLE:
+            jpy_wacc, usd_wacc, nippon_audit = get_verified_nippon_wacc()
+            if jpy_wacc is not None and usd_wacc is not None:
+                audit_trail = {
+                    'source': 'wacc-calculations module',
+                    'nippon': nippon_audit,
+                }
+                return jpy_wacc, usd_wacc, audit_trail
+
+        # Option 2: Manual override
+        if s.override_irp and s.manual_nippon_usd_wacc is not None:
+            # Calculate JPY WACC for reference even when using override
+            nippon_cost_of_equity = s.japan_10yr + s.nippon_equity_risk_premium
+            nippon_cost_of_debt = s.japan_10yr + s.nippon_credit_spread
+            equity_weight = 1 - s.nippon_debt_ratio
+            debt_weight = s.nippon_debt_ratio
+            jpy_wacc = (
+                equity_weight * nippon_cost_of_equity +
+                debt_weight * nippon_cost_of_debt * (1 - s.nippon_tax_rate)
+            )
+            return jpy_wacc, s.manual_nippon_usd_wacc, None
+
+        # Option 3: Default calculation from scenario parameters
         # Calculate Nippon's cost of capital components from JGB rate
         nippon_cost_of_equity = s.japan_10yr + s.nippon_equity_risk_premium
         nippon_cost_of_debt = s.japan_10yr + s.nippon_credit_spread
@@ -1563,14 +1687,10 @@ class PriceVolumeModel:
             debt_weight * nippon_cost_of_debt * (1 - s.nippon_tax_rate)
         )
 
-        # USD WACC: Use manual override if specified, otherwise apply IRP
-        if s.override_irp and s.manual_nippon_usd_wacc is not None:
-            usd_wacc = s.manual_nippon_usd_wacc
-        else:
-            # IRP conversion to USD
-            usd_wacc = (1 + jpy_wacc) * (1 + s.us_10yr) / (1 + s.japan_10yr) - 1
+        # IRP conversion to USD
+        usd_wacc = (1 + jpy_wacc) * (1 + s.us_10yr) / (1 + s.japan_10yr) - 1
 
-        return jpy_wacc, usd_wacc
+        return jpy_wacc, usd_wacc, audit_trail
 
     def calculate_financing_impact(self, df: pd.DataFrame) -> Dict:
         """Calculate the impact of financing capital projects on USS standalone value.
@@ -1798,6 +1918,11 @@ class PriceVolumeModel:
         - No financing adjustment (Nippon has balance sheet capacity)
         - Use IRP-adjusted WACC (lower cost of capital)
         - ADD synergies if configured (synergies apply ONLY to Nippon valuation)
+
+        If use_verified_wacc is True:
+        - Loads USS WACC from wacc-calculations module
+        - Loads Nippon WACC from wacc-calculations module
+        - Populates wacc_audit_trail in results
         """
         # Step 1: Build Projections (0-40%)
         self._report_progress(0, "Building segment projections...")
@@ -1806,7 +1931,29 @@ class PriceVolumeModel:
 
         # Step 2: Calculate WACCs (40-45%)
         self._report_progress(42, "Calculating WACC...")
-        jpy_wacc, usd_wacc = self.calculate_irp_wacc()
+
+        # Build WACC audit trail
+        wacc_audit_trail = {
+            'source': 'scenario parameters',
+            'uss': None,
+            'nippon': None,
+        }
+
+        # USS WACC: optionally load from module
+        uss_wacc = self.scenario.uss_wacc
+        if self.scenario.use_verified_wacc and WACC_MODULE_AVAILABLE:
+            verified_uss_wacc, uss_audit = get_verified_uss_wacc()
+            if verified_uss_wacc is not None:
+                uss_wacc = verified_uss_wacc
+                wacc_audit_trail['uss'] = uss_audit
+                wacc_audit_trail['source'] = 'wacc-calculations module'
+
+        # Nippon WACC: calculate with optional verification
+        jpy_wacc, usd_wacc, nippon_audit = self.calculate_irp_wacc()
+        if nippon_audit:
+            wacc_audit_trail['nippon'] = nippon_audit.get('nippon')
+            wacc_audit_trail['source'] = 'wacc-calculations module'
+
         self._report_progress(45, "WACC calculated")
 
         # Step 3: Financing Impact (45-55%)
@@ -1816,7 +1963,7 @@ class PriceVolumeModel:
 
         # Step 4: USS DCF (55-65%)
         self._report_progress(57, "Running USS valuation...")
-        val_uss = self.calculate_dcf(consolidated, self.scenario.uss_wacc, financing_impact)
+        val_uss = self.calculate_dcf(consolidated, uss_wacc, financing_impact)
         self._report_progress(65, "USS valuation complete")
 
         # Steps 5-6: Synergies (65-80%)
@@ -1875,12 +2022,14 @@ class PriceVolumeModel:
             'segment_dfs': segment_dfs,
             'jpy_wacc': jpy_wacc,
             'usd_wacc': usd_wacc,
+            'uss_wacc': uss_wacc,  # May differ from scenario.uss_wacc if verified
             'val_uss': val_uss,
             'val_nippon': val_nippon,
-            'wacc_advantage': self.scenario.uss_wacc - usd_wacc,
+            'wacc_advantage': uss_wacc - usd_wacc,
             'financing_impact': financing_impact,
             'synergy_schedule': synergy_schedule,
-            'synergy_value': synergy_value
+            'synergy_value': synergy_value,
+            'wacc_audit_trail': wacc_audit_trail if self.scenario.use_verified_wacc else None,
         }
 
         self._report_progress(100, "Analysis complete")

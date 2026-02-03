@@ -1,0 +1,47 @@
+{
+  "fetch_date": "2026-02-03T05:17:47.427294",
+  "target_date": "2023-12-29",
+  "items": {
+    "nippon_stock_price": {
+      "status": "error",
+      "message": "Invalid comparison between dtype=datetime64[ns, Asia/Tokyo] and Timestamp"
+    },
+    "nippon_beta": {
+      "status": "verified",
+      "beta": 1.812,
+      "r_squared": 0.477,
+      "correlation": 0.691,
+      "months_used": 59,
+      "period": "2019-01-01 to 2023-12-31",
+      "benchmark": "TOPIX (or proxy)",
+      "methodology": "5-year monthly returns, OLS regression",
+      "source": "Yahoo Finance (yfinance) - calculated"
+    },
+    "uss_analyst_wacc": {
+      "status": "found",
+      "filing_type": "DEF 14A",
+      "filing_date": "2024-03-15",
+      "accession_number": "0001104659-24-035006",
+      "sec_url": "https://www.sec.gov/Archives/edgar/data/1163302/000110465924035006/",
+      "source": "SEC EDGAR",
+      "notes": "Manual review required to extract Barclays WACC range from fairness opinion",
+      "expected_location": "Annex B or C - Barclays Opinion",
+      "expected_wacc_range": "11.5% - 13.5%"
+    },
+    "nippon_financials": {
+      "status": "verified",
+      "source": "Yahoo Finance (yfinance)",
+      "notes": "Data may not match fiscal year end exactly",
+      "raw_data": {
+        "2025-03-31": {
+          "cash": 672526000000.0,
+          "total_debt": 2507492000000.0
+        },
+        "2024-03-31": {
+          "cash": 448892000000.0,
+          "total_debt": 2711643000000.0
+        }
+      }
+    }
+  }
+}

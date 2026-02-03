@@ -1,0 +1,145 @@
+{
+  "verification_date": "2026-02-03 02:29:51",
+  "results": [
+    {
+      "item": "USS Cash & Equivalents (2023 10-K)",
+      "expected_value": "$2,547M",
+      "verified_value": "$2,956M",
+      "source": "WRDS Compustat (comp.funda)",
+      "source_url": "https://wrds-www.wharton.upenn.edu/",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "mismatch",
+      "notes": "WRDS che = 2956"
+    },
+    {
+      "item": "USS Shares Outstanding",
+      "expected_value": "225M",
+      "verified_value": "224M",
+      "source": "WRDS Compustat (comp.funda)",
+      "source_url": "https://wrds-www.wharton.upenn.edu/",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "verified",
+      "notes": "WRDS csho = 224"
+    },
+    {
+      "item": "10-Year Treasury Yield (12/29/2023)",
+      "expected_value": "0.0388",
+      "verified_value": null,
+      "source": "Federal Reserve H.15",
+      "source_url": "https://www.federalreserve.gov/releases/h15/",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Need to check FRED DGS10 series for 2023-12-29"
+    },
+    {
+      "item": "USS Stock Price (12/29/2023)",
+      "expected_value": "42.73",
+      "verified_value": null,
+      "source": "NYSE / Yahoo Finance",
+      "source_url": "https://finance.yahoo.com/quote/X/history/",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Historical price lookup required"
+    },
+    {
+      "item": "USS Equity Beta",
+      "expected_value": "1.45",
+      "verified_value": null,
+      "source": "Bloomberg / Capital IQ consensus",
+      "source_url": null,
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Sources: Bloomberg 1.42, Yahoo 1.48, Capital IQ 1.44"
+    },
+    {
+      "item": "USS Credit Rating",
+      "expected_value": "BB- / Ba3",
+      "verified_value": null,
+      "source": "S&P / Moody's",
+      "source_url": null,
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Check rating agency press releases"
+    },
+    {
+      "item": "Analyst WACC Estimates (Barclays)",
+      "expected_value": "11.5% - 13.5%",
+      "verified_value": null,
+      "source": "USS Merger Proxy (DEFM14A)",
+      "source_url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001163302&type=DEFM14A",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Fairness opinion in proxy statement"
+    },
+    {
+      "item": "Nippon Steel Financial Data (WRDS)",
+      "expected_value": "See inputs.json",
+      "verified_value": null,
+      "source": "WRDS Compustat Global",
+      "source_url": "https://wrds-www.wharton.upenn.edu/",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "unable_to_verify",
+      "notes": "Japanese company data may require Compustat Global subscription"
+    },
+    {
+      "item": "JGB 10-Year Yield (12/29/2023)",
+      "expected_value": "0.0061",
+      "verified_value": null,
+      "source": "Bank of Japan / Ministry of Finance",
+      "source_url": "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Check MOF JGB statistics"
+    },
+    {
+      "item": "US 10-Year Treasury (for IRP)",
+      "expected_value": "0.0388",
+      "verified_value": null,
+      "source": "Federal Reserve H.15",
+      "source_url": "https://www.federalreserve.gov/releases/h15/",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Same as USS risk-free rate"
+    },
+    {
+      "item": "Nippon Stock Price (12/29/2023)",
+      "expected_value": "\u00a53,360",
+      "verified_value": null,
+      "source": "Tokyo Stock Exchange",
+      "source_url": "https://www.jpx.co.jp/english/",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Historical price for 5401.T"
+    },
+    {
+      "item": "USD/JPY Exchange Rate (12/29/2023)",
+      "expected_value": "141.0",
+      "verified_value": null,
+      "source": "Federal Reserve H.10 / BOJ",
+      "source_url": "https://www.federalreserve.gov/releases/h10/hist/",
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Daily exchange rate"
+    },
+    {
+      "item": "Nippon Beta vs TOPIX",
+      "expected_value": "1.15",
+      "verified_value": null,
+      "source": "Bloomberg",
+      "source_url": null,
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "5401 JP Equity BETA"
+    },
+    {
+      "item": "Nippon Credit Ratings",
+      "expected_value": "BBB+ / Baa1",
+      "verified_value": null,
+      "source": "S&P / Moody's / Fitch / R&I",
+      "source_url": null,
+      "verification_date": "2026-02-03 02:29:51",
+      "status": "needs_manual_verification",
+      "notes": "Check rating agency websites"
+    }
+  ]
+}
