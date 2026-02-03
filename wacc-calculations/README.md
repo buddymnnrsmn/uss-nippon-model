@@ -181,11 +181,54 @@ Model results (10.76%) are at the lower end of analyst ranges, primarily due to:
 
 ## Usage in Model
 
-The WACC calculations integrate with `price_volume_model.py`:
+The WACC calculations are integrated with `price_volume_model.py` and can be used in two ways:
+
+### Automatic Integration (Recommended)
+
+When `use_verified_wacc=True` (the default), the model automatically loads verified WACC values:
 
 ```python
-from wacc_calculations.uss import calculate_uss_wacc
-from wacc_calculations.nippon import calculate_nippon_wacc
+from price_volume_model import (
+    PriceVolumeModel,
+    get_scenario_presets,
+    ScenarioType,
+    WACC_MODULE_AVAILABLE,
+    get_verified_uss_wacc,
+    get_verified_nippon_wacc,
+    get_wacc_module_status
+)
+
+# Check module status
+status = get_wacc_module_status()
+print(f"Module available: {status['available']}")
+print(f"USS WACC: {status['uss_wacc']:.2%}")
+print(f"Nippon USD WACC: {status['nippon_usd_wacc']:.2%}")
+
+# Get verified WACC with audit trail
+uss_wacc, uss_audit = get_verified_uss_wacc()
+jpy_wacc, usd_wacc, nippon_audit = get_verified_nippon_wacc()
+
+# Run model with verified WACC (default behavior)
+presets = get_scenario_presets()
+scenario = presets[ScenarioType.BASE_CASE]
+scenario.use_verified_wacc = True  # Default is True
+
+model = PriceVolumeModel(scenario)
+results = model.run_full_analysis()
+
+# Results include WACC audit trail
+print(f"USS WACC used: {results['uss_wacc']:.2%}")
+print(f"Nippon USD WACC used: {results['usd_wacc']:.2%}")
+print(f"Audit trail: {results['wacc_audit_trail']}")
+```
+
+### Direct Module Usage
+
+For standalone WACC calculations:
+
+```python
+from wacc_calculations.uss.uss_wacc import calculate_uss_wacc
+from wacc_calculations.nippon.nippon_wacc import calculate_nippon_wacc
 
 # Get USS WACC (all inputs loaded from inputs.json)
 uss_result = calculate_uss_wacc()
@@ -216,6 +259,14 @@ print_input_sources()  # Shows all inputs with sources and verification status
 result_high_beta = calculate_uss_wacc(levered_beta=1.6)
 result_low_rf = calculate_uss_wacc(us_10y=0.035)
 ```
+
+### Dashboard Integration
+
+The interactive dashboard (`interactive_dashboard.py`) displays WACC component details in a dedicated section:
+
+1. **WACC Component Details** section shows USS and Nippon breakdowns
+2. **Use Verified WACC** toggle in sidebar switches between verified and manual WACC
+3. **Audit trail** displayed when verified WACC is enabled
 
 ## Sensitivity Analysis
 

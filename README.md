@@ -35,6 +35,7 @@ The dashboard will open in your browser at `http://localhost:8501`
 |------|-------------|
 | `price_volume_model.py` | Main DCF model with Price x Volume methodology |
 | `interactive_dashboard.py` | Streamlit dashboard interface |
+| `wacc-calculations/` | WACC calculation module with verified inputs and audit trail |
 | `requirements.txt` | Python dependencies |
 
 ### Analysis Documents
@@ -85,6 +86,7 @@ The dashboard will open in your browser at `http://localhost:8501`
 - Segment-level Price x Volume model
 - Terminal value via Gordon Growth and Exit Multiple
 - Interest Rate Parity (IRP) adjustment for cross-border valuation
+- Verified WACC calculations with audit trail (USS: 10.70%, Nippon USD: 7.95%)
 
 ## Model Outputs
 
