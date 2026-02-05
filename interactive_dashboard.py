@@ -34,8 +34,41 @@ from price_volume_model import (
     get_capital_projects, BENCHMARK_PRICES_2023,
     get_synergy_presets, SynergyAssumptions, OperatingSynergies,
     TechnologyTransfer, RevenueSynergies, IntegrationCosts, SynergyRampSchedule,
-    WACC_MODULE_AVAILABLE, get_wacc_module_status
+    WACC_MODULE_AVAILABLE, get_wacc_module_status,
+    BLOOMBERG_AVAILABLE, get_bloomberg_status, get_benchmark_prices,
+    SCENARIO_CALIBRATION_AVAILABLE, get_calibration_mode_status,
 )
+
+# Optional: Import Bloomberg module for detailed status display
+BLOOMBERG_DETAILS_AVAILABLE = False
+try:
+    import sys
+    from pathlib import Path as BloombergPath
+    _bloomberg_module_path = BloombergPath(__file__).parent / "market-data" / "bloomberg"
+    if str(_bloomberg_module_path.parent) not in sys.path:
+        sys.path.insert(0, str(_bloomberg_module_path.parent))
+
+    from bloomberg import (
+        get_bloomberg_service,
+        get_price_comparison_table,
+        is_bloomberg_available,
+        get_wacc_overlay,
+        # Scenario calibration
+        ScenarioCalibrationMode,
+        get_all_scenarios_for_mode,
+        get_mode_description,
+        get_mode_short_description,
+    )
+    BLOOMBERG_DETAILS_AVAILABLE = is_bloomberg_available()
+except ImportError:
+    get_bloomberg_service = None
+    get_price_comparison_table = None
+    is_bloomberg_available = None
+    get_wacc_overlay = None
+    ScenarioCalibrationMode = None
+    get_all_scenarios_for_mode = None
+    get_mode_description = None
+    get_mode_short_description = None
 
 # Optional: Import WACC module for detailed component display
 try:
@@ -202,6 +235,9 @@ def render_sidebar():
         st.session_state.reset_section = None
     if 'previous_scenario' not in st.session_state:
         st.session_state.previous_scenario = None
+    # Initialize calibration mode early (UI control is rendered later in sidebar)
+    if 'calibration_mode' not in st.session_state:
+        st.session_state.calibration_mode = 'bloomberg' if SCENARIO_CALIBRATION_AVAILABLE else None
 
     # Scenario Selection
     st.sidebar.header("Scenario Selection")
@@ -248,8 +284,10 @@ def render_sidebar():
         st.session_state.reset_section = "all"
         st.rerun()
 
-    # Get preset values
-    presets = get_scenario_presets()
+    # Get preset values (pass calibration and probability modes if available)
+    calibration_mode = st.session_state.get('calibration_mode')
+    probability_mode = st.session_state.get('probability_mode')
+    presets = get_scenario_presets(calibration_mode=calibration_mode, probability_mode=probability_mode)
     if selected_scenario_type != ScenarioType.CUSTOM:
         preset = presets[selected_scenario_type]
     else:
@@ -304,29 +342,199 @@ def render_sidebar():
 
     st.sidebar.markdown("---")
 
+    # ==========================================================================
+    # BLOOMBERG DATA INTEGRATION
+    # ==========================================================================
+    with st.sidebar.expander("Bloomberg Market Data", expanded=False):
+        # Initialize session state for current price comparison
+        if 'show_current_prices' not in st.session_state:
+            st.session_state.show_current_prices = False
+
+        if BLOOMBERG_DETAILS_AVAILABLE:
+            try:
+                service = get_bloomberg_service()
+                status = service.get_status()
+
+                # Status indicator - Bloomberg 2023 annual avg data is used by default
+                overall_status = status.get('overall_status', 'unavailable')
+                if overall_status in ['fresh', 'stale']:
+                    st.success("Using Bloomberg 2023 Annual Avg Prices")
+                else:
+                    st.warning("Bloomberg data unavailable - using fallbacks")
+
+                # Analysis effective date
+                analysis_date = service.get_analysis_effective_date()
+                if analysis_date:
+                    st.caption(f"Analysis effective date: {analysis_date.strftime('%Y-%m-%d')}")
+
+                # Refresh button
+                if st.button("Refresh Data", key="bloomberg_refresh", help="Reload Bloomberg data from disk"):
+                    service.refresh()
+                    st.rerun()
+
+                # Toggle to show current market prices comparison
+                show_current = st.checkbox(
+                    "Compare to Current Prices",
+                    value=st.session_state.show_current_prices,
+                    key="show_current_prices",
+                    help="Show how current market prices compare to 2023 baseline"
+                )
+
+                # Price comparison table
+                if show_current:
+                    st.caption("Current Market vs 2023 Baseline:")
+                    price_comparisons = get_price_comparison_table(compare_to_current=True)
+                    for pc in price_comparisons:
+                        delta_str = f"+{pc.percent_change:.1f}%" if pc.percent_change > 0 else f"{pc.percent_change:.1f}%"
+                        color = "green" if pc.percent_change > 0 else "red" if pc.percent_change < 0 else "gray"
+                        st.markdown(f"**{pc.benchmark}**: ${pc.current_price:,.0f} (:{color}[{delta_str}])")
+
+            except Exception as e:
+                st.error(f"Bloomberg error: {str(e)[:50]}")
+        else:
+            st.info("Bloomberg integration not available")
+            st.caption("Using hardcoded fallback prices")
+
+    # ==========================================================================
+    # SCENARIO CALIBRATION MODE
+    # ==========================================================================
+    if SCENARIO_CALIBRATION_AVAILABLE and ScenarioCalibrationMode is not None:
+        with st.sidebar.expander("Scenario Calibration", expanded=False):
+            st.caption("Controls how price scenario factors are calculated")
+
+            # Initialize session state for calibration mode
+            if 'calibration_mode' not in st.session_state:
+                st.session_state.calibration_mode = 'bloomberg'
+
+            # Mode selector
+            calibration_mode = st.radio(
+                "Price Scenario Mode",
+                options=["bloomberg", "hybrid", "fixed"],
+                format_func=lambda x: {
+                    "fixed": "Option A: Fixed (±15%)",
+                    "bloomberg": "Option B: Full Bloomberg",
+                    "hybrid": "Option C: Hybrid (Conservative)",
+                }[x],
+                index=["bloomberg", "hybrid", "fixed"].index(st.session_state.calibration_mode),
+                key="calibration_mode_radio",
+                help="""
+**Fixed**: Hardcoded symmetric factors (simple, stable)
+**Bloomberg**: Full percentile-based from historical data (data-driven)
+**Hybrid**: Bloomberg downside, capped upside (conservative for boards)
+"""
+            )
+
+            # Update session state
+            st.session_state.calibration_mode = calibration_mode
+
+            # Show mode description
+            if get_mode_description:
+                mode_enum = ScenarioCalibrationMode(calibration_mode)
+                st.info(get_mode_description(mode_enum))
+
+            # Show current mode's factors
+            if st.checkbox("Show scenario factors", value=False, key="show_calibration_factors"):
+                if get_all_scenarios_for_mode:
+                    mode_enum = ScenarioCalibrationMode(calibration_mode)
+                    factors = get_all_scenarios_for_mode(mode_enum)
+                    st.caption("Price factors by scenario:")
+                    for name, f in factors.items():
+                        st.markdown(f"**{name}**: HRC={f.hrc_us:.0%}, OCTG={f.octg:.0%}")
+
+            st.markdown("---")
+
+            # ==========================================================================
+            # PROBABILITY DISTRIBUTION MODE
+            # ==========================================================================
+            st.subheader("Probability Weights")
+            st.caption("Controls scenario weights for probability-weighted valuation")
+
+            # Initialize session state for probability mode
+            if 'probability_mode' not in st.session_state:
+                st.session_state.probability_mode = 'bloomberg'
+
+            # Mode selector
+            probability_mode = st.radio(
+                "Probability Distribution",
+                options=["bloomberg", "fixed"],
+                format_func=lambda x: {
+                    "fixed": "Fixed (Symmetric)",
+                    "bloomberg": "Bloomberg (Historical)",
+                }[x],
+                index=["bloomberg", "fixed"].index(st.session_state.probability_mode),
+                key="probability_mode_radio",
+                help="""
+**Fixed**: Traditional symmetric distribution centered on base case.
+
+**Bloomberg**: Based on historical percentile frequency from steel price data.
+- Gives more weight to base case (40% vs 35%)
+- Mid-cycle conditions (P30-P70) occur most frequently historically
+- 2023 was an elevated year (~P75), so downside scenarios are data-driven
+"""
+            )
+
+            # Update session state
+            st.session_state.probability_mode = probability_mode
+
+            # Show probability mode description
+            try:
+                from price_volume_model import ProbabilityDistributionMode, get_probability_distribution_description, get_probability_weights
+                if ProbabilityDistributionMode and get_probability_distribution_description:
+                    mode_enum = ProbabilityDistributionMode(probability_mode)
+                    st.info(get_probability_distribution_description(mode_enum))
+
+                # Show probability weights
+                if st.checkbox("Show probability weights", value=False, key="show_probability_weights"):
+                    if get_probability_weights:
+                        weights = get_probability_weights(mode_enum)
+                        st.caption("Scenario probabilities (sum to 100%):")
+                        for name, prob in weights.items():
+                            st.markdown(f"**{name.replace('_', ' ').title()}**: {prob:.0%}")
+                        # Show key insight for Bloomberg mode
+                        if probability_mode == 'bloomberg':
+                            st.caption("*Bloomberg mode reflects that mid-cycle conditions are most common historically.*")
+            except (ImportError, AttributeError):
+                pass
+    else:
+        # If calibration not available, set defaults
+        if 'calibration_mode' not in st.session_state:
+            st.session_state.calibration_mode = None
+        if 'probability_mode' not in st.session_state:
+            st.session_state.probability_mode = None
+
+    st.sidebar.markdown("---")
+
     # Steel Price Benchmarks
     st.sidebar.header("Steel Price Benchmarks")
-    if st.sidebar.button("↺ Reset to Default", key="reset_benchmarks", help="Reset benchmark prices to 2023 defaults"):
+
+    # Always use Bloomberg 2023 prices as defaults (fallback to BENCHMARK_PRICES_2023 if unavailable)
+    benchmark_defaults = BENCHMARK_PRICES_2023  # This now uses Bloomberg 2023 annual avg data if available
+    if BLOOMBERG_AVAILABLE:
+        st.sidebar.caption("Baseline: Bloomberg 2023 Annual Avg")
+    else:
+        st.sidebar.caption("Baseline: Hardcoded Fallbacks")
+
+    if st.sidebar.button("↺ Reset to Default", key="reset_benchmarks", help="Reset benchmark prices to defaults"):
         st.session_state.reset_section = "benchmarks"
         st.rerun()
 
     # Handle benchmark reset
     if st.session_state.reset_section == "benchmarks":
-        st.session_state.hrc_us = BENCHMARK_PRICES_2023['hrc_us']
-        st.session_state.crc_us = BENCHMARK_PRICES_2023['crc_us']
-        st.session_state.coated_us = BENCHMARK_PRICES_2023['coated_us']
-        st.session_state.hrc_eu = BENCHMARK_PRICES_2023['hrc_eu']
-        st.session_state.octg = BENCHMARK_PRICES_2023['octg']
+        st.session_state.hrc_us = benchmark_defaults.get('hrc_us', BENCHMARK_PRICES_2023['hrc_us'])
+        st.session_state.crc_us = benchmark_defaults.get('crc_us', BENCHMARK_PRICES_2023['crc_us'])
+        st.session_state.coated_us = benchmark_defaults.get('coated_us', BENCHMARK_PRICES_2023['coated_us'])
+        st.session_state.hrc_eu = benchmark_defaults.get('hrc_eu', BENCHMARK_PRICES_2023['hrc_eu'])
+        st.session_state.octg = benchmark_defaults.get('octg', BENCHMARK_PRICES_2023['octg'])
         st.session_state.reset_section = None
 
     col1, col2 = st.sidebar.columns(2)
     with col1:
-        hrc_us = st.number_input("US HRC", value=st.session_state.get('hrc_us', BENCHMARK_PRICES_2023['hrc_us']), step=10, key="hrc_us", help="Hot-Rolled Coil - Primary flat steel product")
-        crc_us = st.number_input("US CRC", value=st.session_state.get('crc_us', BENCHMARK_PRICES_2023['crc_us']), step=10, key="crc_us", help="Cold-Rolled Coil - Higher margin product")
-        coated_us = st.number_input("Coated", value=st.session_state.get('coated_us', BENCHMARK_PRICES_2023['coated_us']), step=10, key="coated_us", help="Galvanized/Coated - Premium product")
+        hrc_us = st.number_input("US HRC", value=float(st.session_state.get('hrc_us', BENCHMARK_PRICES_2023['hrc_us'])), step=10.0, key="hrc_us", help="Hot-Rolled Coil - Primary flat steel product")
+        crc_us = st.number_input("US CRC", value=float(st.session_state.get('crc_us', BENCHMARK_PRICES_2023['crc_us'])), step=10.0, key="crc_us", help="Cold-Rolled Coil - Higher margin product")
+        coated_us = st.number_input("Coated", value=float(st.session_state.get('coated_us', BENCHMARK_PRICES_2023['coated_us'])), step=10.0, key="coated_us", help="Galvanized/Coated - Premium product")
     with col2:
-        hrc_eu = st.number_input("EU HRC", value=st.session_state.get('hrc_eu', BENCHMARK_PRICES_2023['hrc_eu']), step=10, key="hrc_eu", help="European Hot-Rolled Coil (USSE segment)")
-        octg = st.number_input("OCTG", value=st.session_state.get('octg', BENCHMARK_PRICES_2023['octg']), step=50, key="octg", help="Oil Country Tubular Goods (Tubular segment)")
+        hrc_eu = st.number_input("EU HRC", value=float(st.session_state.get('hrc_eu', BENCHMARK_PRICES_2023['hrc_eu'])), step=10.0, key="hrc_eu", help="European Hot-Rolled Coil (USSE segment)")
+        octg = st.number_input("OCTG", value=float(st.session_state.get('octg', BENCHMARK_PRICES_2023['octg'])), step=50.0, key="octg", help="Oil Country Tubular Goods (Tubular segment)")
 
     st.sidebar.markdown("---")
 
@@ -990,7 +1198,9 @@ def main():
                 progress_bar_pw = st.progress(0, text="Calculating probability-weighted valuation...")
                 pw_results = calculate_probability_weighted_valuation(
                     custom_benchmarks=custom_benchmarks,
-                    progress_bar=progress_bar_pw
+                    progress_bar=progress_bar_pw,
+                    calibration_mode=st.session_state.get('calibration_mode'),
+                    probability_mode=st.session_state.get('probability_mode')
                 )
                 progress_bar_pw.empty()
                 st.session_state.calc_probability_weighted = {
@@ -3104,7 +3314,9 @@ def main():
         try:
             pw_results = calculate_probability_weighted_valuation(
                 custom_benchmarks=custom_benchmarks,
-                progress_bar=progress_bar_pw
+                progress_bar=progress_bar_pw,
+                calibration_mode=st.session_state.get('calibration_mode'),
+                probability_mode=st.session_state.get('probability_mode')
             )
             progress_bar_pw.empty()
 
@@ -3489,7 +3701,9 @@ def main():
     football_field_data = []
 
     # Calculate total steps for progress tracking
-    presets = get_scenario_presets()
+    calibration_mode = st.session_state.get('calibration_mode')
+    probability_mode = st.session_state.get('probability_mode')
+    presets = get_scenario_presets(calibration_mode=calibration_mode, probability_mode=probability_mode)
     price_test_count = 5  # Number of price sensitivity tests
     wacc_test_count = 4  # Number of WACC tests
     exit_test_count = 4  # Number of exit multiple tests

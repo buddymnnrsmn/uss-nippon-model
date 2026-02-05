@@ -136,14 +136,183 @@ class ScenarioType(Enum):
     MANAGEMENT = "Optimistic"  # Alias for OPTIMISTIC
 
 
-# Steel price benchmarks ($/ton) - 2023 actuals
-BENCHMARK_PRICES_2023 = {
-    'hrc_us': 680,      # US HRC Midwest
+# Steel price benchmarks ($/ton) - hardcoded fallbacks (used only if Bloomberg unavailable)
+_HARDCODED_BENCHMARK_PRICES = {
+    'hrc_us': 680,      # US HRC Midwest (rough 2023 average)
     'crc_us': 850,      # US CRC
     'coated_us': 950,   # US Coated/Galvanized
     'hrc_eu': 620,      # EU HRC
     'octg': 2800,       # OCTG (Oil Country Tubular Goods)
 }
+
+# =============================================================================
+# BLOOMBERG INTEGRATION
+# =============================================================================
+
+# Bloomberg data service provides year-end 2023 prices by default
+# This matches the effective date of the DCF analysis
+BLOOMBERG_AVAILABLE = False
+BENCHMARK_PRICES_2023_BLOOMBERG = None  # Year-end 2023 prices from Bloomberg
+BENCHMARK_PRICES_CURRENT = None         # Latest prices from Bloomberg
+
+try:
+    import sys
+    from pathlib import Path as BloombergPath
+    _bloomberg_module_path = BloombergPath(__file__).parent / "market-data" / "bloomberg"
+    if str(_bloomberg_module_path.parent) not in sys.path:
+        sys.path.insert(0, str(_bloomberg_module_path.parent))
+
+    from bloomberg import get_bloomberg_service, is_bloomberg_available
+
+    if is_bloomberg_available():
+        _service = get_bloomberg_service()
+        if _service.is_available():
+            # Load year-end 2023 prices (matches analysis effective date)
+            BENCHMARK_PRICES_2023_BLOOMBERG = _service.get_benchmark_prices_2023()
+            # Also load current prices for comparison
+            BENCHMARK_PRICES_CURRENT = _service.get_current_prices()
+            BLOOMBERG_AVAILABLE = True
+except ImportError:
+    pass
+except Exception as e:
+    print(f"Warning: Failed to load Bloomberg prices: {e}")
+
+# Scenario Calibration Mode integration
+SCENARIO_CALIBRATION_AVAILABLE = False
+ScenarioCalibrationMode = None
+ProbabilityDistributionMode = None
+_scenario_calibrator_funcs = {}
+try:
+    from bloomberg import (
+        ScenarioCalibrationMode,
+        get_scenario_factors,
+        get_all_scenarios_for_mode,
+        get_mode_description,
+        get_mode_short_description,
+        compare_calibration_modes,
+        # Probability distributions
+        ProbabilityDistributionMode,
+        get_probability_weights,
+        get_probability_details,
+        get_probability_distribution_description,
+        apply_probability_weights_to_scenarios,
+    )
+    _scenario_calibrator_funcs = {
+        'get_scenario_factors': get_scenario_factors,
+        'get_all_scenarios_for_mode': get_all_scenarios_for_mode,
+        'get_mode_description': get_mode_description,
+        'get_mode_short_description': get_mode_short_description,
+        'compare_calibration_modes': compare_calibration_modes,
+        'get_probability_weights': get_probability_weights,
+        'get_probability_details': get_probability_details,
+        'get_probability_distribution_description': get_probability_distribution_description,
+        'apply_probability_weights_to_scenarios': apply_probability_weights_to_scenarios,
+    }
+    SCENARIO_CALIBRATION_AVAILABLE = True
+except ImportError:
+    pass
+
+
+def get_calibration_mode_status() -> dict:
+    """
+    Get status of scenario calibration mode integration.
+
+    Returns dict with:
+        - available: bool, whether calibration modes are available
+        - default_mode: str, the default mode (usually 'bloomberg')
+        - available_modes: list of available mode strings
+        - mode_descriptions: dict mapping mode to description
+        - probability_modes: list of available probability distribution modes
+        - probability_descriptions: dict mapping mode to description
+    """
+    status = {
+        'available': SCENARIO_CALIBRATION_AVAILABLE,
+        'default_mode': 'bloomberg' if SCENARIO_CALIBRATION_AVAILABLE else None,
+        'available_modes': [],
+        'mode_descriptions': {},
+        'probability_modes': [],
+        'probability_descriptions': {},
+    }
+
+    if SCENARIO_CALIBRATION_AVAILABLE:
+        status['available_modes'] = ['fixed', 'bloomberg', 'hybrid']
+        status['mode_descriptions'] = {
+            'fixed': get_mode_description(ScenarioCalibrationMode.FIXED),
+            'bloomberg': get_mode_description(ScenarioCalibrationMode.BLOOMBERG),
+            'hybrid': get_mode_description(ScenarioCalibrationMode.HYBRID),
+        }
+        status['probability_modes'] = ['fixed', 'bloomberg']
+        status['probability_descriptions'] = {
+            'fixed': get_probability_distribution_description(ProbabilityDistributionMode.FIXED),
+            'bloomberg': get_probability_distribution_description(ProbabilityDistributionMode.BLOOMBERG),
+        }
+
+    return status
+
+# BENCHMARK_PRICES_2023 uses Bloomberg year-end 2023 data if available,
+# otherwise falls back to hardcoded values
+if BLOOMBERG_AVAILABLE and BENCHMARK_PRICES_2023_BLOOMBERG:
+    BENCHMARK_PRICES_2023 = BENCHMARK_PRICES_2023_BLOOMBERG.copy()
+    _DEFAULT_BENCHMARK_PRICES = BENCHMARK_PRICES_2023_BLOOMBERG.copy()
+else:
+    BENCHMARK_PRICES_2023 = _HARDCODED_BENCHMARK_PRICES.copy()
+    _DEFAULT_BENCHMARK_PRICES = _HARDCODED_BENCHMARK_PRICES.copy()
+
+
+def get_benchmark_prices(use_bloomberg: bool = True, use_current: bool = False) -> Dict[str, float]:
+    """
+    Get benchmark prices for model calculations.
+
+    By default, returns Bloomberg year-end 2023 prices to match the analysis
+    effective date. Falls back to hardcoded values if Bloomberg unavailable.
+
+    Args:
+        use_bloomberg: If True (default), use Bloomberg data. If False, use hardcoded values.
+        use_current: If True, return latest/current prices instead of year-end 2023.
+                    Only applies when use_bloomberg=True.
+
+    Returns:
+        Dict with benchmark prices (hrc_us, crc_us, coated_us, hrc_eu, octg)
+    """
+    if use_bloomberg and BLOOMBERG_AVAILABLE:
+        if use_current and BENCHMARK_PRICES_CURRENT:
+            return BENCHMARK_PRICES_CURRENT.copy()
+        elif BENCHMARK_PRICES_2023_BLOOMBERG:
+            return BENCHMARK_PRICES_2023_BLOOMBERG.copy()
+    return _HARDCODED_BENCHMARK_PRICES.copy()
+
+
+def get_bloomberg_status() -> dict:
+    """
+    Get status of Bloomberg data integration.
+
+    Returns dict with availability, freshness, and prices.
+    """
+    status = {
+        'available': BLOOMBERG_AVAILABLE,
+        'prices_2023': None,
+        'prices_current': None,
+        'hardcoded_prices': _HARDCODED_BENCHMARK_PRICES.copy(),
+        'analysis_effective_date': '2023-12-29',
+        'freshness': 'unavailable',
+    }
+
+    if BLOOMBERG_AVAILABLE:
+        status['prices_2023'] = BENCHMARK_PRICES_2023_BLOOMBERG.copy() if BENCHMARK_PRICES_2023_BLOOMBERG else None
+        status['prices_current'] = BENCHMARK_PRICES_CURRENT.copy() if BENCHMARK_PRICES_CURRENT else None
+
+        try:
+            from bloomberg import get_bloomberg_service
+            service = get_bloomberg_service()
+            full_status = service.get_status()
+            status['freshness'] = full_status.get('overall_status', 'unknown')
+            data_date = service.get_data_as_of_date()
+            if data_date:
+                status['data_as_of_date'] = data_date.isoformat()
+        except Exception:
+            pass
+
+    return status
 
 
 # =============================================================================
@@ -409,6 +578,10 @@ class ModelScenario:
     use_verified_wacc: bool = True  # If True, load WACC from wacc-calculations module (default)
     wacc_audit_trail: Optional[dict] = None  # Audit trail from WACC module (populated at runtime)
 
+    # Bloomberg Integration (optional)
+    use_bloomberg_prices: bool = False  # Toggle Bloomberg prices vs 2023 baseline
+    bloomberg_price_override: Optional[Dict[str, float]] = None  # Manual price override from Bloomberg
+
 
 # =============================================================================
 # BENCHMARK INTEGRATION
@@ -662,7 +835,103 @@ def get_true_base_case_volume_scenario() -> VolumeScenario:
     )
 
 
-def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
+def _apply_calibration_factors_to_scenario(
+    base_scenario: ModelScenario,
+    calibration_mode: str = None
+) -> ModelScenario:
+    """
+    Apply calibration factors to a ModelScenario based on the selected mode.
+
+    This modifies the price_scenario factors if a calibration mode is specified
+    and the scenario has a matching calibration factor set.
+
+    NOTE: BASE_CASE is NOT modified by calibration. The model's base case represents
+    "mid-cycle" conditions (below 2023 levels since 2023 was elevated), not the
+    2023 annual average. Calibration only affects downside and upside scenarios.
+
+    Args:
+        base_scenario: The base ModelScenario to modify
+        calibration_mode: One of 'fixed', 'bloomberg', 'hybrid', or None
+
+    Returns:
+        ModelScenario with potentially updated price factors
+    """
+    if not calibration_mode or not SCENARIO_CALIBRATION_AVAILABLE:
+        return base_scenario
+
+    # Map scenario types to calibration scenario names
+    # NOTE: BASE_CASE is intentionally excluded - it should use the model's
+    # designed mid-cycle factors (0.9x HRC, 0.8x OCTG), not 1.0x
+    scenario_type_to_calibration = {
+        ScenarioType.SEVERE_DOWNTURN: 'severe_downturn',
+        ScenarioType.DOWNSIDE: 'downside',
+        # ScenarioType.BASE_CASE excluded - preserve model's mid-cycle factors
+        ScenarioType.ABOVE_AVERAGE: 'upside',  # Maps to upside/modest_upside
+        ScenarioType.OPTIMISTIC: 'optimistic',  # Maps to optimistic/boom
+        ScenarioType.CONSERVATIVE: 'downside',  # Alias
+    }
+
+    calibration_name = scenario_type_to_calibration.get(base_scenario.scenario_type)
+    if not calibration_name:
+        # BASE_CASE, WALL_STREET, NIPPON_COMMITMENTS don't use calibration
+        return base_scenario
+
+    try:
+        mode_enum = ScenarioCalibrationMode(calibration_mode)
+        factors = get_scenario_factors(calibration_name, mode_enum)
+
+        if factors:
+            # Create a new price scenario with calibrated factors
+            calibrated_price = SteelPriceScenario(
+                name=base_scenario.price_scenario.name + f" ({calibration_mode})",
+                description=factors.description,
+                hrc_us_factor=factors.hrc_us,
+                crc_us_factor=factors.crc_us,
+                coated_us_factor=factors.coated_us,
+                hrc_eu_factor=factors.hrc_eu,
+                octg_factor=factors.octg,
+                annual_price_growth=factors.annual_price_growth,
+            )
+
+            # Create a new scenario with updated price factors
+            # Using dataclass replace pattern (manual since we're using @dataclass)
+            return ModelScenario(
+                name=base_scenario.name,
+                scenario_type=base_scenario.scenario_type,
+                description=base_scenario.description,
+                price_scenario=calibrated_price,
+                volume_scenario=base_scenario.volume_scenario,
+                uss_wacc=base_scenario.uss_wacc,
+                terminal_growth=base_scenario.terminal_growth,
+                exit_multiple=base_scenario.exit_multiple,
+                us_10yr=base_scenario.us_10yr,
+                japan_10yr=base_scenario.japan_10yr,
+                nippon_equity_risk_premium=base_scenario.nippon_equity_risk_premium,
+                nippon_credit_spread=base_scenario.nippon_credit_spread,
+                nippon_debt_ratio=base_scenario.nippon_debt_ratio,
+                nippon_tax_rate=base_scenario.nippon_tax_rate,
+                override_irp=base_scenario.override_irp,
+                manual_nippon_usd_wacc=base_scenario.manual_nippon_usd_wacc,
+                include_projects=base_scenario.include_projects,
+                probability_weight=base_scenario.probability_weight,
+                financing=base_scenario.financing,
+                use_benchmark_multiples=base_scenario.use_benchmark_multiples,
+                synergies=base_scenario.synergies,
+                use_verified_wacc=base_scenario.use_verified_wacc,
+                wacc_audit_trail=base_scenario.wacc_audit_trail,
+                use_bloomberg_prices=base_scenario.use_bloomberg_prices,
+                bloomberg_price_override=base_scenario.bloomberg_price_override,
+            )
+    except (ValueError, KeyError):
+        pass
+
+    return base_scenario
+
+
+def get_scenario_presets(
+    calibration_mode: Optional[str] = None,
+    probability_mode: Optional[str] = None
+) -> Dict[ScenarioType, ModelScenario]:
     """Return all pre-built scenario configurations
 
     Scenarios calibrated to historical data (1990-2023):
@@ -673,9 +942,22 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
     - Optimistic: 90th+ percentile (historical frequency: 5%)
     - Wall Street: Analyst consensus (reference only, no probability weight)
     - Nippon Commitments: $14B NSA investment program (reference only)
+
+    Args:
+        calibration_mode: Optional calibration mode for price factors.
+            One of 'fixed', 'bloomberg', 'hybrid', or None.
+            - None: Use default hardcoded factors (current behavior)
+            - 'fixed': Symmetric ±15% factors (simple, stable)
+            - 'bloomberg': Full percentile-based from historical data
+            - 'hybrid': Bloomberg downside, capped upside (conservative)
+        probability_mode: Optional probability distribution mode.
+            One of 'fixed', 'bloomberg', or None.
+            - None: Use default hardcoded probability weights
+            - 'fixed': Symmetric probability distribution
+            - 'bloomberg': Percentile-based distribution from historical data
     """
 
-    return {
+    presets = {
         ScenarioType.SEVERE_DOWNTURN: ModelScenario(
             name="Severe Downturn (Historical Crisis)",
             scenario_type=ScenarioType.SEVERE_DOWNTURN,
@@ -904,6 +1186,25 @@ def get_scenario_presets() -> Dict[ScenarioType, ModelScenario]:
         ),
     }
 
+    # Apply calibration mode if specified
+    if calibration_mode and SCENARIO_CALIBRATION_AVAILABLE:
+        calibrated_presets = {}
+        for scenario_type, scenario in presets.items():
+            calibrated_presets[scenario_type] = _apply_calibration_factors_to_scenario(
+                scenario, calibration_mode
+            )
+        presets = calibrated_presets
+
+    # Apply probability mode if specified
+    if probability_mode and SCENARIO_CALIBRATION_AVAILABLE:
+        try:
+            mode_enum = ProbabilityDistributionMode(probability_mode)
+            presets = apply_probability_weights_to_scenarios(presets, mode_enum)
+        except (ValueError, TypeError):
+            pass  # Invalid mode, keep default weights
+
+    return presets
+
 
 # =============================================================================
 # SYNERGY PRESETS
@@ -1095,13 +1396,13 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             volume_growth_rate=-0.005,  # Slight decline as mini mills gain share
             capacity_utilization_2023=0.712,
             max_capacity_utilization=0.85,
-            base_price_2023=1030,  # $/ton realized
+            base_price_2023=1030,  # $/ton realized from 10-K
             price_growth_rate=0.02,
-            price_premium_to_benchmark=0.207,  # Calibrated: $1030 / $853.30 weighted benchmark - 1
+            price_premium_to_benchmark=-0.093,  # Discount: $1030 / $1136 Bloomberg weighted - 1
             benchmark_type='hrc_us',  # Fallback (not used when product_mix is set)
             # 2023 10-K: HRC $1,926M (21%), CRC $3,568M (40%), Coated $3,484M (39%)
             product_mix={'hrc_us': 0.21, 'crc_us': 0.40, 'coated_us': 0.39},
-            ebitda_margin_at_base_price=0.12,  # Mgmt: 16% blended margin at mid-cycle
+            ebitda_margin_at_base_price=0.12,  # ~11% actual 2023
             margin_sensitivity_to_price=0.04,  # 4% margin change per $100 price
             da_pct_of_revenue=0.055,
             maintenance_capex_pct=0.045,  # Reduced for better FCF
@@ -1116,11 +1417,11 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.95,
             base_price_2023=875,
             price_growth_rate=0.02,
-            price_premium_to_benchmark=0.114,  # Calibrated: $875 / $785.50 weighted benchmark - 1
+            price_premium_to_benchmark=-0.167,  # Discount: $875 / $1051 Bloomberg weighted - 1
             benchmark_type='hrc_us',  # Fallback (not used when product_mix is set)
             # 2023 10-K: HRC $1,215M (55%), CRC $365M (16%), Coated $639M (29%)
             product_mix={'hrc_us': 0.55, 'crc_us': 0.16, 'coated_us': 0.29},
-            ebitda_margin_at_base_price=0.20,  # Mini mills are highly profitable
+            ebitda_margin_at_base_price=0.17,  # ~17% actual 2023
             margin_sensitivity_to_price=0.05,  # 5% margin change per $100 price
             da_pct_of_revenue=0.045,
             maintenance_capex_pct=0.034,
@@ -1135,12 +1436,12 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.90,
             base_price_2023=873,
             price_growth_rate=0.01,
-            price_premium_to_benchmark=0.142,  # Calibrated: $873 / $764.20 weighted benchmark - 1
+            price_premium_to_benchmark=-0.092,  # Discount: $873 / $961 Bloomberg weighted - 1
             benchmark_type='hrc_eu',  # Fallback (not used when product_mix is set)
             # 2023 10-K: HRC $1,637M (51%), CRC $269M (8%), Coated $1,278M (40%)
             # Note: USSE uses EU benchmark prices
             product_mix={'hrc_eu': 0.51, 'crc_us': 0.08, 'coated_us': 0.40},
-            ebitda_margin_at_base_price=0.14,  # European ops have decent margins
+            ebitda_margin_at_base_price=0.09,  # ~9% actual 2023
             margin_sensitivity_to_price=0.04,  # 4% margin change per $100 price
             da_pct_of_revenue=0.050,
             maintenance_capex_pct=0.027,
@@ -1155,11 +1456,11 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.85,
             base_price_2023=3137,
             price_growth_rate=0.02,
-            price_premium_to_benchmark=0.120,  # Calibrated: $3137/$2800 - 1
+            price_premium_to_benchmark=0.141,  # Premium: $3137 / $2750 Bloomberg OCTG - 1
             benchmark_type='octg',
             # Tubular is 100% OCTG products
             product_mix={'octg': 1.0},
-            ebitda_margin_at_base_price=0.15,  # OCTG margins are strong
+            ebitda_margin_at_base_price=0.26,  # ~26% actual 2023
             margin_sensitivity_to_price=0.02,  # 2% margin change per $100 price
             da_pct_of_revenue=0.060,
             maintenance_capex_pct=0.040,
@@ -2095,7 +2396,9 @@ def calculate_probability_weighted_valuation(
     scenarios: Dict[ScenarioType, ModelScenario] = None,
     exclude_scenarios: List[ScenarioType] = None,
     custom_benchmarks: dict = None,
-    progress_bar=None
+    progress_bar=None,
+    calibration_mode: Optional[str] = None,
+    probability_mode: Optional[str] = None
 ) -> Dict[str, any]:
     """
     Calculate probability-weighted expected value across scenarios
@@ -2105,12 +2408,17 @@ def calculate_probability_weighted_valuation(
         exclude_scenarios: Scenarios to exclude (default: CUSTOM, WALL_STREET, NIPPON_COMMITMENTS)
         custom_benchmarks: Optional custom benchmark prices dict
         progress_bar: Optional Streamlit progress bar for tracking
+        calibration_mode: Optional calibration mode ('fixed', 'bloomberg', 'hybrid')
+        probability_mode: Optional probability mode ('fixed', 'bloomberg')
 
     Returns:
         Dict with weighted metrics and scenario breakdown
     """
     if scenarios is None:
-        scenarios = get_scenario_presets()
+        scenarios = get_scenario_presets(
+            calibration_mode=calibration_mode,
+            probability_mode=probability_mode
+        )
 
     if exclude_scenarios is None:
         exclude_scenarios = [
