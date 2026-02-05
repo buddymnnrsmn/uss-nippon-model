@@ -1,6 +1,6 @@
 # Project Status
 
-**Last Updated:** 2026-02-03
+**Last Updated:** 2026-02-05
 
 ---
 
@@ -10,7 +10,7 @@ A Python-based DCF valuation model analyzing Nippon Steel's $55/share acquisitio
 
 **Core Capabilities:**
 - **Valuation Engine** — Price × Volume methodology across 4 business segments (Flat-Rolled, Mini Mill, USSE, Tubular), projecting 5-year cash flows with dual valuation: USS standalone (10.7% verified WACC) vs Nippon view (7.95% IRP-adjusted WACC). WACC calculations sourced from verifiable public data with full audit trails.
-- **Scenario Framework** — 7 scenarios calibrated to 34-year historical data with probability weights, from Severe Downturn (25% probability) to Optimistic (5%)
+- **Scenario Framework** — 7 scenarios calibrated to 34-year historical data with probability weights. Supports three calibration modes (Fixed, Bloomberg, Hybrid) and two probability distribution modes (Fixed, Bloomberg) for weighted-average valuation.
 - **Interactive Dashboard** — Streamlit interface with on-demand calculations, caching, and real-time progress tracking
 - **Monte Carlo Simulation** — Probabilistic valuation with Latin Hypercube Sampling, correlation modeling, and risk metrics (VaR, CVaR)
 - **Breakup Fee Analysis** — $565M fee modeling with adjustable probability sliders and expected value calculations
@@ -35,7 +35,7 @@ Run with: `streamlit run interactive_dashboard.py`
 |------|------------|-------|
 | **Premium Steel Market Opportunity** | Bloomberg data | Model 5 premium segments (EV automotive, electrical, green, offshore wind, aerospace/defense) as Nippon technology synergies. Design spec in `market-data/premium-steel-market-opportunity.md`. Ready for implementation once data is gathered. |
 | Monte Carlo Phase 2: Enhanced Analytics | — | Tornado diagrams, two-way sensitivity tables, Excel/PDF export. Ready to start. |
-| Bloomberg data integration | Data access | Infrastructure built (`market-data/`). Comprehensive guide in `market-data/BLOOMBERG_DATA_GUIDE.md`. |
+| Bloomberg data integration | Data access | Infrastructure built (`market-data/`). Scenario calibration modes and probability distributions implemented. Remaining: live data feeds, Monte Carlo calibration. Guide in `market-data/BLOOMBERG_DATA_GUIDE.md`. |
 | Source data audit completion | Manual effort | Tracker in `audit-verification/data_collection/`. Requires extracting values from 10-K, steel price sources. |
 | Monte Carlo dashboard integration | Phase 2 completion | Add interactive Monte Carlo controls to Streamlit dashboard. |
 
@@ -49,9 +49,23 @@ Run with: `streamlit run interactive_dashboard.py`
 |------|---------|
 | `BLOOMBERG_DATA_GUIDE.md` | Complete data gathering guide with 13 phases: Monte Carlo calibration data (steel prices, rates, peers, demand drivers, macro, M&A) + premium steel segment research (EV, green, wind, electrical, aerospace). |
 | `premium-steel-market-opportunity.md` | Technical spec for modeling 5 premium steel segments as technology transfer synergies. Includes dataclass design, dashboard layout, integration points. |
+| `bloomberg/scenario_calibrator.py` | **NEW** — Three-mode scenario calibration (Fixed, Bloomberg, Hybrid) and probability distributions. |
 | `bloomberg_loader.py` | Python loader for Bloomberg exports |
 | `integrate_with_model.py` | Integration with main valuation model |
 | `QUICK_REFERENCE.md` | Bloomberg ticker reference |
+
+**Scenario Calibration Modes:**
+| Mode | Description | Best For |
+|------|-------------|----------|
+| Fixed | Symmetric ±15% factors | Simple analysis |
+| Bloomberg | Full percentile-based (P10/P25/P50/P75/P90) | Data-driven analysis |
+| Hybrid | Bloomberg downside, capped upside | Board presentations |
+
+**Probability Distribution Modes:**
+| Mode | Base Case Weight | Notes |
+|------|------------------|-------|
+| Fixed | 35% | Traditional symmetric distribution |
+| Bloomberg | 40% | Historical percentile frequency (mid-cycle most common) |
 
 **Premium Segment Priority:**
 1. EV Automotive Steel — AHSS, ultra-high tensile, battery case (largest TAM)
@@ -110,6 +124,7 @@ Run with: `streamlit run interactive_dashboard.py`
 
 | Item | Date | Notes |
 |------|------|-------|
+| Bloomberg scenario calibration & probability distributions | 2026-02-05 | Three price calibration modes (Fixed ±15%, Bloomberg percentiles, Hybrid conservative) and two probability distribution modes (Fixed symmetric, Bloomberg historical). Dashboard UI in "Scenario Calibration" expander. 53 tests passing. |
 | SCENARIO_RATIONALE documentation update | 2026-02-03 | Updated all scenario valuations with current model outputs. Added WACC data sources section (S.5) with verifiable inputs from Federal Reserve, Duff & Phelps, USS 10-K, Bank of Japan. Exported to PDF and Word formats. |
 | Documentation export workflows | 2026-02-03 | Created `WORKFLOW_REFERENCE.md` documenting how to run model scenarios, export to PDF (WeasyPrint), export to Word (python-docx), and access WACC audit trails. |
 | Nippon Steel buyer capacity analysis | 2026-02-02 | WRDS-verified financials, pro forma leverage, funding gap analysis, stress tests. Three comprehensive documentation files + Python modules. |
