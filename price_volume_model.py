@@ -680,7 +680,7 @@ class SynergyAssumptions:
 class FinancingAssumptions:
     """Assumptions for how USS would finance large capital programs standalone"""
     # Current balance sheet
-    current_debt: float = 4222.0  # $M - Current total debt
+    current_debt: float = 3913.0  # $M - Total financial debt (WACC inputs.json, USS 10-K)
     current_shares: float = 225.0  # M shares outstanding
 
     # Financing mix for incremental CapEx beyond FCF
@@ -2889,17 +2889,18 @@ class PriceVolumeModel:
         ev_exit = sum_pv_fcf + pv_tv_exit
         ev_blended = (ev_gordon + ev_exit) / 2
 
-        # Equity bridge - adjust for new debt if financing impact provided
-        base_debt = 4222.0
+        # Equity bridge - convert enterprise value to equity value
+        # Source: WACC inputs.json (verified against USS 10-K, Capital IQ, 2023-12-31)
+        # Note: Pension/lease obligations flow through segment EBITDA projections
+        # and are NOT separately deducted here to avoid double-counting.
+        base_debt = 3913.0   # Total financial debt (Senior Notes + Term Loan + other)
+        base_cash = 2547.0   # Cash and short-term investments
         if financing_impact:
             total_debt = financing_impact.get('total_debt', base_debt)
         else:
             total_debt = base_debt
 
-        pension = 126.0
-        leases = 117.0
-        cash = 3013.9
-        investments = 761.0
+        cash = base_cash
 
         # Use diluted share count if financing impact provided
         if financing_impact:
@@ -2907,7 +2908,7 @@ class PriceVolumeModel:
         else:
             shares = 225.0
 
-        equity_bridge = -total_debt - pension - leases + cash + investments
+        equity_bridge = -total_debt + cash
 
         # Calculate equity value and apply floor at zero
         # Shareholders have limited liability - they can lose their entire investment but no more

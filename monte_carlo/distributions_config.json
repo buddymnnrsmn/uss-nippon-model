@@ -381,28 +381,29 @@
     }
   },
   "correlations": {
+    "_calibration_note": "Recalibrated 2026-02-06 from Bloomberg monthly return correlations (2019-2023). Prior values used level correlations which overstate co-movement.",
     "hrc_price_factor": {
-      "crc_price_factor": 0.9696756965604892,
-      "octg_price_factor": 0.4978557121519224,
-      "flat_rolled_volume": 0.5563255946279376,
-      "hrc_eu_factor": 0.70,
+      "crc_price_factor": 0.88,
+      "octg_price_factor": 0.20,
+      "flat_rolled_volume": 0.35,
+      "hrc_eu_factor": 0.60,
       "annual_price_growth": 0.30
     },
     "crc_price_factor": {
-      "hrc_price_factor": 0.9696756965604892,
-      "coated_price_factor": 0.92
+      "hrc_price_factor": 0.88,
+      "coated_price_factor": 0.88
     },
     "octg_price_factor": {
-      "hrc_price_factor": 0.4978557121519224,
-      "tubular_volume": 0.7288289402507373
+      "hrc_price_factor": 0.20,
+      "tubular_volume": 0.30
     },
     "flat_rolled_volume": {
-      "hrc_price_factor": 0.5563255946279376,
+      "hrc_price_factor": 0.35,
       "mini_mill_volume": 0.7,
       "usse_volume": 0.50
     },
     "tubular_volume": {
-      "octg_price_factor": 0.75
+      "octg_price_factor": 0.30
     },
     "gary_works_execution": {
       "mon_valley_execution": 0.6
@@ -416,7 +417,7 @@
       "uss_wacc": -0.30
     },
     "hrc_eu_factor": {
-      "hrc_price_factor": 0.70,
+      "hrc_price_factor": 0.60,
       "usse_volume": 0.40,
       "tariff_probability": -0.10
     },
