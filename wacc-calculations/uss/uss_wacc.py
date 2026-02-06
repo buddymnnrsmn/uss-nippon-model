@@ -485,18 +485,93 @@ class USSWACCCalculator:
         return results
 
 
-def calculate_uss_wacc(**kwargs) -> USSWACCResult:
+def calculate_uss_wacc(bloomberg_overlay: Optional[dict] = None, **kwargs) -> USSWACCResult:
     """
     Convenience function to calculate USS WACC
 
     Args:
+        bloomberg_overlay: Optional dict with Bloomberg-sourced WACC components.
+                          If provided, these values will override inputs.json.
+                          Expected keys: risk_free_rate, suggested_cost_of_debt
         **kwargs: Override any input parameters (for sensitivity analysis only)
 
     Returns:
         USSWACCResult with full WACC breakdown and audit trail
+
+    Note:
+        The bloomberg_overlay allows using current market rates from Bloomberg
+        while preserving the ability to audit which values came from Bloomberg
+        vs the verified inputs.json file.
     """
+    # If Bloomberg overlay is provided, merge it into kwargs
+    if bloomberg_overlay:
+        # Map Bloomberg overlay fields to kwargs
+        if 'risk_free_rate' in bloomberg_overlay and 'us_10y' not in kwargs:
+            kwargs['us_10y'] = bloomberg_overlay['risk_free_rate']
+        if 'suggested_cost_of_debt' in bloomberg_overlay and 'pretax_cod' not in kwargs:
+            kwargs['pretax_cod'] = bloomberg_overlay['suggested_cost_of_debt']
+        # Note: beta is not overridden from Bloomberg as it requires SPY data
+
     calc = USSWACCCalculator(**kwargs)
-    return calc.calculate()
+    result = calc.calculate()
+
+    # Add Bloomberg overlay info to audit trail
+    if bloomberg_overlay:
+        audit = result.get_audit_trail()
+        audit['bloomberg_overlay'] = {
+            'applied': True,
+            'overrides': bloomberg_overlay,
+        }
+        # Update sources to indicate Bloomberg
+        if 'us_10y' in kwargs:
+            result.input_sources['risk_free_rate'] = 'Bloomberg (current)'
+        if 'pretax_cod' in kwargs:
+            result.input_sources['cost_of_debt'] = 'Bloomberg (current)'
+
+    return result
+
+
+def calculate_uss_wacc_with_bloomberg() -> Optional[USSWACCResult]:
+    """
+    Calculate USS WACC using current Bloomberg market data.
+
+    Loads current Treasury yields and credit spreads from Bloomberg data
+    and uses them for the WACC calculation. Falls back to verified inputs
+    if Bloomberg data is unavailable.
+
+    Returns:
+        USSWACCResult with Bloomberg-current inputs, or None if Bloomberg unavailable.
+    """
+    try:
+        import sys
+        from pathlib import Path as BloombergPath
+        _bloomberg_path = BloombergPath(__file__).parent.parent.parent / "market-data" / "bloomberg"
+        if str(_bloomberg_path.parent) not in sys.path:
+            sys.path.insert(0, str(_bloomberg_path.parent))
+
+        from bloomberg import get_wacc_overlay, is_bloomberg_available
+
+        if not is_bloomberg_available():
+            return None
+
+        overlay = get_wacc_overlay()
+        if not overlay:
+            return None
+
+        # Convert overlay to dict
+        overlay_dict = {
+            'risk_free_rate': overlay.risk_free_rate,
+        }
+        if overlay.suggested_cost_of_debt:
+            overlay_dict['suggested_cost_of_debt'] = overlay.suggested_cost_of_debt
+
+        return calculate_uss_wacc(bloomberg_overlay=overlay_dict)
+
+    except ImportError:
+        return None
+    except Exception as e:
+        print(f"Warning: Failed to calculate WACC with Bloomberg: {e}")
+        return None
 
 
 def compare_to_analyst_estimates(calculated_wacc: float) -> Dict[str, Dict]:

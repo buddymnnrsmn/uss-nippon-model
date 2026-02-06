@@ -1,0 +1,5 @@
+segment,empirical_sensitivity_per_100,r_squared,slope_pp_per_dollar,model_calibration_per_100,ratio_empirical_to_model,data_years,n_observations,notes
+Flat-Rolled,4.26,0.852,0.0426,2.0,2.13,2019-2023,5,
+Mini Mill,2.84,0.848,0.0284,2.5,1.14,2019-2023,5,
+USSE,3.83,0.872,0.0383,2.0,1.92,2019-2023,5,
+Tubular,2.08,0.736,0.0208,1.0,2.08,2019-2023,5,

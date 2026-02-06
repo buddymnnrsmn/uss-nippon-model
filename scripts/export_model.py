@@ -141,6 +141,33 @@ class ModelExporter:
         self.model = PriceVolumeModel(scenario, execution_factor, custom_benchmarks)
         self.analysis = self.model.run_full_analysis()
 
+        # Segment enum mapping for dynamic EBITDA calculation
+        self._segment_map = {
+            'Mini Mill': Segment.MINI_MILL,
+            'Flat-Rolled': Segment.FLAT_ROLLED,
+            'Tubular': Segment.TUBULAR,
+            'USSE': Segment.USSE
+        }
+
+    def _get_dynamic_project_ebitda(self, proj, year: int) -> float:
+        """Calculate project EBITDA using dynamic formula based on scenario prices.
+
+        This method uses the model's calculate_project_ebitda() which calculates:
+        Capacity × Utilization × Scenario Price × Margin
+        """
+        if proj.nameplate_capacity == 0:
+            # Fall back to legacy schedule if no dynamic params
+            return proj.ebitda_schedule.get(year, 0)
+
+        # Get segment price for this year from the model
+        segment_enum = self._segment_map.get(proj.segment)
+        if segment_enum:
+            segment_price = self.model.calculate_segment_price(segment_enum, year)
+        else:
+            segment_price = 900  # Default fallback
+
+        return self.model.calculate_project_ebitda(proj, year, segment_price)
+
     def export_single_scenario(self) -> BytesIO:
         """Export single scenario to Excel workbook
 
@@ -416,14 +443,20 @@ class ModelExporter:
                 proj = projects.get(proj_name)
                 if proj:
                     total_capex = sum(proj.capex_schedule.values())
-                    total_ebitda = sum(proj.ebitda_schedule.values())
+                    # Use dynamic EBITDA calculation (sum over projection years)
+                    years = list(range(2024, 2034))
+                    total_ebitda = sum(self._get_dynamic_project_ebitda(proj, y) for y in years)
                     ws.cell(row=row, column=1, value=proj_name)
                     ws.cell(row=row, column=2, value=f"${total_capex:,.0f}M CapEx")
-                    ws.cell(row=row, column=3, value=f"${total_ebitda:,.0f}M EBITDA")
+                    ws.cell(row=row, column=3, value=f"${total_ebitda:,.0f}M EBITDA*")
                     self.styler.style_data_cell(ws, row, 1)
                     self.styler.style_data_cell(ws, row, 2)
                     self.styler.style_data_cell(ws, row, 3)
                     row += 1
+            # Add note about dynamic calculation
+            ws.cell(row=row, column=1, value="*EBITDA calculated dynamically based on scenario prices")
+            ws.cell(row=row, column=1).font = Font(italic=True, size=9)
+            row += 1
         else:
             ws.cell(row=row, column=1, value="No capital projects enabled")
             row += 1
@@ -848,8 +881,8 @@ class ModelExporter:
 
         row += 2
 
-        # EBITDA Schedule
-        self.styler.style_section_header(ws, row, "INCREMENTAL EBITDA SCHEDULE ($M)", 1, len(years) + 2)
+        # EBITDA Schedule (Dynamic calculation based on scenario prices)
+        self.styler.style_section_header(ws, row, "INCREMENTAL EBITDA SCHEDULE ($M) - Dynamic Calculation", 1, len(years) + 2)
         row += 1
 
         for col, header in enumerate(headers, 1):
@@ -864,12 +897,8 @@ class ModelExporter:
 
             total = 0
             for col_idx, year in enumerate(years, 2):
-                value = proj.ebitda_schedule.get(year, 0)
-                # Apply execution factor for non-BR2 projects
-                if enabled and proj_name != 'BR2 Mini Mill':
-                    value *= self.execution_factor
-                elif not enabled:
-                    value = 0
+                # Use dynamic EBITDA calculation (execution factor applied internally)
+                value = self._get_dynamic_project_ebitda(proj, year) if enabled else 0
 
                 cell = ws.cell(row=row, column=col_idx, value=value)
                 cell.number_format = self.styler.currency_format
@@ -881,6 +910,67 @@ class ModelExporter:
             cell.number_format = self.styler.currency_format
             self.styler.style_data_cell(ws, row, len(years) + 2, 'positive' if enabled else None)
             row += 1
+
+        # Add note about dynamic calculation
+        row += 1
+        ws.cell(row=row, column=1, value="Note: EBITDA calculated as Capacity × Utilization × Scenario Price × Margin")
+        ws.cell(row=row, column=1).font = Font(italic=True, size=9)
+        row += 2
+
+        # Project Parameters Summary (including terminal multiples)
+        self.styler.style_section_header(ws, row, "PROJECT PARAMETERS (Sourced from WRDS Peer Analysis)", 1, 7)
+        row += 1
+
+        param_headers = ["Project", "Capacity (kt)", "Utilization", "Margin", "Terminal Multiple", "Type", "Source"]
+        for col, header in enumerate(param_headers, 1):
+            ws.cell(row=row, column=col, value=header)
+        self.styler.style_header_row(ws, row, 1, len(param_headers))
+        row += 1
+
+        # Terminal multiple sources by type
+        multiple_sources = {
+            'Mini Mill': 'STLD/NUE/CMC median 6.7x → 7.0x',
+            'Flat-Rolled': 'CLF/MT/PKX median 4.8x → 5.0x',
+            'Tubular': 'Blended EAF/Integrated → 6.0x',
+            'Mining': 'Conservative commodity → 5.0x'
+        }
+
+        for proj_name, proj in projects.items():
+            enabled = proj_name in self.scenario.include_projects
+            ws.cell(row=row, column=1, value=f"{proj_name}{' (Enabled)' if enabled else ''}")
+            self.styler.style_data_cell(ws, row, 1, 'positive' if enabled else None)
+
+            ws.cell(row=row, column=2, value=proj.nameplate_capacity)
+            ws.cell(row=row, column=2).number_format = '#,##0'
+
+            cell = ws.cell(row=row, column=3, value=proj.base_utilization)
+            cell.number_format = '0%'
+
+            cell = ws.cell(row=row, column=4, value=proj.ebitda_margin)
+            cell.number_format = '0%'
+
+            cell = ws.cell(row=row, column=5, value=proj.terminal_multiple)
+            cell.number_format = '0.0"x"'
+
+            # Determine type based on segment and technology
+            if 'Mini Mill' in proj_name or proj.segment == 'Mini Mill':
+                proj_type = 'EAF Mini Mill'
+            elif proj.base_price_override:
+                proj_type = 'Mining'
+            elif proj.segment == 'Tubular':
+                proj_type = 'Tubular'
+            else:
+                proj_type = 'Integrated BF'
+            ws.cell(row=row, column=6, value=proj_type)
+
+            source = multiple_sources.get(proj.segment, 'WRDS peer analysis')
+            ws.cell(row=row, column=7, value=source)
+            row += 1
+
+        row += 1
+        ws.cell(row=row, column=1, value="Terminal Multiple Source: WRDS Compustat annual fundamentals, FY2021-2024")
+        ws.cell(row=row, column=1).font = Font(italic=True, size=9)
+        row += 1
 
         # Column widths
         ws.column_dimensions['A'].width = 30

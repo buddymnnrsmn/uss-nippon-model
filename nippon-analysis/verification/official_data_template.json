@@ -1,0 +1,48 @@
+{
+    "_comment": "Fill in this file with verified data from official Nippon Steel filings",
+    "source": {
+        "document": "Nippon Steel FY2024 Annual Report",
+        "url": "https://www.nipponsteel.com/en/ir/library/",
+        "download_date": null,
+        "verified_by": null
+    },
+    "fiscal_year": 2024,
+    "fiscal_year_end": "March 2024",
+    "currency": "JPY",
+    "units": "billions",
+
+    "income_statement": {
+        "revenue_jpy_b": null,
+        "operating_income_jpy_b": null,
+        "depreciation_amortization_jpy_b": null,
+        "ebitda_jpy_b": null,
+        "net_income_jpy_b": null,
+        "interest_expense_jpy_b": null
+    },
+
+    "balance_sheet": {
+        "cash_and_equivalents_jpy_b": null,
+        "total_current_assets_jpy_b": null,
+        "total_assets_jpy_b": null,
+        "short_term_debt_jpy_b": null,
+        "long_term_debt_jpy_b": null,
+        "total_debt_jpy_b": null,
+        "total_liabilities_jpy_b": null,
+        "total_equity_jpy_b": null
+    },
+
+    "cash_flow": {
+        "operating_cash_flow_jpy_b": null,
+        "capex_jpy_b": null,
+        "free_cash_flow_jpy_b": null,
+        "dividends_paid_jpy_b": null
+    },
+
+    "credit_facilities": {
+        "committed_facilities_jpy_b": null,
+        "drawn_facilities_jpy_b": null,
+        "available_facilities_jpy_b": null
+    },
+
+    "notes": []
+}

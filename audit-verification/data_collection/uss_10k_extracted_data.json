@@ -1,0 +1,734 @@
+{
+  "source_file": "/workspaces/claude-in-docker/FinancialModel/references/uss_10k_2023.htm",
+  "source_size_bytes": 4658863,
+  "text_length": 764519,
+  "cross_check_targets": {
+    "total_debt_mm": 3913,
+    "cash_mm": 2547,
+    "net_debt_mm": 1366,
+    "shares_outstanding_mm": 225
+  },
+  "sections": {
+    "debt": {
+      "search_hits": 42,
+      "items": [
+        {
+          "description": "We have approximately $4.1 billion of long-term debt (see Note 17 to the Consolidated Financial Stat",
+          "amounts_found": [
+            "$4.1",
+            "17"
+          ]
+        },
+        {
+          "description": "We have approximately $4.1 billion of long-term debt (see Note 17 to the Consolidated Financial Stat",
+          "amounts_found": [
+            "$4.1",
+            "17"
+          ]
+        },
+        {
+          "description": "If we cannot make scheduled payments on our debt, we will be in default and holders of our senior un",
+          "amounts_found": [
+            "30"
+          ]
+        },
+        {
+          "description": "Certain of our credit facilities, including the Credit Facility Agreement, the Big River Steel ABL F",
+          "amounts_found": [
+            "202",
+            "3",
+            "$238",
+            "$240",
+            "5.700"
+          ]
+        },
+        {
+          "description": "We may from time to time seek to retire or repurchase our outstanding long-term debt through open ma",
+          "amounts_found": [
+            "$7",
+            "31",
+            "202",
+            "3",
+            "17"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Amount available under Credit Facility Agreement|CELL|1,746\u00a0|CELL|",
+          "amounts_found": [
+            "2,948",
+            "1,746",
+            "299"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Amounts available under USSK Credit Agreement and USSK Credit Facility|CELL|181\u00a0|CELL|",
+          "amounts_found": [
+            "299",
+            "181",
+            "5,174"
+          ]
+        },
+        {
+          "description": "We expect that our estimated liquidity requirements will consist primarily of our 2024 planned strat",
+          "amounts_found": [
+            "31",
+            "202",
+            "3",
+            "$325",
+            "31"
+          ]
+        },
+        {
+          "description": "(c)Reflects, by class of financial instrument, the estimated incremental effect of a hypothetical 10",
+          "amounts_found": [
+            "20",
+            "10",
+            "31",
+            "202",
+            "3"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Short-term debt and current maturities of long-term debt (Note 17)|CELL||CELL|142\u00a0|CELL||",
+          "amounts_found": [
+            "24",
+            "44",
+            "49",
+            "17",
+            "142"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Long-term debt, less unamortized discount and debt issuance costs (Note 17)|CELL||CELL|4,",
+          "amounts_found": [
+            "24",
+            "73",
+            "105",
+            "17",
+            "4,080"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Issuance of long-term debt, net of financing costs (Note 17)|CELL||CELL|241\u00a0|CELL||CELL||",
+          "amounts_found": [
+            "17",
+            "911",
+            "17",
+            "241",
+            "343"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Repayment of long-term debt (Note 17)|CELL||CELL|(89)|CELL||CELL||CELL|(382)|CELL||CELL||",
+          "amounts_found": [
+            "17",
+            "241",
+            "343",
+            "864",
+            "17"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Long-term debt, less unamortized discount and debt issuance costs|CELL|$3,863|CELL|$74|CE",
+          "amounts_found": [
+            "$3,863",
+            "$74",
+            "$3,937",
+            "$122",
+            "15"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Short-term debt and current maturities of long-term debt|CELL|29\u00a0|CELL|",
+          "amounts_found": [
+            "33",
+            "29",
+            "1,997"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Long-term debt|CELL|1,997\u00a0|CELL|",
+          "amounts_found": [
+            "29",
+            "1,997",
+            "26"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|USSK Credit Facility|CELL||CELL|4\u00a0|CELL||CELL||CELL|3\u00a0|CELL||CELL||CELL|4\u00a0|CELL|",
+          "amounts_found": [
+            "5",
+            "5",
+            "6",
+            "4",
+            "3"
+          ]
+        },
+        {
+          "description": "(a)Represents a net pretax charge of $292 million during 2021 related to the repayments of the Expor",
+          "amounts_found": [
+            "248",
+            "99",
+            "602",
+            "$292",
+            "202"
+          ]
+        },
+        {
+          "description": "(a)Represents a net pretax charge of $292 million during 2021 related to the repayments of the Expor",
+          "amounts_found": [
+            "248",
+            "99",
+            "602",
+            "$292",
+            "202"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|2037 Senior Notes|CELL||CELL|U. S. Steel|CELL||CELL|6.650|CELL||CELL|2037|CELL||CELL|$|CE",
+          "amounts_found": [
+            "202",
+            "3",
+            "202",
+            "2",
+            "203"
+          ]
+        }
+      ],
+      "cross_check_target": "$3,913M"
+    },
+    "cash": {
+      "search_hits": 25,
+      "items": [
+        {
+          "description": "We use surety bonds, trusts and letters of credit to provide financial assurance for certain transac",
+          "amounts_found": [
+            "$192",
+            "31",
+            "202",
+            "3",
+            "$7"
+          ]
+        },
+        {
+          "description": "Our major cash requirements in 2024 are expected to be for capital expenditures, including strategic",
+          "amounts_found": [
+            "202",
+            "4",
+            "202",
+            "3",
+            "$2,948"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Cash and cash equivalents|CELL|$|CELL|2,948\u00a0|CELL|",
+          "amounts_found": [
+            "2,948",
+            "1,746"
+          ]
+        },
+        {
+          "description": "As of December\u00a031, 2023, $325 million of the total cash and cash equivalents was held by our foreign",
+          "amounts_found": [
+            "31",
+            "202",
+            "3",
+            "$325",
+            "31"
+          ]
+        },
+        {
+          "description": "We expect that our estimated liquidity requirements will consist primarily of our 2024 planned strat",
+          "amounts_found": [
+            "31",
+            "202",
+            "3",
+            "$325",
+            "31"
+          ]
+        },
+        {
+          "description": "(a)Fair values of cash and cash equivalents, current accounts and notes receivable, accounts payable",
+          "amounts_found": [
+            "4,797",
+            "325",
+            "3,815",
+            "116",
+            "20"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Cash and cash equivalents (Note 9)|CELL||CELL|$|CELL|2,948\u00a0|CELL||CELL||CELL|$|CELL|3,504",
+          "amounts_found": [
+            "9",
+            "2,948",
+            "3,504",
+            "$38",
+            "1,390"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Long-term restricted cash (Note 9)|CELL||CELL|32\u00a0|CELL||CELL||CELL|31\u00a0|CELL|",
+          "amounts_found": [
+            "6,943",
+            "7,866",
+            "9",
+            "32",
+            "31"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Increase (decrease) in cash and cash equivalents|CELL||CELL||CELL||CELL||CELL||CELL|",
+          "amounts_found": [
+            "202",
+            "3",
+            "202",
+            "2",
+            "202"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Net (decrease) increase in cash, cash equivalents and restricted cash|CELL||CELL|(551)|CE",
+          "amounts_found": [
+            "15",
+            "19",
+            "21",
+            "551",
+            "939"
+          ]
+        }
+      ],
+      "cross_check_target": "$2,547M"
+    },
+    "pension": {
+      "search_hits": 112,
+      "unique_items": [
+        {
+          "description": "x-20231231false2023FY0001163302http://fasb.org/us-gaap/2023#OtherLiabilitiesNoncurrenthttp://fasb.or",
+          "amounts_found": [
+            "202",
+            "312",
+            "31",
+            "202",
+            "3"
+          ]
+        },
+        {
+          "description": "U.\u00a0S.\u00a0Steel provides defined benefit pension and/or other post-employment benefits to approximately ",
+          "amounts_found": [
+            "60,000",
+            "1",
+            "200",
+            "3",
+            "31"
+          ]
+        },
+        {
+          "description": "Certain hourly employees of U. S. Steel\u2019s flat-rolled, tubular, cokemaking and iron ore operations i",
+          "amounts_found": [
+            "80",
+            "1",
+            "202",
+            "2",
+            "202"
+          ]
+        },
+        {
+          "description": "Our Best for All strategy's primary financial goal is to enhance stockholder value by utilizing our ",
+          "amounts_found": [
+            "11"
+          ]
+        },
+        {
+          "description": "Furthermore, ratings agencies could downgrade our ratings either due to factors specific to our busi",
+          "amounts_found": []
+        },
+        {
+          "description": "We have significant retiree health care, retiree life insurance and pension plan costs, which may ne",
+          "amounts_found": [
+            "197",
+            "4",
+            "200",
+            "6"
+          ]
+        },
+        {
+          "description": "We maintain retiree health care and life insurance and defined benefit pension plans covering many o",
+          "amounts_found": [
+            "197",
+            "4",
+            "200",
+            "6",
+            "7"
+          ]
+        },
+        {
+          "description": "The level of cash funding for our defined benefit pension plans in future years depends upon various",
+          "amounts_found": [
+            "197",
+            "4",
+            "200",
+            "6",
+            "7"
+          ]
+        },
+        {
+          "description": "U. S. Steel contributes to a domestic multiemployer defined benefit pension plan, the SPT, for USW-r",
+          "amounts_found": [
+            "7",
+            "18",
+            "200",
+            "3",
+            "202"
+          ]
+        },
+        {
+          "description": "Pensions and Other Benefits \u2013 The recording of net periodic benefit costs for defined benefit pensio",
+          "amounts_found": [
+            "53",
+            "43",
+            "31",
+            "202",
+            "3"
+          ]
+        },
+        {
+          "description": "U.\u00a0S.\u00a0Steel\u2019s investment strategy for its U.S. pension and Other Benefits plan assets provides for a",
+          "amounts_found": [
+            "69",
+            "6",
+            "90",
+            "202",
+            "4"
+          ]
+        },
+        {
+          "description": "For its Other Benefits plan, U. S. Steel is employing a liability driven investment strategy. The pl",
+          "amounts_found": [
+            "69",
+            "6",
+            "90",
+            "202",
+            "4"
+          ]
+        },
+        {
+          "description": "The expected long-term rate of return on plan assets is applied to the market value of assets as of ",
+          "amounts_found": [
+            "80",
+            "6",
+            "00",
+            "202",
+            "4"
+          ]
+        },
+        {
+          "description": "To determine the discount rate used to measure our pension and Other Benefit obligations for U.S. pl",
+          "amounts_found": [
+            "31",
+            "202",
+            "3",
+            "5",
+            "49"
+          ]
+        },
+        {
+          "description": "Net periodic pension benefit cost (credit), including multiemployer plans, is expected to total appr",
+          "amounts_found": [
+            "80",
+            "200",
+            "6",
+            "203",
+            "0"
+          ]
+        }
+      ]
+    },
+    "shares": {
+      "search_hits": 17,
+      "items": [
+        {
+          "description": "There were 223,730,444 shares of United\u00a0States\u00a0Steel Corporation Common Stock outstanding as of Janu",
+          "amounts_found": [
+            "12",
+            "30",
+            "202",
+            "405",
+            "193"
+          ]
+        },
+        {
+          "description": "On December 18, 2023, the Company entered into an Agreement and Plan of Merger (the \"Merger Agreemen",
+          "amounts_found": [
+            "18",
+            "202",
+            "202",
+            "13",
+            "00"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Treasury stock, at cost (62,288,523 shares and 54,089,559 shares)",
+          "amounts_found": [
+            "286",
+            "283",
+            "62,288,523",
+            "54,089,559",
+            "418"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Treasury stock:|CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL|",
+          "amounts_found": [
+            "286",
+            "283",
+            "280",
+            "285,960",
+            "282,487"
+          ]
+        },
+        {
+          "description": "In August 2020, the FASB issued Accounting Standards Update 2020-06, Accounting for Convertible Inst",
+          "amounts_found": [
+            "31",
+            "202",
+            "84",
+            "202",
+            "202"
+          ]
+        },
+        {
+          "description": "Basic earnings per common share is based on the weighted average number of common shares outstanding",
+          "amounts_found": [
+            "202",
+            "202",
+            "202",
+            "202",
+            "06"
+          ]
+        },
+        {
+          "description": "Diluted earnings per common share assumes the exercise of stock options, the vesting of restricted s",
+          "amounts_found": [
+            "202",
+            "202",
+            "202",
+            "202",
+            "06"
+          ]
+        },
+        {
+          "description": "|ROW||CELL|Weighted-average shares outstanding (in thousands):|CELL||CELL||CELL||CELL||CELL||CELL|",
+          "amounts_found": [
+            "908",
+            "537",
+            "174",
+            "224,761",
+            "246,986"
+          ]
+        },
+        {
+          "description": "U. S. Steel has outstanding stock-based compensation awards that were granted by the Compensation & ",
+          "amounts_found": [
+            "200",
+            "200",
+            "201",
+            "26",
+            "201"
+          ]
+        },
+        {
+          "description": "Compensation expense for stock options is recorded over the vesting period based on the fair value o",
+          "amounts_found": [
+            "171,000",
+            "202",
+            "202",
+            "202"
+          ]
+        }
+      ],
+      "cross_check_target": "225M"
+    },
+    "segments": {
+      "search_hits": 300,
+      "items": [
+        {
+          "description": "x-20231231false2023FY0001163302http://fasb.org/us-gaap/2023#OtherLiabilitiesNoncurrenthttp://fasb.org/us-gaap/2023#Accou",
+          "context_preview": "\n\n\nx-20231231false2023FY0001163302http://fasb.org/us-gaap/2023#OtherLiabilitiesNoncurrenthttp://fasb.org/us-gaap/2023#AccountsPayableAndAccruedLiabilitiesCurrentP7Y1010.0748391http://fasb.org/us-gaap/"
+        },
+        {
+          "description": "During 2023, U. S. Steel had annual raw steel production capability of 22.4 million net tons (17.4 million tons in North",
+          "context_preview": "United States Steel Corporation, with operations in the United States of America (U.S.) and Central Europe, is transforming itself into a customer-centric, world-competitive, Best for All\u00ae steelmaker "
+        },
+        {
+          "description": "U.\u00a0S.\u00a0Steel has four reportable segments: North American Flat-Rolled (Flat-Rolled), Mini Mill, U.\u00a0S.\u00a0Steel Europe (USSE)",
+          "context_preview": "Segments\n\n\nU.\u00a0S.\u00a0Steel has four reportable segments: North American Flat-Rolled (Flat-Rolled), Mini Mill, U.\u00a0S.\u00a0Steel Europe (USSE) and Tubular Products (Tubular). The Mini Mill segment reflects the f"
+        },
+        {
+          "description": "Flat-Rolled",
+          "context_preview": "U.\u00a0S.\u00a0Steel has four reportable segments: North American Flat-Rolled (Flat-Rolled), Mini Mill, U.\u00a0S.\u00a0Steel Europe (USSE) and Tubular Products (Tubular). The Mini Mill segment reflects the full ownersh"
+        },
+        {
+          "description": "The Flat-Rolled segment includes the operating results of U.\u00a0S.\u00a0Steel\u2019s integrated steel plants and equity investees in ",
+          "context_preview": "Flat-Rolled\n\n\nThe Flat-Rolled segment includes the operating results of U.\u00a0S.\u00a0Steel\u2019s integrated steel plants and equity investees in North America involved in the production of slabs, strip mill plat"
+        },
+        {
+          "description": "During 2023, Flat-Rolled had aggregate annual raw steel production capability of 13.2 million tons at our Gary Works, Mo",
+          "context_preview": "The Flat-Rolled segment includes the operating results of U.\u00a0S.\u00a0Steel\u2019s integrated steel plants and equity investees in North America involved in the production of slabs, strip mill plates, sheets and"
+        },
+        {
+          "description": "Mini Mill",
+          "context_preview": "During 2023, Flat-Rolled had aggregate annual raw steel production capability of 13.2 million tons at our Gary Works, Mon Valley Works, and Granite City Works facilities. In December 2021, U. S. Steel"
+        },
+        {
+          "description": "The Mini Mill segment includes the operating results of U. S. Steel's Big River Steel facility and a second mini mill cu",
+          "context_preview": "Mini Mill\n\n\nThe Mini Mill segment includes the operating results of U. S. Steel's Big River Steel facility and a second mini mill currently under construction, both are located in Osceola, Arkansas. T"
+        },
+        {
+          "description": "Mini Mill has aggregate annual raw steel production capability of 3.3 million tons at our Big River Steel facility. Raw ",
+          "context_preview": "\nTable of Contents\n\nMini Mill has aggregate annual raw steel production capability of 3.3 million tons at our Big River Steel facility. Raw steel production was 3.0 million tons in 2023 and 2.7 millio"
+        },
+        {
+          "description": "The USSE segment includes the operating results of U.\u00a0S.\u00a0Steel Ko\u0161ice (USSK), U.\u00a0S.\u00a0Steel\u2019s integrated steel plant and c",
+          "context_preview": "European Operations\n\n\nThe USSE segment includes the operating results of U.\u00a0S.\u00a0Steel Ko\u0161ice (USSK), U.\u00a0S.\u00a0Steel\u2019s integrated steel plant and coke production facilities in Slovakia, and its subsidiarie"
+        },
+        {
+          "description": "USSE has annual raw steel production capability of 5.0\u00a0million tons. USSE\u2019s raw steel production was 4.4\u00a0million tons in",
+          "context_preview": "The USSE segment includes the operating results of U.\u00a0S.\u00a0Steel Ko\u0161ice (USSK), U.\u00a0S.\u00a0Steel\u2019s integrated steel plant and coke production facilities in Slovakia, and its subsidiaries. USSE conducts its b"
+        },
+        {
+          "description": "Tubular",
+          "context_preview": "USSE has annual raw steel production capability of 5.0\u00a0million tons. USSE\u2019s raw steel production was 4.4\u00a0million tons in 2023, 3.8\u00a0million tons in 2022, and 4.9\u00a0million tons in 2021. USSE\u2019s raw steel "
+        },
+        {
+          "description": "The Tubular segment includes the operating results of U.\u00a0S.\u00a0Steel\u2019s tubular production facilities and an equity investee",
+          "context_preview": "Tubular\n\n\nThe Tubular segment includes the operating results of U.\u00a0S.\u00a0Steel\u2019s tubular production facilities and an equity investee in the United States. These operations can produce and sell rounds, s"
+        },
+        {
+          "description": "Steel Shipments by Market and Segment",
+          "context_preview": "\nTable of Contents\n\nSteel Shipments by Market and Segment\n\n\nThe following table, except as noted in Footnote 1 below, does not include shipments to end customers by joint ventures and other equity inv"
+        },
+        {
+          "description": "The following table, except as noted in Footnote 1 below, does not include shipments to end customers by joint ventures ",
+          "context_preview": "Steel Shipments by Market and Segment\n\n\nThe following table, except as noted in Footnote 1 below, does not include shipments to end customers by joint ventures and other equity investees of U.\u00a0S.\u00a0Stee"
+        },
+        {
+          "description": "|ROW||CELL|(Thousands of Tons)|CELL|Flat-Rolled|CELL|Mini Mill|CELL|USSE|CELL|Tubular|CELL|Total",
+          "context_preview": "\n|ROW||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL||CELL|\n\n|ROW||CELL|(Thousands of Tons)|CELL|Flat-Rolled|CELL|Mini Mill|CELL|USSE|CELL|Tubula"
+        },
+        {
+          "description": "(1) PRO-TEC automotive substrate shipments are included in the Transportation and Automotive category.",
+          "context_preview": "\n|ROW||CELL|TOTAL|CELL|9,018\u00a0|CELL||CELL|2,230\u00a0|CELL||CELL|4,302\u00a0|CELL||CELL|444\u00a0|CELL||CELL|15,994\u00a0|CELL|\n\n(1) PRO-TEC automotive substrate shipments are included in the Transportation and Automotive"
+        },
+        {
+          "description": "EAF producers typically require lower capital expenditures for construction and operation of facilities and may have low",
+          "context_preview": "See \"International Trade\" below for a discussion of global overcapacity and the Company's efforts to mitigate the competitive impact. \n\n\nEAF producers typically require lower capital expenditures for "
+        },
+        {
+          "description": "We believe that our major North American and many European integrated steel competitors are confronted with substantiall",
+          "context_preview": "U.\u00a0S.\u00a0Steel provides defined benefit pension and/or other post-employment benefits to approximately 60,000 current employees, retirees and their beneficiaries. Many of our competitors do not have comp"
+        },
+        {
+          "description": "We are executing on our customer-centric Best for All\u00ae strategy to provide customers with profitable steel solutions for",
+          "context_preview": "Business Strategy\n\n\nWe are executing on our customer-centric Best for All\u00ae strategy to provide customers with profitable steel solutions for people and planet. Our strategy is focused on developing qu"
+        }
+      ]
+    },
+    "leases": {
+      "search_hits": 136,
+      "items": [
+        {
+          "description": "x-20231231false2023FY0001163302http://fasb.org/us-gaap/2023#OtherLiabilitiesNoncurrenthttp://fasb.or",
+          "amounts_found": [
+            "202",
+            "312",
+            "31",
+            "202",
+            "3"
+          ]
+        },
+        {
+          "description": "United States Steel Corporation, with operations in the United States of America (U.S.) and Central ",
+          "amounts_found": [
+            "1",
+            "202",
+            "3",
+            "22",
+            "4"
+          ]
+        },
+        {
+          "description": "During 2023, U. S. Steel had annual raw steel production capability of 22.4 million net tons (17.4 m",
+          "amounts_found": [
+            "202",
+            "3",
+            "22",
+            "4",
+            "17"
+          ]
+        },
+        {
+          "description": "The Tubular segment includes the operating results of U.\u00a0S.\u00a0Steel\u2019s tubular production facilities an",
+          "amounts_found": [
+            "900",
+            "568",
+            "202",
+            "3",
+            "634"
+          ]
+        },
+        {
+          "description": "Steel Industry Background and Competition",
+          "amounts_found": []
+        },
+        {
+          "description": "In 2024, we expect additional steelmaking capacity will enter the domestic steel market as competito",
+          "amounts_found": [
+            "2",
+            "2",
+            "202",
+            "4"
+          ]
+        },
+        {
+          "description": "We are executing on our customer-centric Best for All\u00ae strategy to provide customers with profitable",
+          "amounts_found": [
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        {
+          "description": "We are focused on strategic markets, where there is the greatest opportunity to provide differentiat",
+          "amounts_found": [
+            "1",
+            "2",
+            "3",
+            "202",
+            "1"
+          ]
+        },
+        {
+          "description": "construction and agricultural-related heavy machinery as well as skelp for line pipe used for energy",
+          "amounts_found": [
+            "202",
+            "1",
+            "90",
+            "70",
+            "80"
+          ]
+        },
+        {
+          "description": "U. S. Steel is committed to leveraging our Best for All strategy to develop and commercialize our lo",
+          "amounts_found": [
+            "202",
+            "1",
+            "90",
+            "70",
+            "80"
+          ]
+        }
+      ]
+    }
+  }
+}

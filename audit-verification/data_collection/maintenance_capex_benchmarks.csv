@@ -1,0 +1,8 @@
+ticker,company,technology,total_capex_mm,shipments_kt,capex_per_ton,sustaining_capex_mm,growth_capex_mm,notes
+NUE,Nucor Corporation,EAF,2934,24700,119,,,Est. sustaining: ~$25/ton (EAF benchmark)
+STLD,Steel Dynamics,EAF,2107,12800,165,,,Est. sustaining: ~$25/ton (EAF benchmark)
+CLF,Cleveland-Cliffs,Integrated (BF+EAF),809,16400,49,8,,Est. sustaining: ~$40/ton (integrated benchmark); Company discloses sustaining/growth split
+CMC,Commercial Metals,EAF,762,7200,106,,,Est. sustaining: ~$25/ton (EAF benchmark)
+MT,ArcelorMittal,Integrated,4919,58500,84,31,0,Est. sustaining: ~$40/ton (integrated benchmark); Company discloses sustaining/growth split
+X,United States Steel,Integrated (BF+EAF),2019,14900,135,,,FY2023 from 10-K; includes BR2 growth capex
+MODEL,Model Assumptions,Various,,,,,,EAF: $20/ton | BF: $40/ton | HSM: $35/ton | Mining: $8/ton | Tubular: $25/ton

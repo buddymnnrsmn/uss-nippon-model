@@ -1,16 +1,16 @@
 # USS / Nippon Steel Financial Model - Comprehensive Audit
 
-**Generated:** 2026-01-26 00:07:14
+**Generated:** 2026-02-06 07:34:07
 
 ---
 
 ## Executive Summary
 
-**Input Validation:** 5/16 items match source documents (31%)
+**Input Validation:** 2/6 items match source documents (33%)
 
 **Assumptions Documented:** 28 items with sources
 
-**Output Validations:** 18 metrics validated
+**Output Validations:** 26 metrics validated
 
 ---
 
@@ -20,22 +20,12 @@ Comparison of Capital IQ Excel data vs 2023 10-K (PDF)
 
 | Item | Excel (CIQ) | PDF (10-K) | Difference | Status |
 |------|-------------|------------|------------|--------|
-| Revenue | $18,053 | $18,057 | $-4 | MATCH |
-| Revenue 2022 | $21,065 | $21,065 | $0 | MATCH |
-| Cost of Goods Sold 2023 | $15,749 | $15,803 | $-54 | MATCH |
-| Cost of Goods Sold 2022 | $16,712 | $18,028 | $-1,316 | DIFF |
-| SG&A 2023 | N/A | $501 | N/A | MISSING |
-| Depreciation 2023 | $916 | $757 | $159 | DIFF |
-| Operating Income 2023 | $1,003 | $1,015 | $-12 | MATCH |
-| Net Income 2023 | $895 | $895 | $0 | MATCH |
-| Total Current Assets | N/A | $6,582 | N/A | MISSING |
-| PP&E Net 2023 | N/A | $10,393 | N/A | MISSING |
-| Total Assets 2023 | N/A | $19,141 | N/A | MISSING |
-| Total Current Liab 2023 | N/A | $3,468 | N/A | MISSING |
-| Long-term Debt 2023 | N/A | $4,080 | N/A | MISSING |
-| Total Liabilities 2023 | N/A | $11,376 | N/A | MISSING |
-| Cash from Ops 2023 | $2,100 | $1,829 | $271 | DIFF |
-| CapEx 2023 | $-2,576 | $2,090 | $-4,666 | DIFF |
+| Total Current Assets | $6,943 | $6,582 | $361 | DIFF |
+| PP&E Net 2023 | $10,502 | $10,393 | $109 | MATCH |
+| Total Assets 2023 | $20,451 | $19,141 | $1,310 | DIFF |
+| Total Current Liab 2023 | $3,948 | $3,468 | $480 | DIFF |
+| Long-term Debt 2023 | $3,943 | $4,080 | $-137 | MATCH |
+| Total Liabilities 2023 | $9,311 | $11,376 | $-2,065 | DIFF |
 
 ---
 
@@ -45,11 +35,11 @@ Comparison of Capital IQ Excel data vs 2023 10-K (PDF)
 
 | Item | Model Value | Source |
 |------|-------------|--------|
-| HRC US Midwest | 680 | CME HRC Futures / Platts / 10-K MD&A |
-| CRC US | 850 | CRU / Metal Bulletin |
-| Coated/Galvanized | 950 | CRU / Metal Bulletin |
-| HRC EU | 620 | Platts / LME |
-| OCTG | 2800 | Industry reports / Company data |
+| HRC US Midwest | 738 | CME HRC Futures / Platts / 10-K MD&A |
+| CRC US | 994 | CRU / Metal Bulletin |
+| Coated/Galvanized | 1113 | CRU / Metal Bulletin |
+| HRC EU | 611 | Platts / LME |
+| OCTG | 2388 | Industry reports / Company data |
 
 ### Segments
 
@@ -64,12 +54,12 @@ Comparison of Capital IQ Excel data vs 2023 10-K (PDF)
 
 | Item | Model Value | Source |
 |------|-------------|--------|
-| BR2 Mini Mill | 2197 | USS Investor Presentation / NSA Agreement |
-| Gary Works BF | 3100 | NSA Agreement / CFIUS Filing |
-| Mon Valley HSM | 1000 | NSA Agreement |
+| BR2 Mini Mill | 3200 | USS Investor Presentation / NSA Agreement |
+| Gary Works BF | 3200 | NSA Agreement / CFIUS Filing |
+| Mon Valley HSM | 2400 | NSA Agreement |
 | Greenfield Mini Mill | 1000 | NSA Agreement |
-| Mining Investment | 800 | Company Guidance |
-| Fairfield Works | 500 | Company Guidance |
+| Mining Investment | 1000 | Company Guidance |
+| Fairfield Works | 600 | Company Guidance |
 
 ### WACC/Valuation
 
@@ -102,28 +92,36 @@ Comparison of Capital IQ Excel data vs 2023 10-K (PDF)
 
 | Scenario | USS Value | Nippon Value | vs $55 Offer | WACC Adv |
 |----------|-----------|--------------|--------------|----------|
-| Severe Downturn (Historical Crisis) | $0.00 | $1.28 | $-53.72 | 5.1% |
-| Downside (Weak Markets) | $24.31 | $41.63 | $-13.37 | 4.0% |
-| Base Case (Mid-Cycle) | $34.07 | $53.35 | $-1.65 | 3.3% |
-| Above Average (Strong Cycle) | $51.27 | $76.40 | $21.40 | 3.3% |
-| Wall Street Consensus | $34.00 | $60.11 | $5.11 | 4.9% |
-| Optimistic (Peak Cycle) | $39.00 | $59.33 | $4.33 | 3.3% |
-| NSA Mandated CapEx | $48.66 | $109.88 | $54.88 | 2.9% |
+| Severe Downturn (Historical Crisis) | $0.00 | $0.00 | $-55.00 | 2.7% |
+| Downside (Weak Markets) | $27.68 | $40.76 | $-14.24 | 2.7% |
+| Base Case (Mid-Cycle) | $53.85 | $76.04 | $21.04 | 2.7% |
+| Above Average (Strong Cycle) | $81.98 | $113.05 | $58.05 | 2.7% |
+| Wall Street Consensus | $74.48 | $102.20 | $47.20 | 2.7% |
+| Optimistic (Sustained Growth) | $98.67 | $137.12 | $82.12 | 2.7% |
+| NSA Mandated CapEx | $69.82 | $122.41 | $67.41 | 2.7% |
+| Futures: Downside | $33.72 | $47.77 | $-7.23 | 2.7% |
+| Futures: Base Case | $80.81 | $111.47 | $56.47 | 2.7% |
+| Futures: Above Average | $118.41 | $161.55 | $106.55 | 2.7% |
+| Futures: Optimistic | $186.25 | $257.77 | $202.77 | 2.7% |
+| Futures: No Tariff | $42.05 | $60.55 | $5.55 | 2.7% |
+| Tariff Removal | $31.90 | $47.10 | $-7.90 | 2.7% |
+| Tariff Reduced (10%) | $40.18 | $58.02 | $3.02 | 2.7% |
+| Tariff Escalation (50%) | $79.60 | $109.84 | $54.84 | 2.7% |
 
 ### Base Case 10-Year Projections
 
 | Year | Revenue ($M) | EBITDA ($M) | Margin | CapEx ($M) | FCF ($M) |
 |------|--------------|-------------|--------|------------|----------|
-| 2024 | 12,820 | 1,041 | 8.1% | 1,504 | -1,169 |
-| 2025 | 13,093 | 1,225 | 9.4% | 646 | 490 |
-| 2026 | 13,451 | 1,524 | 11.3% | 658 | 731 |
-| 2027 | 13,778 | 1,772 | 12.9% | 670 | 928 |
-| 2028 | 14,114 | 1,985 | 14.1% | 681 | 1,096 |
-| 2029 | 14,255 | 2,058 | 14.4% | 686 | 1,148 |
-| 2030 | 14,401 | 2,133 | 14.8% | 691 | 1,207 |
-| 2031 | 14,552 | 2,211 | 15.2% | 696 | 1,268 |
-| 2032 | 14,707 | 2,292 | 15.6% | 702 | 1,331 |
-| 2033 | 14,868 | 2,376 | 16.0% | 707 | 1,396 |
+| 2024 | 14,670 | 1,923 | 13.1% | 574 | 416 |
+| 2025 | 14,986 | 2,095 | 14.0% | 785 | 1,091 |
+| 2026 | 15,399 | 2,378 | 15.4% | 1,399 | 717 |
+| 2027 | 15,777 | 2,614 | 16.6% | 1,512 | 803 |
+| 2028 | 16,164 | 2,764 | 17.1% | 1,925 | 517 |
+| 2029 | 16,331 | 2,830 | 17.3% | 631 | 1,863 |
+| 2030 | 16,503 | 2,898 | 17.6% | 637 | 1,915 |
+| 2031 | 16,681 | 2,968 | 17.8% | 643 | 1,968 |
+| 2032 | 16,865 | 3,040 | 18.0% | 650 | 2,023 |
+| 2033 | 17,055 | 3,114 | 18.3% | 656 | 2,079 |
 
 ---
 

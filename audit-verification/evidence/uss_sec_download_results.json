@@ -1,0 +1,18 @@
+{
+  "USS 10-K FY2023": {
+    "status": "downloaded",
+    "path": "/workspaces/claude-in-docker/FinancialModel/references/uss_10k_2023.htm",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1163302/000116330224000009/x-20231231.htm",
+    "filing_date": "2024-02-02",
+    "accession": "0001163302-24-000009",
+    "size": 4658863
+  },
+  "USS DEFM14A (Merger Proxy)": {
+    "status": "downloaded",
+    "path": "/workspaces/claude-in-docker/FinancialModel/audit-verification/evidence/uss_defm14a_2024.htm",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1163302/000110465924033546/tm243679-12_defm14a.htm",
+    "filing_date": "2024-03-12",
+    "accession": "0001104659-24-033546",
+    "size": 2899318
+  }
+}

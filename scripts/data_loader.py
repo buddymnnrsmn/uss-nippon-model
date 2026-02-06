@@ -30,6 +30,23 @@ class USSteelDataLoader:
         # Cache for loaded data
         self._cache: Dict[str, pd.DataFrame] = {}
 
+        # Resolve sheet names (handle "US Steel_" prefix variant)
+        self._sheet_map: Dict[str, str] = {}
+
+    def _resolve_sheet(self, target_name: str) -> str:
+        """Resolve sheet name, handling 'US Steel_' prefix variant."""
+        if not self._sheet_map:
+            try:
+                xls = pd.ExcelFile(self.financials_file)
+                for sheet in xls.sheet_names:
+                    # Map both exact and stripped names
+                    self._sheet_map[sheet] = sheet
+                    stripped = sheet.replace('US Steel_', '')
+                    self._sheet_map[stripped] = sheet
+            except Exception:
+                pass
+        return self._sheet_map.get(target_name, target_name)
+
     def _clean_column_headers(self, df: pd.DataFrame, header_row: int) -> pd.DataFrame:
         """Extract period dates from header row and set as column names."""
         headers = df.iloc[header_row].tolist()
@@ -71,7 +88,7 @@ class USSteelDataLoader:
         if use_cache and cache_key in self._cache:
             return self._cache[cache_key]
 
-        df = pd.read_excel(self.financials_file, sheet_name='Income Statement', header=None)
+        df = pd.read_excel(self.financials_file, sheet_name=self._resolve_sheet('Income Statement'), header=None)
 
         # Find data start row (where "Revenue" appears)
         for i, val in enumerate(df.iloc[:, 0]):
@@ -110,7 +127,7 @@ class USSteelDataLoader:
         if use_cache and cache_key in self._cache:
             return self._cache[cache_key]
 
-        df = pd.read_excel(self.financials_file, sheet_name='Balance Sheet', header=None)
+        df = pd.read_excel(self.financials_file, sheet_name=self._resolve_sheet('Balance Sheet'), header=None)
 
         # Find header row (Balance Sheet as of:)
         for i, val in enumerate(df.iloc[:, 0]):
@@ -147,7 +164,7 @@ class USSteelDataLoader:
         if use_cache and cache_key in self._cache:
             return self._cache[cache_key]
 
-        df = pd.read_excel(self.financials_file, sheet_name='Cash Flow', header=None)
+        df = pd.read_excel(self.financials_file, sheet_name=self._resolve_sheet('Cash Flow'), header=None)
 
         # Find header row
         for i, val in enumerate(df.iloc[:, 0]):
@@ -177,7 +194,7 @@ class USSteelDataLoader:
         if use_cache and cache_key in self._cache:
             return self._cache[cache_key]
 
-        df = pd.read_excel(self.financials_file, sheet_name='Ratios', header=None)
+        df = pd.read_excel(self.financials_file, sheet_name=self._resolve_sheet('Ratios'), header=None)
 
         # Find header row
         for i, val in enumerate(df.iloc[:, 0]):
@@ -206,7 +223,7 @@ class USSteelDataLoader:
         if use_cache and cache_key in self._cache:
             return self._cache[cache_key]
 
-        df = pd.read_excel(self.financials_file, sheet_name='Multiples', header=None)
+        df = pd.read_excel(self.financials_file, sheet_name=self._resolve_sheet('Multiples'), header=None)
 
         # Find header row (For Quarter Ending)
         for i, val in enumerate(df.iloc[:, 0]):
@@ -238,7 +255,7 @@ class USSteelDataLoader:
         if use_cache and cache_key in self._cache:
             return self._cache[cache_key]
 
-        df = pd.read_excel(self.financials_file, sheet_name='Historical Capitalization', header=None)
+        df = pd.read_excel(self.financials_file, sheet_name=self._resolve_sheet('Historical Capitalization'), header=None)
 
         # Find header row
         for i, val in enumerate(df.iloc[:, 0]):

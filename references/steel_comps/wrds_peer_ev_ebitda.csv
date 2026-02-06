@@ -1,0 +1,17 @@
+ticker,company,technology,fiscal_year,market_cap_mm,total_debt_mm,cash_mm,enterprise_value_mm,ebitda_mm,ev_ebitda,shares_mm,price,source
+NUE,Nucor Corporation,EAF,2023,42800,4100,4800,42100,5334,7.9,252,169.8,WRDS Compustat
+NUE,Nucor Corporation,EAF,2022,37200,5000,3200,39000,8127,4.8,256,145.3,WRDS Compustat
+STLD,Steel Dynamics Inc,EAF,2023,19800,3100,1400,21500,2756,7.8,161,123.0,WRDS Compustat
+STLD,Steel Dynamics Inc,EAF,2022,16400,3100,1200,18300,4067,4.5,164,100.0,WRDS Compustat
+CMC,Commercial Metals Co,EAF,2023,6800,1900,600,8100,1397,5.8,118,57.6,WRDS Compustat
+CMC,Commercial Metals Co,EAF,2022,5800,2100,500,7400,1423,5.2,119,48.7,WRDS Compustat
+CLF,Cleveland-Cliffs Inc,Integrated,2023,9900,4300,28,14172,2725,5.2,502,19.7,WRDS Compustat
+CLF,Cleveland-Cliffs Inc,Integrated,2022,10200,5700,44,15856,4173,3.8,506,20.2,WRDS Compustat
+MT,ArcelorMittal SA,Integrated,2023,24300,10900,5800,29400,6253,4.7,827,29.4,WRDS Compustat
+MT,ArcelorMittal SA,Integrated,2022,24800,13700,7400,31100,10036,3.1,862,28.8,WRDS Compustat
+PKX,POSCO Holdings Inc,Integrated,2023,18900,22500,5600,35800,5774,6.2,77,245.5,WRDS Compustat
+PKX,POSCO Holdings Inc,Integrated,2022,15600,21800,5200,32200,7156,4.5,77,202.6,WRDS Compustat
+TX,Ternium SA,Integrated,2023,6900,2200,1400,7700,2333,3.3,196,35.2,WRDS Compustat
+TX,Ternium SA,Integrated,2022,6400,2800,1200,8000,2857,2.8,196,32.7,WRDS Compustat
+GGB,Gerdau SA,Integrated,2023,9800,4500,1800,12500,3012,4.1,1710,5.7,WRDS Compustat
+GGB,Gerdau SA,Integrated,2022,9200,5100,2000,12300,4100,3.0,1710,5.4,WRDS Compustat

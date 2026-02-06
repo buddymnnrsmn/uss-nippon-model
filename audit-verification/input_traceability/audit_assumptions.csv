@@ -1,19 +1,19 @@
 Category,Item,Model_Value,Source,Status
-Steel Prices,HRC US Midwest,680,CME HRC Futures / Platts / 10-K MD&A,MATCH
-Steel Prices,CRC US,850,CRU / Metal Bulletin,MATCH
-Steel Prices,Coated/Galvanized,950,CRU / Metal Bulletin,MATCH
-Steel Prices,HRC EU,620,Platts / LME,MATCH
-Steel Prices,OCTG,2800,Industry reports / Company data,MATCH
+Steel Prices,HRC US Midwest,738,CME HRC Futures / Platts / 10-K MD&A,CHECK
+Steel Prices,CRC US,994,CRU / Metal Bulletin,CHECK
+Steel Prices,Coated/Galvanized,1113,CRU / Metal Bulletin,CHECK
+Steel Prices,HRC EU,611,Platts / LME,CHECK
+Steel Prices,OCTG,2388,Industry reports / Company data,CHECK
 Segments,Flat-Rolled Shipments,8706,10-K Segment Disclosure,MATCH
 Segments,Mini Mill Shipments,2424,10-K Segment Disclosure,MATCH
 Segments,USSE Shipments,3899,10-K Segment Disclosure,MATCH
 Segments,Tubular Shipments,478,10-K Segment Disclosure,MATCH
-CapEx Projects,BR2 Mini Mill,2197,USS Investor Presentation / NSA Agreement,DOCUMENTED
-CapEx Projects,Gary Works BF,3100,NSA Agreement / CFIUS Filing,DOCUMENTED
-CapEx Projects,Mon Valley HSM,1000,NSA Agreement,DOCUMENTED
+CapEx Projects,BR2 Mini Mill,3200,USS Investor Presentation / NSA Agreement,DOCUMENTED
+CapEx Projects,Gary Works BF,3200,NSA Agreement / CFIUS Filing,DOCUMENTED
+CapEx Projects,Mon Valley HSM,2400,NSA Agreement,DOCUMENTED
 CapEx Projects,Greenfield Mini Mill,1000,NSA Agreement,DOCUMENTED
-CapEx Projects,Mining Investment,800,Company Guidance,DOCUMENTED
-CapEx Projects,Fairfield Works,500,Company Guidance,DOCUMENTED
+CapEx Projects,Mining Investment,1000,Company Guidance,DOCUMENTED
+CapEx Projects,Fairfield Works,600,Company Guidance,DOCUMENTED
 WACC/Valuation,USS WACC (Base Case),10.9%,Barclays/Goldman Fairness Opinion: 11.5%-13.5%,DOCUMENTED
 WACC/Valuation,Terminal Growth,1.0%,Industry standard: 0.5%-2.0%,DOCUMENTED
 WACC/Valuation,Exit Multiple,4.5x,Comparable M&A: 3.5x-6.0x EBITDA,DOCUMENTED

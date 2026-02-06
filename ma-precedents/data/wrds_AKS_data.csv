@@ -1,0 +1,7 @@
+datadate,fyear,company_name,ticker,revenue,ebitda,operating_income,net_income,total_assets,total_liabilities,stockholders_equity,capx,operating_cf,long_term_debt,current_debt,cash,shares_outstanding,stock_price,total_debt,net_debt,ebitda_margin_pct,capex_pct_rev,debt_to_ebitda,market_cap,ev,ev_to_ebitda
+2017-12-31,2017,AK STEEL HOLDING CORP,AKS,6080.5,512.5,282.5,6.2,4296.1,4166.9,-216.0,152.5,198.8,2110.1,0.0,38.0,314.885,5.66,2110.1,2072.1,8.4,2.5,4.12,1782.2491,3854.3491,7.52
+2017-12-31,2017,AK STEEL HOLDING CORP,AKS,,,,103.5,4474.8,,-44.6,152.5,,2110.1,,,,5.66,2110.1,2110.1,,,,,,
+2018-12-31,2018,AK STEEL HOLDING CORP,AKS,6818.2,578.5,349.3,186.0,4515.7,4086.2,99.9,152.0,364.7,1993.7,0.0,48.6,315.536,2.25,1993.7,1945.1000000000001,8.5,2.2,3.45,709.956,2655.056,4.59
+2018-12-31,2018,AK STEEL HOLDING CORP,AKS,,,,186.0,4515.7,,99.9,152.0,,1993.7,,,,2.25,1993.7,1993.7,,,,,,
+2019-12-31,2019,AK STEEL HOLDING CORP,AKS,6359.4,448.7,246.4,11.2,4590.6,4113.3,151.5,194.8,265.9,2180.9,49.6,31.0,316.401,3.29,2230.5,2199.5,7.1,3.1,4.97,1040.95929,3240.45929,7.22
+2019-12-31,2019,AK STEEL HOLDING CORP,AKS,,,,11.2,4590.6,,151.5,194.8,,2180.9,,,,3.29,2180.9,2180.9,,,,,,

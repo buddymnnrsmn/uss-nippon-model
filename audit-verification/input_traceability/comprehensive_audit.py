@@ -32,9 +32,24 @@ class ComprehensiveAudit:
     """Full audit of model inputs, assumptions, and outputs"""
 
     def __init__(self):
-        # Use absolute path to reference_materials
         root_dir = Path(__file__).parent.parent.parent
-        self.loader = USSteelDataLoader(data_dir=str(root_dir / "reference_materials"))
+        self.root_dir = root_dir
+
+        # Try multiple possible data directories for Capital IQ files
+        for data_dir in [
+            root_dir / "reference_materials",
+            root_dir / "references",
+            root_dir / "audit-verification" / "evidence",
+        ]:
+            if data_dir.exists():
+                self.loader = USSteelDataLoader(data_dir=str(data_dir))
+                break
+        else:
+            self.loader = USSteelDataLoader(data_dir=str(root_dir / "references"))
+
+        # Capital IQ balance sheet export (new format .xls)
+        self.ciq_balance_sheet_file = root_dir / "references" / "uss_capital_iq_export_2023.xls"
+
         self.results = {
             'inputs': [],
             'assumptions': [],
@@ -84,10 +99,140 @@ class ComprehensiveAudit:
             'Diluted Shares Outstanding 2023': 226.2,
         }
 
-        # Load Capital IQ data
-        income = self.loader.load_income_statement()
-        balance = self.loader.load_balance_sheet()
-        cash_flow = self.loader.load_cash_flow()
+        # Load Capital IQ data - try old-format loader first, then new CIQ export
+        income = None
+        balance = None
+        cash_flow = None
+        use_ciq_direct = False
+
+        try:
+            income = self.loader.load_income_statement()
+            balance = self.loader.load_balance_sheet()
+            cash_flow = self.loader.load_cash_flow()
+        except Exception as e:
+            print(f"  Note: Old-format CIQ loader failed ({e})")
+            print(f"  Falling back to new Capital IQ balance sheet export...")
+            use_ciq_direct = True
+
+        if use_ciq_direct and self.ciq_balance_sheet_file.exists():
+            try:
+                import xlrd
+                wb = xlrd.open_workbook(str(self.ciq_balance_sheet_file))
+                ws = wb.sheet_by_name('Balance Sheet')
+
+                # FY2023 is column 11 (Dec-31-2023)
+                FY2023_COL = 11
+
+                # Build a lookup from row labels to FY2023 values
+                ciq_data = {}
+                for r in range(ws.nrows):
+                    label = str(ws.cell_value(r, 0)).strip()
+                    if label:
+                        val = ws.cell_value(r, FY2023_COL)
+                        if isinstance(val, (int, float)) and val != 0:
+                            ciq_data[label] = val
+
+                # Map CIQ balance sheet items to audit items
+                ciq_mapping = {
+                    'Total Current Assets': ciq_data.get('Total Current Assets'),
+                    'Net Property, Plant & Equipment': ciq_data.get('Net Property, Plant & Equipment'),
+                    'Total Assets': ciq_data.get('Total Assets'),
+                    'Total Current Liabilities': ciq_data.get('Total Current Liabilities'),
+                    'Long-Term Debt': ciq_data.get('Long-Term Debt'),
+                    'Total Liabilities': ciq_data.get('Total Liabilities'),
+                    'Total Debt': ciq_data.get('Total Debt'),
+                    'Cash And Equivalents': ciq_data.get('Cash And Equivalents'),
+                    'Total Shares Out': ciq_data.get('Total Shares Out. on Balance Sheet Date'),
+                }
+
+                print(f"  Loaded {len(ciq_data)} items from CIQ balance sheet export")
+                print(f"  Key values: Debt=${ciq_data.get('Total Debt', 'N/A'):,.0f}M, "
+                      f"Cash=${ciq_data.get('Cash And Equivalents', 'N/A'):,.0f}M, "
+                      f"Shares={ciq_data.get('Total Shares Out. on Balance Sheet Date', 'N/A'):.1f}M")
+
+                # Override audit_items to use CIQ direct data
+                print("\n{:<40} {:>15} {:>15} {:>12} {:>10}".format(
+                    "Item", "CIQ Export", "PDF (10-K)", "Diff ($M)", "Status"
+                ))
+                print("-" * 95)
+
+                matches = 0
+                diffs = 0
+                missing = 0
+
+                ciq_audit_items = [
+                    ('Total Current Assets', ciq_mapping.get('Total Current Assets'), 'Total Current Assets 2023'),
+                    ('PP&E Net 2023', ciq_mapping.get('Net Property, Plant & Equipment'), 'Property, Plant & Equip Net 2023'),
+                    ('Total Assets 2023', ciq_mapping.get('Total Assets'), 'Total Assets 2023'),
+                    ('Total Current Liab 2023', ciq_mapping.get('Total Current Liabilities'), 'Total Current Liabilities 2023'),
+                    ('Long-term Debt 2023', ciq_mapping.get('Long-Term Debt'), 'Long-term Debt 2023'),
+                    ('Total Liabilities 2023', ciq_mapping.get('Total Liabilities'), 'Total Liabilities 2023'),
+                ]
+
+                for name, excel_val, pdf_key in ciq_audit_items:
+                    pdf_val = pdf_values.get(pdf_key)
+
+                    if excel_val is None:
+                        status = "MISSING"
+                        diff = None
+                        missing += 1
+                    elif pdf_val is None:
+                        status = "NO PDF"
+                        diff = None
+                        missing += 1
+                    else:
+                        diff = excel_val - pdf_val
+                        tolerance = max(abs(pdf_val) * 0.05, 50)
+                        if abs(diff) <= tolerance:
+                            status = "MATCH"
+                            matches += 1
+                        else:
+                            status = "DIFF"
+                            diffs += 1
+
+                    excel_str = f"${excel_val:,.0f}" if excel_val else "N/A"
+                    pdf_str = f"${pdf_val:,.0f}" if pdf_val else "N/A"
+                    diff_str = f"${diff:,.0f}" if diff is not None else "N/A"
+
+                    print(f"{name:<40} {excel_str:>15} {pdf_str:>15} {diff_str:>12} {status:>10}")
+
+                    self.results['inputs'].append({
+                        'Item': name,
+                        'Excel_Value': excel_val,
+                        'PDF_Value': pdf_val,
+                        'Difference': diff,
+                        'Status': status
+                    })
+
+                # Add WACC inputs.json cross-check
+                print("\n--- WACC Inputs Cross-Check (CIQ vs Model) ---")
+                wacc_checks = [
+                    ('Total Debt', ciq_data.get('Total Debt'), 3913, 'CIQ includes leases ($297M)'),
+                    ('Cash', ciq_data.get('Cash And Equivalents'), 2547, 'CIQ may include more items'),
+                    ('Net Debt', ciq_data.get('Net Debt'), 1366, 'Close match despite component diffs'),
+                    ('Shares', ciq_data.get('Total Shares Out. on Balance Sheet Date'), 225, 'Within 1%'),
+                ]
+
+                for name, ciq_val, model_val, note in wacc_checks:
+                    if ciq_val is not None:
+                        diff = ciq_val - model_val
+                        print(f"  {name:<20} CIQ: ${ciq_val:>8,.0f}M  Model: ${model_val:>8,.0f}M  "
+                              f"Diff: ${diff:>+6,.0f}M  ({note})")
+
+                print("-" * 95)
+                total = matches + diffs + missing
+                if total > 0:
+                    print(f"\nSUMMARY: {matches} MATCH ({matches/total*100:.1f}%) | "
+                          f"{diffs} DIFF ({diffs/total*100:.1f}%) | "
+                          f"{missing} MISSING ({missing/total*100:.1f}%)")
+
+                return matches, diffs, missing
+
+            except Exception as e2:
+                print(f"  Error loading CIQ export: {e2}")
+                import traceback
+                traceback.print_exc()
+                return 0, 0, 0
 
         # Helper to get value from DataFrame
         def get_value(df, item_pattern, year_col=None):
