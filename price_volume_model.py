@@ -134,6 +134,16 @@ class ScenarioType(Enum):
     # Legacy names for backward compatibility
     CONSERVATIVE = "Downside"  # Alias for DOWNSIDE
     MANAGEMENT = "Optimistic"  # Alias for OPTIMISTIC
+    # Futures Model scenarios (post-COVID, 50% tariff regime)
+    FUTURES_DOWNSIDE = "Futures: Downside"
+    FUTURES_BASE_CASE = "Futures: Base Case"
+    FUTURES_ABOVE_AVERAGE = "Futures: Above Average"
+    FUTURES_OPTIMISTIC = "Futures: Optimistic"
+    FUTURES_NO_TARIFF = "Futures: No Tariff"
+    # Tariff scenario types (use base factors with varying tariff_rate)
+    TARIFF_REMOVAL = "Tariff Removal"
+    TARIFF_REDUCED = "Tariff Reduced"
+    TARIFF_ESCALATION = "Tariff Escalation"
 
 
 # Steel price benchmarks ($/ton) - hardcoded fallbacks (used only if Bloomberg unavailable)
@@ -144,6 +154,39 @@ _HARDCODED_BENCHMARK_PRICES = {
     'hrc_eu': 620,      # EU HRC
     'octg': 2800,       # OCTG (Oil Country Tubular Goods)
 }
+
+# Through-cycle benchmark prices ($/ton) — Avg(Pre-COVID median, Post-Spike H2 2022+ median)
+# These represent structural equilibrium, not 2023 elevated levels
+BENCHMARK_PRICES_THROUGH_CYCLE = {
+    'hrc_us': 738,      # Pre-COVID ~$625, Post-Spike ~$850, avg = $738
+    'crc_us': 994,      # Pre-COVID ~$820, Post-Spike ~$1130, avg = $994  (CRC 35% premium to HRC)
+    'coated_us': 1113,  # Pre-COVID ~$920, Post-Spike ~$1266, avg = $1113 (Coated 51% premium to HRC)
+    'hrc_eu': 611,      # Pre-COVID ~$512, Post-Spike ~$710, avg = $611
+    'octg': 2388,       # Pre-COVID ~$1350, Post-Spike ~$3228, avg = $2388 (OCTG 3.2x HRC)
+}
+
+# Reference: period-specific medians for decomposition
+BENCHMARK_PRICES_PRE_COVID = {
+    'hrc_us': 625, 'crc_us': 820, 'coated_us': 920, 'hrc_eu': 512, 'octg': 1350,
+}
+BENCHMARK_PRICES_POST_SPIKE = {
+    'hrc_us': 850, 'crc_us': 1130, 'coated_us': 1266, 'hrc_eu': 710, 'octg': 3228,
+}
+
+# Section 232 Tariff Configuration
+# OLS: ln(HRC) includes 0.0685 binary tariff coefficient → exp(0.0685) = +7.1% direct effect
+# Empirical: Pre-tariff $610 → Post-tariff $720 = +18% total effect (includes indirect/sentiment)
+# Model uses conservative 15% for HRC (between OLS 7% and empirical 18%)
+TARIFF_CONFIG = {
+    'current_rate': 0.25,             # Section 232: 25% on steel imports
+    'ols_coefficient': 0.0685,        # Binary 0/1 in OLS regression
+    'empirical_uplift_hrc': 0.18,     # Bloomberg: pre-tariff $610 -> post-tariff $720 = +18%
+    'model_uplift_hrc': 0.15,         # Conservative: between OLS (7%) and empirical (18%)
+    'us_products': ['hrc_us', 'crc_us', 'coated_us'],
+    'eu_indirect_share': 0.30,        # EU gets ~30% of US tariff uplift (trade diversion)
+    'octg_share': 0.60,               # OCTG gets ~60% of HRC uplift (separate trade dynamics)
+}
+
 
 # =============================================================================
 # BLOOMBERG INTEGRATION
@@ -249,31 +292,38 @@ def get_calibration_mode_status() -> dict:
 
     return status
 
-# BENCHMARK_PRICES_2023 uses Bloomberg year-end 2023 data if available,
-# otherwise falls back to hardcoded values
+# Model default: through-cycle baseline (not 2023 elevated levels)
+# Factor 1.0 = through-cycle normal; 2023 = ~1.24x (recognized as elevated)
+# Bloomberg 2023 prices stored separately for reference/decomposition
+BENCHMARK_PRICES_2023 = BENCHMARK_PRICES_THROUGH_CYCLE.copy()
+_DEFAULT_BENCHMARK_PRICES = BENCHMARK_PRICES_THROUGH_CYCLE.copy()
+
+# Store Bloomberg 2023 prices for reference if available
 if BLOOMBERG_AVAILABLE and BENCHMARK_PRICES_2023_BLOOMBERG:
-    BENCHMARK_PRICES_2023 = BENCHMARK_PRICES_2023_BLOOMBERG.copy()
-    _DEFAULT_BENCHMARK_PRICES = BENCHMARK_PRICES_2023_BLOOMBERG.copy()
+    _BLOOMBERG_2023_REFERENCE = BENCHMARK_PRICES_2023_BLOOMBERG.copy()
 else:
-    BENCHMARK_PRICES_2023 = _HARDCODED_BENCHMARK_PRICES.copy()
-    _DEFAULT_BENCHMARK_PRICES = _HARDCODED_BENCHMARK_PRICES.copy()
+    _BLOOMBERG_2023_REFERENCE = _HARDCODED_BENCHMARK_PRICES.copy()
 
 
-def get_benchmark_prices(use_bloomberg: bool = True, use_current: bool = False) -> Dict[str, float]:
+def get_benchmark_prices(use_bloomberg: bool = True, use_current: bool = False,
+                         use_through_cycle: bool = True) -> Dict[str, float]:
     """
     Get benchmark prices for model calculations.
 
-    By default, returns Bloomberg year-end 2023 prices to match the analysis
-    effective date. Falls back to hardcoded values if Bloomberg unavailable.
+    By default, returns through-cycle baseline prices (structural equilibrium).
+    Can also return Bloomberg 2023 or current prices for reference.
 
     Args:
-        use_bloomberg: If True (default), use Bloomberg data. If False, use hardcoded values.
-        use_current: If True, return latest/current prices instead of year-end 2023.
-                    Only applies when use_bloomberg=True.
+        use_bloomberg: If True (default), use Bloomberg data when available.
+        use_current: If True, return latest/current prices instead of baseline.
+        use_through_cycle: If True (default), return through-cycle baseline.
+                          If False, return Bloomberg 2023 or hardcoded fallback.
 
     Returns:
         Dict with benchmark prices (hrc_us, crc_us, coated_us, hrc_eu, octg)
     """
+    if use_through_cycle:
+        return BENCHMARK_PRICES_THROUGH_CYCLE.copy()
     if use_bloomberg and BLOOMBERG_AVAILABLE:
         if use_current and BENCHMARK_PRICES_CURRENT:
             return BENCHMARK_PRICES_CURRENT.copy()
@@ -313,6 +363,88 @@ def get_bloomberg_status() -> dict:
             pass
 
     return status
+
+
+# =============================================================================
+# TARIFF ADJUSTMENT FUNCTIONS
+# =============================================================================
+
+def calculate_tariff_adjustment(tariff_rate: float, benchmark_type: str) -> float:
+    """Multiplicative price adjustment for tariff rate vs embedded rate (0.25).
+
+    The through-cycle baseline already embeds current 25% Section 232 tariffs.
+    This function returns a multiplicative adjustment when tariff_rate differs
+    from the embedded 0.25.
+
+    Uses conservative empirical uplift (15% for HRC US) rather than just the
+    OLS coefficient (7%), since the OLS underestimates total market impact.
+
+    Args:
+        tariff_rate: Effective Section 232 tariff rate (0.0-1.0)
+        benchmark_type: Product key ('hrc_us', 'crc_us', etc.)
+
+    Returns:
+        Multiplicative price adjustment factor (1.0 = no change from baseline)
+    """
+    embedded_rate = TARIFF_CONFIG['current_rate']  # 0.25
+    if abs(tariff_rate - embedded_rate) < 0.001:
+        return 1.0
+
+    hrc_uplift = TARIFF_CONFIG['model_uplift_hrc']  # 0.15
+
+    # Scale uplift by product type
+    if benchmark_type in TARIFF_CONFIG['us_products']:
+        # US flat-rolled: full uplift
+        full_uplift = hrc_uplift
+    elif benchmark_type == 'hrc_eu':
+        # EU: indirect effect (trade diversion)
+        full_uplift = hrc_uplift * TARIFF_CONFIG['eu_indirect_share']
+    elif benchmark_type == 'octg':
+        # OCTG: partial (separate trade dynamics)
+        full_uplift = hrc_uplift * TARIFF_CONFIG['octg_share']
+    else:
+        return 1.0
+
+    # Linear scaling: full removal (0.0) = -full_uplift; double (0.50) = +full_uplift
+    # At embedded rate (0.25): adjustment = 0 → factor = 1.0
+    rate_delta = (tariff_rate - embedded_rate) / embedded_rate
+    adjustment = full_uplift * rate_delta
+
+    return 1.0 + adjustment
+
+
+def get_tariff_decomposition(tariff_rate: float = 0.25) -> Dict[str, Dict[str, float]]:
+    """Decompose price into tariff vs fundamental components per benchmark.
+
+    Returns dict keyed by benchmark type with:
+    - through_cycle: baseline price (embeds current tariff)
+    - pre_tariff: estimated pre-tariff price
+    - tariff_component: dollar amount attributable to tariff
+    - tariff_adjustment: multiplicative factor for given tariff_rate
+    - adjusted_price: price at given tariff_rate
+
+    Args:
+        tariff_rate: Section 232 tariff rate to analyze
+
+    Returns:
+        Dict of decomposition per benchmark type
+    """
+    result = {}
+    for btype, base_price in BENCHMARK_PRICES_THROUGH_CYCLE.items():
+        adj = calculate_tariff_adjustment(tariff_rate, btype)
+        # Estimate pre-tariff price (what price would be without any tariff)
+        no_tariff_adj = calculate_tariff_adjustment(0.0, btype)
+        pre_tariff_price = base_price * no_tariff_adj
+
+        result[btype] = {
+            'through_cycle': base_price,
+            'pre_tariff_est': round(pre_tariff_price, 0),
+            'tariff_component': round(base_price - pre_tariff_price, 0),
+            'tariff_pct_of_price': round((base_price - pre_tariff_price) / base_price * 100, 1),
+            'tariff_adjustment': round(adj, 4),
+            'adjusted_price': round(base_price * adj, 0),
+        }
+    return result
 
 
 # =============================================================================
@@ -364,7 +496,7 @@ class SteelPriceScenario:
     name: str
     description: str
 
-    # Price levels relative to 2023 (1.0 = flat, 1.1 = +10%)
+    # Price levels relative to through-cycle baseline (1.0 = through-cycle normal)
     hrc_us_factor: float
     crc_us_factor: float
     coated_us_factor: float
@@ -373,6 +505,11 @@ class SteelPriceScenario:
 
     # Annual price growth after initial adjustment
     annual_price_growth: float
+
+    # Section 232 tariff rate (0.0 = removed, 0.25 = current, 0.50 = escalation)
+    # Through-cycle baseline already embeds current 25% tariff
+    # Adjustment only applies when tariff_rate != 0.25
+    tariff_rate: float = 0.25
 
 
 @dataclass
@@ -396,12 +533,42 @@ class VolumeScenario:
 
 @dataclass
 class CapitalProject:
-    """Capital project with segment allocation"""
+    """Capital project with segment allocation and dynamic EBITDA calculation.
+
+    Dynamic EBITDA Formula: Capacity × Utilization × Price × Margin
+    Source: Capstone Project Analysis, Tables 1-3
+
+    Margin Rules by Technology (sourced from industry benchmarks):
+    - EAF Mini Mill: 20% (management target; peers STLD/NUE achieve 18-23%)
+    - Blast Furnace: 12-15% (post-upgrade efficiency; improved from 4.4% actual)
+    - Mining: 12% (conservative given captive use)
+
+    Terminal Multiple Rules (sourced from WRDS peer EV/EBITDA analysis):
+    - EAF Mini Mill: 7x EBITDA (peer median: STLD 7.8x, NUE 7.9x, CMC 5.8x)
+    - Blast Furnace: 5x EBITDA (peer median: MT 4.7x, PKX 6.2x, TX 3.3x)
+    - Mining: 5x EBITDA (similar to integrated assets)
+    - Tubular/OCTG: 6x EBITDA (blended, specialty premium)
+    """
     name: str
     segment: str
     enabled: bool
     capex_schedule: Dict[int, float]
-    ebitda_schedule: Dict[int, float]
+
+    # Dynamic EBITDA parameters (sourced from Capstone analysis)
+    nameplate_capacity: float = 0.0           # kt/year at full operation
+    base_utilization: float = 0.85            # 85% base case (conservative vs. 90%+ industry)
+    ebitda_margin: float = 0.12               # Project-specific EBITDA margin
+    capacity_ramp: Dict[int, float] = field(default_factory=dict)  # Year → utilization %
+    base_price_override: Optional[float] = None  # Use instead of segment price (e.g., $150/ton for mining)
+
+    # Terminal value parameters (sourced from WRDS peer comparable analysis)
+    terminal_multiple: float = 5.0            # EV/EBITDA exit multiple for terminal value
+
+    # Maintenance capex (annual sustaining capital after construction)
+    maintenance_capex_per_ton: float = 0.0    # $/ton annual maintenance capex
+
+    # LEGACY: Retained for backwards compatibility and reference
+    ebitda_schedule: Dict[int, float] = field(default_factory=dict)
     volume_addition: Dict[int, float] = field(default_factory=dict)  # Additional tons
 
 
@@ -667,67 +834,72 @@ def validate_margin_vs_peers(segment_margin: float, segment_name: str) -> dict:
 # =============================================================================
 
 def get_base_price_scenario() -> SteelPriceScenario:
+    """Above Average: strong markets, ~15% above through-cycle"""
     return SteelPriceScenario(
         name="Above Average Prices",
         description="Strong markets with good pricing power and sustained growth",
-        hrc_us_factor=0.95,  # Slight pullback from 2023 elevated levels
-        crc_us_factor=0.95,
-        coated_us_factor=0.95,
-        hrc_eu_factor=0.90,  # Aligned with 0.05 step
-        octg_factor=0.95,
-        annual_price_growth=0.015  # 1.5% - good growth in strong markets
+        hrc_us_factor=1.15,   # ~$849 HRC (strong cycle)
+        crc_us_factor=1.10,
+        coated_us_factor=1.10,
+        hrc_eu_factor=1.15,
+        octg_factor=1.15,
+        annual_price_growth=0.01
     )
 
 
 def get_conservative_price_scenario() -> SteelPriceScenario:
+    """Downside: 10% below through-cycle"""
     return SteelPriceScenario(
         name="Conservative Prices",
-        description="Steel prices decline 15-20% from 2023, remain flat in weak demand",
-        hrc_us_factor=0.85,
-        crc_us_factor=0.85,
-        coated_us_factor=0.85,
-        hrc_eu_factor=0.80,
+        description="Below-cycle: soft demand, import pressure, flat pricing",
+        hrc_us_factor=0.90,   # ~$664 HRC (below mid-cycle)
+        crc_us_factor=0.90,
+        coated_us_factor=0.90,
+        hrc_eu_factor=0.85,
         octg_factor=0.85,
-        annual_price_growth=0.00  # Flat pricing in weak markets
+        annual_price_growth=0.00
     )
 
 
 def get_wall_street_price_scenario() -> SteelPriceScenario:
+    """Wall Street Consensus: ~20% above through-cycle (2023 elevated), flat growth"""
     return SteelPriceScenario(
         name="Wall Street Consensus",
-        description="Analyst consensus - flat pricing calibrated to $39-52 fairness opinion range",
-        hrc_us_factor=0.97,  # Calibrated to match analyst DCF valuations
-        crc_us_factor=0.97,
-        coated_us_factor=0.97,
-        hrc_eu_factor=0.97,
-        octg_factor=0.97,
-        annual_price_growth=0.00  # Flat pricing (no growth) per analyst assumptions
+        description="Analyst consensus - calibrated to $39-52 fairness opinion range",
+        hrc_us_factor=1.20,   # ~$886 HRC (analysts anchored to 2023 levels)
+        crc_us_factor=1.10,
+        coated_us_factor=1.10,
+        hrc_eu_factor=1.15,
+        octg_factor=1.10,
+        annual_price_growth=0.00
     )
 
 
 def get_management_price_scenario() -> SteelPriceScenario:
+    """Management Guidance: above through-cycle with optimistic growth"""
     return SteelPriceScenario(
         name="Management Guidance",
-        description="Management optimism - prices recover and grow",
-        hrc_us_factor=1.05,
-        crc_us_factor=1.05,
-        coated_us_factor=1.05,
-        hrc_eu_factor=1.0,
-        octg_factor=1.10,
-        annual_price_growth=0.03
+        description="Management optimism - prices above mid-cycle and grow",
+        hrc_us_factor=1.15,
+        crc_us_factor=1.10,
+        coated_us_factor=1.10,
+        hrc_eu_factor=1.10,
+        octg_factor=1.15,
+        annual_price_growth=0.02
     )
 
 
 def get_optimistic_price_scenario() -> SteelPriceScenario:
+    """Optimistic: 25% above through-cycle with 1.5% growth"""
     return SteelPriceScenario(
         name="Optimistic Pricing",
-        description="Sustained favorable markets: benchmark pricing with strong 2% growth",
-        hrc_us_factor=1.00,  # At benchmark level
-        crc_us_factor=1.00,
-        coated_us_factor=1.00,
-        hrc_eu_factor=1.00,
-        octg_factor=1.00,
-        annual_price_growth=0.02  # 2% sustained growth
+        description="Sustained favorable markets: well above through-cycle with 1.5% growth",
+        hrc_us_factor=1.25,   # ~$923 HRC (sustained strong markets)
+        crc_us_factor=1.15,
+        coated_us_factor=1.15,
+        hrc_eu_factor=1.20,
+        octg_factor=1.20,
+        annual_price_growth=0.015
     )
 
 
@@ -762,30 +934,30 @@ def get_conservative_volume_scenario() -> VolumeScenario:
 
 
 def get_nippon_price_scenario() -> SteelPriceScenario:
-    """Nippon NSA scenario with modest price support from capacity discipline"""
+    """Nippon NSA scenario: at through-cycle with capacity discipline supporting 1% growth"""
     return SteelPriceScenario(
         name="Nippon Commitments",
-        description="NSA investment case - stable pricing with capacity discipline",
-        hrc_us_factor=1.0,
-        crc_us_factor=1.0,
-        coated_us_factor=1.0,
-        hrc_eu_factor=0.95,
-        octg_factor=1.0,
-        annual_price_growth=0.015  # Modest 1.5% real price growth from capacity discipline
+        description="NSA investment case - through-cycle pricing with capacity discipline",
+        hrc_us_factor=1.05,
+        crc_us_factor=1.05,
+        coated_us_factor=1.05,
+        hrc_eu_factor=1.00,
+        octg_factor=1.05,
+        annual_price_growth=0.01
     )
 
 
 def get_severe_downturn_price_scenario() -> SteelPriceScenario:
-    """Severe downturn: Historical recession levels (2009, 2015, 2020)"""
+    """Severe downturn: 25% below through-cycle (2009, 2015, 2020 levels)"""
     return SteelPriceScenario(
         name="Severe Downturn Pricing",
-        description="Historical recession levels (2009, 2015, 2020)",
-        hrc_us_factor=0.70,      # -30% from benchmark (aligned with 0.05 step)
-        crc_us_factor=0.70,      # Aligned with 0.05 step
-        coated_us_factor=0.70,
-        hrc_eu_factor=0.65,      # EU hit harder
-        octg_factor=0.50,        # Oil crash correlation
-        annual_price_growth=-0.02  # -2% deflation
+        description="Historical recession levels: 25% below through-cycle",
+        hrc_us_factor=0.75,      # ~$554 HRC (recession level)
+        crc_us_factor=0.75,
+        coated_us_factor=0.75,
+        hrc_eu_factor=0.70,      # EU hit harder
+        octg_factor=0.55,        # Oil crash correlation
+        annual_price_growth=-0.02
     )
 
 
@@ -806,15 +978,15 @@ def get_severe_downturn_volume_scenario() -> VolumeScenario:
 
 
 def get_true_base_case_price_scenario() -> SteelPriceScenario:
-    """Mid-cycle pricing: Historical median steel prices"""
+    """Mid-cycle pricing: through-cycle structural equilibrium (factor 1.0)"""
     return SteelPriceScenario(
         name="Mid-Cycle Pricing",
-        description="Historical median steel prices",
-        hrc_us_factor=0.90,      # Aligned with 0.05 step
-        crc_us_factor=0.90,      # Aligned with 0.05 step
-        coated_us_factor=0.90,
-        hrc_eu_factor=0.85,
-        octg_factor=0.80,
+        description="Through-cycle structural equilibrium (Avg pre-COVID + post-spike medians)",
+        hrc_us_factor=1.00,      # $738 HRC = through-cycle normal
+        crc_us_factor=1.00,
+        coated_us_factor=1.00,
+        hrc_eu_factor=1.00,
+        octg_factor=1.00,
         annual_price_growth=0.01  # 1% inflation
     )
 
@@ -832,6 +1004,168 @@ def get_true_base_case_volume_scenario() -> VolumeScenario:
         mini_mill_growth_adj=0.005,
         usse_growth_adj=-0.005,
         tubular_growth_adj=0.00
+    )
+
+
+# =============================================================================
+# FUTURES MODEL SCENARIOS
+# =============================================================================
+# These scenarios are derived from the CommodityModel Futures Model, which uses:
+#   - Post-COVID training data (2022-Q3 onwards)
+#   - 50% Section 232 tariff assumptions
+#   - Model: ln(HRC) = -2.98 + 1.57×ln(Scrap) + 0.01×Capacity + 0.07×Tariff
+#
+# Key difference from original scenarios:
+#   - Original: Mean reversion to ~$600-680 HRC
+#   - Futures: Tariff supports ~$850-950 HRC
+#
+# Price factors derived from Monte Carlo with stochastic spreads:
+#   - CRC = HRC + Normal($249, $79)
+#   - Coated = CRC + $100
+#   - EU HRC = HRC × Normal(0.79, 0.10)
+#   - OCTG = HRC × Normal(2.92, 1.17)
+
+def get_futures_downside_price_scenario() -> SteelPriceScenario:
+    """Futures Model: Downside (weak demand, scrap falls)
+
+    Inputs: Scrap $270, Capacity 70%, Tariff 50%
+    HRC Forecast: ~$726/ton → factor = $726/$738 = 0.98
+    """
+    return SteelPriceScenario(
+        name="Futures: Downside",
+        description="Post-COVID downside: weak demand, scrap ~$270, capacity ~70%",
+        hrc_us_factor=0.98,      # $726 / $738
+        crc_us_factor=0.98,      # ($726 + $249) / $994
+        coated_us_factor=0.97,   # ($726 + $249 + $100) / $1113
+        hrc_eu_factor=0.94,      # $726 × 0.79 / $611
+        octg_factor=0.89,        # $726 × 2.92 / $2388
+        annual_price_growth=0.00,
+        tariff_rate=0.25,
+    )
+
+
+def get_futures_base_case_price_scenario() -> SteelPriceScenario:
+    """Futures Model: Base Case (normalized post-COVID market)
+
+    Inputs: Scrap $293, Capacity 76%, Tariff 50%
+    HRC Forecast: ~$885/ton → factor = $885/$738 = 1.20
+    """
+    return SteelPriceScenario(
+        name="Futures: Base Case",
+        description="Post-COVID normalized: scrap ~$293, capacity ~76%, 50% tariff",
+        hrc_us_factor=1.20,      # $885 / $738
+        crc_us_factor=1.14,      # ($885 + $249) / $994
+        coated_us_factor=1.12,   # ($885 + $249 + $100) / $1113
+        hrc_eu_factor=1.14,      # $885 × 0.79 / $611
+        octg_factor=1.08,        # $885 × 2.92 / $2388
+        annual_price_growth=0.01,
+        tariff_rate=0.25,
+    )
+
+
+def get_futures_above_average_price_scenario() -> SteelPriceScenario:
+    """Futures Model: Above Average (strong demand, infrastructure spending)
+
+    Inputs: Scrap $320, Capacity 79%, Tariff 50%
+    HRC Forecast: ~$1,040/ton → factor = $1040/$738 = 1.41
+    """
+    return SteelPriceScenario(
+        name="Futures: Above Average",
+        description="Post-COVID strong: scrap ~$320, capacity ~79%, infrastructure",
+        hrc_us_factor=1.41,      # $1,040 / $738
+        crc_us_factor=1.30,      # ($1,040 + $249) / $994
+        coated_us_factor=1.25,   # ($1,040 + $249 + $100) / $1113
+        hrc_eu_factor=1.34,      # $1,040 × 0.79 / $611
+        octg_factor=1.27,        # $1,040 × 2.92 / $2388
+        annual_price_growth=0.015,
+        tariff_rate=0.25,
+    )
+
+
+def get_futures_optimistic_price_scenario() -> SteelPriceScenario:
+    """Futures Model: Optimistic (strong demand, supply constraints)
+
+    Inputs: Scrap $355, Capacity 82%, Tariff 50%
+    HRC Forecast: ~$1,263/ton → factor = $1263/$738 = 1.71
+    """
+    return SteelPriceScenario(
+        name="Futures: Optimistic",
+        description="Post-COVID boom: scrap ~$355, capacity ~82%, tight supply",
+        hrc_us_factor=1.71,      # $1,263 / $738
+        crc_us_factor=1.52,      # ($1,263 + $249) / $994
+        coated_us_factor=1.45,   # ($1,263 + $249 + $100) / $1113
+        hrc_eu_factor=1.63,      # $1,263 × 0.79 / $611
+        octg_factor=1.54,        # $1,263 × 2.92 / $2388
+        annual_price_growth=0.02,
+        tariff_rate=0.25,
+    )
+
+
+def get_futures_no_tariff_price_scenario() -> SteelPriceScenario:
+    """Futures Model: No Tariff (tariff removed)
+
+    Inputs: Scrap $293, Capacity 76%, Tariff 0%
+    HRC Forecast: ~$827/ton → factor = $827/$738 = 1.12
+    tariff_rate=0.0 applies additional adjustment via calculate_tariff_adjustment()
+    """
+    return SteelPriceScenario(
+        name="Futures: No Tariff",
+        description="Futures base if tariff removed: $827 HRC, with tariff adjustment",
+        hrc_us_factor=1.12,      # $827 / $738
+        crc_us_factor=1.08,      # ($827 + $249) / $994
+        coated_us_factor=1.06,   # ($827 + $249 + $100) / $1113
+        hrc_eu_factor=1.07,      # $827 × 0.79 / $611
+        octg_factor=1.01,        # $827 × 2.92 / $2388
+        annual_price_growth=0.01,
+        tariff_rate=0.0,         # Tariff removal scenario
+    )
+
+
+def get_futures_base_volume_scenario() -> VolumeScenario:
+    """Futures Model: Base case volumes (normalized demand)"""
+    return VolumeScenario(
+        name="Futures: Base Volumes",
+        description="Post-COVID normalized demand",
+        flat_rolled_volume_factor=0.93,
+        mini_mill_volume_factor=0.98,
+        usse_volume_factor=0.90,
+        tubular_volume_factor=0.95,
+        flat_rolled_growth_adj=-0.005,
+        mini_mill_growth_adj=0.01,
+        usse_growth_adj=-0.005,
+        tubular_growth_adj=0.0
+    )
+
+
+def get_futures_downside_volume_scenario() -> VolumeScenario:
+    """Futures Model: Downside volumes (weak demand)"""
+    return VolumeScenario(
+        name="Futures: Downside Volumes",
+        description="Below-trend demand",
+        flat_rolled_volume_factor=0.88,
+        mini_mill_volume_factor=0.92,
+        usse_volume_factor=0.85,
+        tubular_volume_factor=0.85,
+        flat_rolled_growth_adj=-0.01,
+        mini_mill_growth_adj=0.0,
+        usse_growth_adj=-0.01,
+        tubular_growth_adj=-0.01
+    )
+
+
+def get_futures_optimistic_volume_scenario() -> VolumeScenario:
+    """Futures Model: Optimistic volumes (strong demand)"""
+    return VolumeScenario(
+        name="Futures: Optimistic Volumes",
+        description="Strong demand across segments",
+        flat_rolled_volume_factor=0.98,
+        mini_mill_volume_factor=1.02,
+        usse_volume_factor=0.95,
+        tubular_volume_factor=1.05,
+        flat_rolled_growth_adj=0.0,
+        mini_mill_growth_adj=0.02,
+        usse_growth_adj=0.0,
+        tubular_growth_adj=0.01
     )
 
 
@@ -860,12 +1194,13 @@ def _apply_calibration_factors_to_scenario(
         return base_scenario
 
     # Map scenario types to calibration scenario names
-    # NOTE: BASE_CASE is intentionally excluded - it should use the model's
-    # designed mid-cycle factors (0.9x HRC, 0.8x OCTG), not 1.0x
+    # All core scenarios now use recalibrated factors from scenario_calibrator.py
+    # Base Case uses recalibrated mid-cycle factors (0.94x HRC, 0.76x OCTG)
+    # calibrated to actual 2024-2025 Bloomberg data
     scenario_type_to_calibration = {
         ScenarioType.SEVERE_DOWNTURN: 'severe_downturn',
         ScenarioType.DOWNSIDE: 'downside',
-        # ScenarioType.BASE_CASE excluded - preserve model's mid-cycle factors
+        ScenarioType.BASE_CASE: 'base_case',  # Now uses recalibrated factors
         ScenarioType.ABOVE_AVERAGE: 'upside',  # Maps to upside/modest_upside
         ScenarioType.OPTIMISTIC: 'optimistic',  # Maps to optimistic/boom
         ScenarioType.CONSERVATIVE: 'downside',  # Alias
@@ -1151,12 +1486,12 @@ def get_scenario_presets(
             description="$14B government-mandated investment: Gary $3.1B, Mon Valley $1B, BRS $3B, New Mini Mill $1B",
             price_scenario=SteelPriceScenario(
                 name="Nippon Investment Case",
-                description="Stable mid-cycle pricing with capacity discipline",
-                hrc_us_factor=0.95,
-                crc_us_factor=0.95,
-                coated_us_factor=0.95,
-                hrc_eu_factor=0.90,  # Aligned with 0.05 step
-                octg_factor=0.95,
+                description="Through-cycle pricing with capacity discipline",
+                hrc_us_factor=1.05,
+                crc_us_factor=1.05,
+                coated_us_factor=1.05,
+                hrc_eu_factor=1.00,
+                octg_factor=1.05,
                 annual_price_growth=0.01
             ),
             volume_scenario=VolumeScenario(
@@ -1183,6 +1518,176 @@ def get_scenario_presets(
             include_projects=['BR2 Mini Mill', 'Gary Works BF', 'Mon Valley HSM',
                             'Greenfield Mini Mill', 'Mining Investment', 'Fairfield Works'],
             probability_weight=0.0  # Reference only, no probability weight
+        ),
+
+        # =====================================================================
+        # FUTURES MODEL SCENARIOS
+        # Based on post-COVID OLS regression: ln(HRC) = -2.98 + 1.57×ln(Scrap) + 0.0105×Capacity + 0.0685×Tariff
+        # Benchmarks: HRC $680, CRC $850, Coated $950 (2023)
+        # =====================================================================
+
+        ScenarioType.FUTURES_DOWNSIDE: ModelScenario(
+            name="Futures: Downside",
+            scenario_type=ScenarioType.FUTURES_DOWNSIDE,
+            description="Recession scenario: Scrap $250, Capacity 70%, with 50% tariff. HRC ~$750",
+            price_scenario=get_futures_downside_price_scenario(),
+            volume_scenario=get_futures_downside_volume_scenario(),
+            uss_wacc=0.115,  # Higher WACC in recession
+            terminal_growth=0.005,
+            exit_multiple=4.0,
+            us_10yr=0.0425,
+            japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0500,
+            nippon_credit_spread=0.0100,
+            nippon_debt_ratio=0.35,
+            nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.15
+        ),
+
+        ScenarioType.FUTURES_BASE_CASE: ModelScenario(
+            name="Futures: Base Case",
+            scenario_type=ScenarioType.FUTURES_BASE_CASE,
+            description="Current market: Scrap $293, Capacity 76%, with 50% tariff. HRC ~$888",
+            price_scenario=get_futures_base_case_price_scenario(),
+            volume_scenario=get_futures_base_volume_scenario(),
+            uss_wacc=0.109,
+            terminal_growth=0.010,
+            exit_multiple=4.5,
+            us_10yr=0.0425,
+            japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0475,
+            nippon_credit_spread=0.0075,
+            nippon_debt_ratio=0.35,
+            nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.40
+        ),
+
+        ScenarioType.FUTURES_ABOVE_AVERAGE: ModelScenario(
+            name="Futures: Above Average",
+            scenario_type=ScenarioType.FUTURES_ABOVE_AVERAGE,
+            description="Strong market: Scrap $320, Capacity 80%, with 50% tariff. HRC ~$1,005",
+            price_scenario=get_futures_above_average_price_scenario(),
+            volume_scenario=get_futures_base_volume_scenario(),
+            uss_wacc=0.109,
+            terminal_growth=0.010,
+            exit_multiple=4.5,
+            us_10yr=0.0425,
+            japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0475,
+            nippon_credit_spread=0.0075,
+            nippon_debt_ratio=0.35,
+            nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.30
+        ),
+
+        ScenarioType.FUTURES_OPTIMISTIC: ModelScenario(
+            name="Futures: Optimistic",
+            scenario_type=ScenarioType.FUTURES_OPTIMISTIC,
+            description="Boom conditions: Scrap $350, Capacity 84%, with 50% tariff. HRC ~$1,140",
+            price_scenario=get_futures_optimistic_price_scenario(),
+            volume_scenario=get_futures_optimistic_volume_scenario(),
+            uss_wacc=0.105,
+            terminal_growth=0.015,
+            exit_multiple=5.0,
+            us_10yr=0.0425,
+            japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0450,
+            nippon_credit_spread=0.0060,
+            nippon_debt_ratio=0.35,
+            nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill', 'Gary Works BF'],
+            probability_weight=0.15
+        ),
+
+        ScenarioType.FUTURES_NO_TARIFF: ModelScenario(
+            name="Futures: No Tariff",
+            scenario_type=ScenarioType.FUTURES_NO_TARIFF,
+            description="Base inputs without tariff protection. HRC ~$829 (-7% vs base)",
+            price_scenario=get_futures_no_tariff_price_scenario(),
+            volume_scenario=get_futures_base_volume_scenario(),
+            uss_wacc=0.112,  # Higher risk without tariff
+            terminal_growth=0.010,
+            exit_multiple=4.5,
+            us_10yr=0.0425,
+            japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0500,
+            nippon_credit_spread=0.0085,
+            nippon_debt_ratio=0.35,
+            nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.0  # Reference scenario, not in probability weighting
+        ),
+
+        # =====================================================================
+        # TARIFF SCENARIO TYPES
+        # Use base case factors (1.0x) with varying tariff_rate for clean
+        # tariff-only impact analysis
+        # =====================================================================
+
+        ScenarioType.TARIFF_REMOVAL: ModelScenario(
+            name="Tariff Removal",
+            scenario_type=ScenarioType.TARIFF_REMOVAL,
+            description="Section 232 tariff fully removed: HRC drops ~15%",
+            price_scenario=SteelPriceScenario(
+                name="Tariff Removal",
+                description="Through-cycle pricing with tariff removed",
+                hrc_us_factor=1.00, crc_us_factor=1.00, coated_us_factor=1.00,
+                hrc_eu_factor=1.00, octg_factor=1.00,
+                annual_price_growth=0.01,
+                tariff_rate=0.0,
+            ),
+            volume_scenario=get_true_base_case_volume_scenario(),
+            uss_wacc=0.112, terminal_growth=0.01, exit_multiple=4.5,
+            us_10yr=0.0425, japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0500, nippon_credit_spread=0.0085,
+            nippon_debt_ratio=0.35, nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.0,
+        ),
+
+        ScenarioType.TARIFF_REDUCED: ModelScenario(
+            name="Tariff Reduced (10%)",
+            scenario_type=ScenarioType.TARIFF_REDUCED,
+            description="Section 232 tariff reduced to 10%: HRC drops ~9%",
+            price_scenario=SteelPriceScenario(
+                name="Tariff Reduced",
+                description="Through-cycle pricing with tariff reduced to 10%",
+                hrc_us_factor=1.00, crc_us_factor=1.00, coated_us_factor=1.00,
+                hrc_eu_factor=1.00, octg_factor=1.00,
+                annual_price_growth=0.01,
+                tariff_rate=0.10,
+            ),
+            volume_scenario=get_true_base_case_volume_scenario(),
+            uss_wacc=0.110, terminal_growth=0.01, exit_multiple=4.5,
+            us_10yr=0.0425, japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0475, nippon_credit_spread=0.0080,
+            nippon_debt_ratio=0.35, nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.0,
+        ),
+
+        ScenarioType.TARIFF_ESCALATION: ModelScenario(
+            name="Tariff Escalation (50%)",
+            scenario_type=ScenarioType.TARIFF_ESCALATION,
+            description="Section 232 tariff doubled to 50%: HRC rises ~15%",
+            price_scenario=SteelPriceScenario(
+                name="Tariff Escalation",
+                description="Through-cycle pricing with tariff doubled to 50%",
+                hrc_us_factor=1.00, crc_us_factor=1.00, coated_us_factor=1.00,
+                hrc_eu_factor=1.00, octg_factor=1.00,
+                annual_price_growth=0.01,
+                tariff_rate=0.50,
+            ),
+            volume_scenario=get_true_base_case_volume_scenario(),
+            uss_wacc=0.109, terminal_growth=0.01, exit_multiple=4.5,
+            us_10yr=0.0425, japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0475, nippon_credit_spread=0.0075,
+            nippon_debt_ratio=0.35, nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill'],
+            probability_weight=0.0,
         ),
     }
 
@@ -1398,12 +1903,13 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.85,
             base_price_2023=1030,  # $/ton realized from 10-K
             price_growth_rate=0.02,
-            price_premium_to_benchmark=-0.093,  # Discount: $1030 / $1136 Bloomberg weighted - 1
+            price_premium_to_benchmark=0.044,  # Premium: $1030 / $987 through-cycle weighted - 1
             benchmark_type='hrc_us',  # Fallback (not used when product_mix is set)
             # 2023 10-K: HRC $1,926M (21%), CRC $3,568M (40%), Coated $3,484M (39%)
+            # Weighted benchmark: 0.21×$738 + 0.40×$994 + 0.39×$1113 = $987
             product_mix={'hrc_us': 0.21, 'crc_us': 0.40, 'coated_us': 0.39},
             ebitda_margin_at_base_price=0.12,  # ~11% actual 2023
-            margin_sensitivity_to_price=0.04,  # 4% margin change per $100 price
+            margin_sensitivity_to_price=0.02,  # 2% margin change per $100 price (halved from 4% to reduce unrealistic operating leverage)
             da_pct_of_revenue=0.055,
             maintenance_capex_pct=0.045,  # Reduced for better FCF
             dso=28, dih=55, dpo=60
@@ -1417,12 +1923,13 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.95,
             base_price_2023=875,
             price_growth_rate=0.02,
-            price_premium_to_benchmark=-0.167,  # Discount: $875 / $1051 Bloomberg weighted - 1
+            price_premium_to_benchmark=-0.014,  # Discount: $875 / $888 through-cycle weighted - 1
             benchmark_type='hrc_us',  # Fallback (not used when product_mix is set)
             # 2023 10-K: HRC $1,215M (55%), CRC $365M (16%), Coated $639M (29%)
+            # Weighted benchmark: 0.55×$738 + 0.16×$994 + 0.29×$1113 = $888
             product_mix={'hrc_us': 0.55, 'crc_us': 0.16, 'coated_us': 0.29},
             ebitda_margin_at_base_price=0.17,  # ~17% actual 2023
-            margin_sensitivity_to_price=0.05,  # 5% margin change per $100 price
+            margin_sensitivity_to_price=0.025,  # 2.5% margin change per $100 price (halved from 5%)
             da_pct_of_revenue=0.045,
             maintenance_capex_pct=0.034,
             dso=22, dih=40, dpo=70
@@ -1436,13 +1943,13 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.90,
             base_price_2023=873,
             price_growth_rate=0.01,
-            price_premium_to_benchmark=-0.092,  # Discount: $873 / $961 Bloomberg weighted - 1
+            price_premium_to_benchmark=0.044,  # Premium: $873 / $836 through-cycle weighted - 1
             benchmark_type='hrc_eu',  # Fallback (not used when product_mix is set)
             # 2023 10-K: HRC $1,637M (51%), CRC $269M (8%), Coated $1,278M (40%)
-            # Note: USSE uses EU benchmark prices
+            # Weighted benchmark: 0.51×$611 + 0.08×$994 + 0.40×$1113 = $836
             product_mix={'hrc_eu': 0.51, 'crc_us': 0.08, 'coated_us': 0.40},
             ebitda_margin_at_base_price=0.09,  # ~9% actual 2023
-            margin_sensitivity_to_price=0.04,  # 4% margin change per $100 price
+            margin_sensitivity_to_price=0.02,  # 2% margin change per $100 price (halved from 4%)
             da_pct_of_revenue=0.050,
             maintenance_capex_pct=0.027,
             dso=30, dih=50, dpo=65
@@ -1456,12 +1963,12 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
             max_capacity_utilization=0.85,
             base_price_2023=3137,
             price_growth_rate=0.02,
-            price_premium_to_benchmark=0.141,  # Premium: $3137 / $2750 Bloomberg OCTG - 1
+            price_premium_to_benchmark=0.314,  # Premium: $3137 / $2388 through-cycle OCTG - 1
             benchmark_type='octg',
             # Tubular is 100% OCTG products
             product_mix={'octg': 1.0},
             ebitda_margin_at_base_price=0.26,  # ~26% actual 2023
-            margin_sensitivity_to_price=0.02,  # 2% margin change per $100 price
+            margin_sensitivity_to_price=0.01,  # 1% margin change per $100 price (halved from 2%)
             da_pct_of_revenue=0.060,
             maintenance_capex_pct=0.040,
             dso=35, dih=60, dpo=55
@@ -1470,15 +1977,64 @@ def get_segment_configs() -> Dict[Segment, SegmentVolumePrice]:
 
 
 def get_capital_projects() -> Dict[str, CapitalProject]:
-    """Return capital project configurations"""
+    """Return capital project configurations with dynamic EBITDA parameters.
+
+    Dynamic EBITDA is calculated using:
+        EBITDA = Capacity × Utilization × Price × Margin
+
+    Terminal Value is calculated using:
+        TV = Final Year EBITDA × Terminal Multiple (EV/EBITDA)
+
+    Sources:
+    - Capacity & Margins: Capital Projects EBITDA Impact Analysis (Feb 2026)
+    - Terminal Multiples: WRDS peer company EV/EBITDA analysis (2019-2025)
+
+    Target EBITDA by Project (from sourced document):
+    - BR2 Mini Mill:      $459M (3,000 kt × $900 × 17%)
+    - Gary Works BF:      $285M (2,500 kt × $950 × 12%)
+    - Mon Valley HSM:     $205M (1,800 kt × $950 × 12%)
+    - Greenfield:         $77M  (500 kt × $900 × 17%)
+    - Mining Investment:  $108M (6,000 kt × $150 × 12%)
+    - Fairfield Works:    $130M (1,200 kt × $900 × 12%)
+    - TOTAL:              $1,264M
+
+    Margin Rules by Technology:
+    - EAF Mini Mill: 17% (conservative vs. 20%+ management target)
+    - Blast Furnace: 12% (post-upgrade efficiency)
+    - Mining: 12% (cost avoidance mechanism)
+    - Tubular/OCTG: 12% (integrated operations)
+
+    Terminal Multiple Rules (from WRDS peer comparables):
+    - EAF Mini Mill: 7x EBITDA (peer median: STLD 7.8x, NUE 7.9x, CMC 5.8x)
+    - Blast Furnace: 5x EBITDA (peer median: MT 4.7x, PKX 6.2x, TX 3.3x)
+    - Mining: 5x EBITDA (similar to integrated assets)
+    - Tubular/OCTG: 6x EBITDA (blended, specialty premium)
+
+    Maintenance CapEx Rules (annual sustaining capital):
+    - EAF Mini Mill: $20/ton (newer equipment, lower maintenance)
+    - Blast Furnace: $40/ton (complex equipment, higher maintenance)
+    - Hot Strip Mill: $35/ton (rolling equipment, moderate maintenance)
+    - Mining: $8/ton (equipment replacement, pit development)
+    - Tubular: $25/ton (specialized equipment)
+    """
 
     return {
         'BR2 Mini Mill': CapitalProject(
             name='BR2 Mini Mill',
             segment='Mini Mill',
             enabled=True,
-            capex_schedule={2024: 1000, 2025: 133, 2026: 133, 2027: 133, 2028: 133,
-                           2029: 133, 2030: 133, 2031: 133, 2032: 133, 2033: 133},
+            capex_schedule={2025: 200, 2026: 800, 2027: 900, 2028: 1300},
+            # Dynamic EBITDA: 3,000 kt × $900 × 17% = $459M (source: EBITDA Impact Analysis)
+            nameplate_capacity=3000,      # 3,000 kt/year (Nippon presentation)
+            base_utilization=1.0,         # 100% steady-state
+            ebitda_margin=0.17,           # 17% EAF margin (conservative vs. 20%+ target)
+            capacity_ramp={               # Ramp: 30-40% → 60-85% → 90-100%
+                2025: 0.20, 2026: 0.60, 2027: 0.90,
+                2028: 1.0, 2029: 1.0, 2030: 1.0, 2031: 1.0, 2032: 1.0, 2033: 1.0
+            },
+            terminal_multiple=7.0,        # 7x EBITDA (EAF peer median from WRDS)
+            maintenance_capex_per_ton=20, # $20/ton - EAF lower maintenance than BF
+            # Legacy (retained for reference)
             ebitda_schedule={2024: 0, 2025: 100, 2026: 300, 2027: 450, 2028: 560,
                             2029: 560, 2030: 560, 2031: 560, 2032: 560, 2033: 560},
             volume_addition={2025: 200, 2026: 500, 2027: 750, 2028: 1000,
@@ -1488,7 +2044,16 @@ def get_capital_projects() -> Dict[str, CapitalProject]:
             name='Gary Works BF',
             segment='Flat-Rolled',
             enabled=False,
-            capex_schedule={2024: 400, 2025: 1200, 2026: 1001, 2027: 499},
+            capex_schedule={2025: 400, 2026: 900, 2027: 800, 2028: 1100},
+            # Dynamic EBITDA: 2,500 kt × $950 × 12% = $285M (source: EBITDA Impact Analysis)
+            # Mixed mechanism: 70% asset preservation + 30% efficiency improvement
+            nameplate_capacity=2500,      # 2,500 kt/year incremental effective capacity
+            base_utilization=1.0,         # 100% steady-state
+            ebitda_margin=0.12,           # 12% BF margin (post-upgrade efficiency)
+            capacity_ramp={2028: 0.50, 2029: 0.90, 2030: 1.0, 2031: 1.0, 2032: 1.0, 2033: 1.0},
+            terminal_multiple=5.0,        # 5x EBITDA (Integrated peer median from WRDS)
+            maintenance_capex_per_ton=40, # $40/ton - BF higher maintenance than EAF
+            # Legacy (retained for reference)
             ebitda_schedule={2027: 100, 2028: 300, 2029: 402, 2030: 402,
                             2031: 402, 2032: 402, 2033: 402}
         ),
@@ -1496,7 +2061,16 @@ def get_capital_projects() -> Dict[str, CapitalProject]:
             name='Mon Valley HSM',
             segment='Flat-Rolled',
             enabled=False,
-            capex_schedule={2024: 200, 2025: 500, 2026: 250, 2027: 50},
+            capex_schedule={2025: 100, 2026: 700, 2027: 700, 2028: 900},
+            # Dynamic EBITDA: 1,800 kt × $950 × 12% = $205M (source: EBITDA Impact Analysis)
+            # Mechanism: 80% efficiency improvement + 20% premium product capability
+            nameplate_capacity=1800,      # 1,800 kt/year (current 2,800 kt, but EBITDA from improvements)
+            base_utilization=1.0,         # 100% steady-state
+            ebitda_margin=0.12,           # 12% integrated margin
+            capacity_ramp={2028: 0.50, 2029: 0.90, 2030: 1.0, 2031: 1.0, 2032: 1.0, 2033: 1.0},
+            terminal_multiple=5.0,        # 5x EBITDA (Integrated peer median from WRDS)
+            maintenance_capex_per_ton=35, # $35/ton - HSM slightly lower than full BF
+            # Legacy (retained for reference)
             ebitda_schedule={2026: 50, 2027: 100, 2028: 130, 2029: 130,
                             2030: 130, 2031: 130, 2032: 130, 2033: 130}
         ),
@@ -1504,7 +2078,16 @@ def get_capital_projects() -> Dict[str, CapitalProject]:
             name='Greenfield Mini Mill',
             segment='Mini Mill',
             enabled=False,
-            capex_schedule={2025: 100, 2026: 400, 2027: 400, 2028: 100},
+            capex_schedule={2028: 1000},
+            # Dynamic EBITDA: 500 kt × $900 × 17% = $77M (source: EBITDA Impact Analysis)
+            # Strategic option with minimal near-term impact; post-2028 greenfield
+            nameplate_capacity=500,       # 500 kt/year (conservative; document says 0.5-1.0 Mt)
+            base_utilization=1.0,         # 100% steady-state (post-ramp)
+            ebitda_margin=0.17,           # 17% EAF margin (lower during ramp per document)
+            capacity_ramp={2029: 0.50, 2030: 0.80, 2031: 1.0, 2032: 1.0, 2033: 1.0},
+            terminal_multiple=7.0,        # 7x EBITDA (EAF peer median from WRDS)
+            maintenance_capex_per_ton=20, # $20/ton - EAF lower maintenance
+            # Legacy (retained for reference)
             ebitda_schedule={2027: 50, 2028: 150, 2029: 274, 2030: 274,
                             2031: 274, 2032: 274, 2033: 274},
             volume_addition={2027: 100, 2028: 300, 2029: 500, 2030: 500,
@@ -1512,17 +2095,38 @@ def get_capital_projects() -> Dict[str, CapitalProject]:
         ),
         'Mining Investment': CapitalProject(
             name='Mining Investment',
-            segment='Flat-Rolled',
+            segment='Mining',             # Iron ore pellets - uses price override, not segment price
             enabled=False,
-            capex_schedule={2024: 150, 2025: 300, 2026: 250, 2027: 100},
+            capex_schedule={2025: 200, 2026: 200, 2027: 300, 2028: 300},
+            # Dynamic EBITDA: 6,000 kt × $150 × 12% = $108M (source: EBITDA Impact Analysis)
+            # Mechanism: 100% cost avoidance through vertical integration
+            nameplate_capacity=6000,      # 6,000 kt/year pellets (Keetac + Minntac)
+            base_utilization=1.0,         # 100% steady-state
+            ebitda_margin=0.12,           # 12% mining margin (cost savings mechanism)
+            base_price_override=150,      # $150/ton pellets (not steel price)
+            capacity_ramp={2026: 0.50, 2027: 0.90, 2028: 1.0, 2029: 1.0,
+                          2030: 1.0, 2031: 1.0, 2032: 1.0, 2033: 1.0},
+            terminal_multiple=5.0,        # 5x EBITDA (similar to integrated assets)
+            maintenance_capex_per_ton=8,  # $8/ton - mining equipment, pit development
+            # Legacy (retained for reference)
             ebitda_schedule={2025: 20, 2026: 50, 2027: 80, 2028: 80,
                             2029: 80, 2030: 80, 2031: 80, 2032: 80, 2033: 80}
         ),
         'Fairfield Works': CapitalProject(
             name='Fairfield Works',
-            segment='Flat-Rolled',
+            segment='Tubular',            # Tubular segment
             enabled=False,
-            capex_schedule={2024: 50, 2025: 200, 2026: 200, 2027: 50},
+            capex_schedule={2025: 200, 2026: 200, 2027: 100, 2028: 100},
+            # Dynamic EBITDA: 1,200 kt × $900 × 12% = $130M (source: EBITDA Impact Analysis)
+            # Mechanism: 60% efficiency improvement + 40% capacity expansion
+            nameplate_capacity=1200,      # 1,200 kt/year (current 1.5 Mt, targeting 1.8-2.0 Mt)
+            base_utilization=1.0,         # 100% steady-state
+            ebitda_margin=0.12,           # 12% margin (document notes highest ROIC project)
+            capacity_ramp={2026: 0.50, 2027: 0.90, 2028: 1.0, 2029: 1.0,
+                          2030: 1.0, 2031: 1.0, 2032: 1.0, 2033: 1.0},
+            terminal_multiple=6.0,        # 6x EBITDA (blended, specialty OCTG premium)
+            maintenance_capex_per_ton=25, # $25/ton - tubular specialized equipment
+            # Legacy (retained for reference)
             ebitda_schedule={2026: 20, 2027: 40, 2028: 60, 2029: 60,
                             2030: 60, 2031: 60, 2032: 60, 2033: 60}
         ),
@@ -1573,7 +2177,7 @@ class PriceVolumeModel:
             self.progress_callback(percent, message)
 
     def get_benchmark_price(self, benchmark_type: str, year: int) -> float:
-        """Calculate benchmark price for a given year"""
+        """Calculate benchmark price for a given year, including tariff adjustment"""
         base_price = self.custom_benchmarks.get(benchmark_type, 700)
         price_scenario = self.scenario.price_scenario
 
@@ -1589,8 +2193,13 @@ class PriceVolumeModel:
         initial_factor = factor_map.get(benchmark_type, 1.0)
         years_from_base = year - 2024
 
-        # Apply initial factor then annual growth
-        price = base_price * initial_factor * ((1 + price_scenario.annual_price_growth) ** years_from_base)
+        # Tariff adjustment (1.0 when tariff_rate = embedded 0.25)
+        tariff_rate = getattr(price_scenario, 'tariff_rate', 0.25)
+        tariff_adj = calculate_tariff_adjustment(tariff_rate, benchmark_type)
+
+        # Apply initial factor, tariff adjustment, then annual growth
+        growth_compound = (1 + price_scenario.annual_price_growth) ** years_from_base
+        price = base_price * initial_factor * tariff_adj * growth_compound
 
         return price
 
@@ -1660,7 +2269,129 @@ class PriceVolumeModel:
         margin = seg.ebitda_margin_at_base_price + margin_adj
 
         # Floor and ceiling
-        return max(0.02, min(0.30, margin))
+        return max(0.02, min(0.22, margin))
+
+    def get_segment_volume_factor(self, segment_name: str) -> float:
+        """Get the volume factor for a segment from the scenario.
+
+        Links capital project utilization to segment demand assumptions.
+
+        Args:
+            segment_name: Segment name (e.g., 'Mini Mill', 'Flat-Rolled')
+
+        Returns:
+            Volume factor (0.0-1.5+) from scenario's volume_scenario
+        """
+        vol = self.scenario.volume_scenario
+        factor_map = {
+            'Mini Mill': vol.mini_mill_volume_factor,
+            'Flat-Rolled': vol.flat_rolled_volume_factor,
+            'Tubular': vol.tubular_volume_factor,
+            'USSE': vol.usse_volume_factor,
+            'Mining': 1.0,  # Mining not affected by steel demand
+        }
+        return factor_map.get(segment_name, 1.0)
+
+    def calculate_project_ebitda(self, project: CapitalProject, year: int,
+                                  segment_price: float) -> float:
+        """Calculate project EBITDA dynamically based on capacity, price, margin.
+
+        Formula: Capacity × Utilization × Volume Factor × Price × Margin
+
+        The volume factor links project utilization to segment demand:
+        - If Mini Mill volume factor is 0.8, BR2 utilization scales to 80%
+        - This reflects that lower market demand affects project performance
+
+        Args:
+            project: CapitalProject instance with capacity/margin parameters
+            year: Projection year
+            segment_price: $/ton price from scenario for this segment
+
+        Returns:
+            Project EBITDA in $M for the given year
+        """
+        # If no dynamic parameters configured, fall back to legacy schedule
+        if project.nameplate_capacity == 0:
+            return project.ebitda_schedule.get(year, 0)
+
+        # Get utilization for this year from ramp schedule
+        # If year is explicitly in ramp, use that value
+        # If year is BEFORE first ramp year, project not yet operational (0%)
+        # If year is AFTER last ramp year, use base_utilization (steady state)
+        if year in project.capacity_ramp:
+            utilization = project.capacity_ramp[year]
+        elif project.capacity_ramp:
+            min_ramp_year = min(project.capacity_ramp.keys())
+            max_ramp_year = max(project.capacity_ramp.keys())
+            if year < min_ramp_year:
+                utilization = 0.0  # Project not yet operational
+            elif year > max_ramp_year:
+                utilization = project.base_utilization  # Steady state
+            else:
+                # Year is between min and max but not specified - interpolate or use base
+                utilization = project.base_utilization
+        else:
+            # No ramp schedule defined, use base utilization
+            utilization = project.base_utilization
+
+        # Apply segment volume factor to link project to market demand
+        volume_factor = self.get_segment_volume_factor(project.segment)
+        utilization *= volume_factor
+
+        # Effective volume: capacity × utilization (in kt)
+        effective_volume = project.nameplate_capacity * utilization
+
+        # Apply execution factor for non-BR2 projects
+        if project.name != 'BR2 Mini Mill':
+            effective_volume *= self.execution_factor
+
+        # Use price override for mining (pellets are $150/ton, not steel price)
+        price = project.base_price_override if project.base_price_override else segment_price
+
+        # Revenue: volume (kt) × price ($/ton) / 1000 = $M
+        project_revenue = (effective_volume * price) / 1000
+
+        # EBITDA: revenue × margin
+        return project_revenue * project.ebitda_margin
+
+    def calculate_project_maintenance_capex(self, project: CapitalProject, year: int) -> float:
+        """Calculate annual maintenance capex for a project.
+
+        Maintenance capex is required to sustain operations after construction
+        is COMPLETE. No maintenance capex during construction years.
+
+        Formula: Effective Volume × Maintenance CapEx per Ton / 1000
+
+        Typical values by technology:
+        - EAF Mini Mill: $20/ton (newer equipment, lower maintenance)
+        - Blast Furnace: $40/ton (complex equipment, higher maintenance)
+        - Mining: $8/ton (equipment replacement, pit development)
+        - Tubular: $25/ton (specialized equipment)
+
+        Args:
+            project: CapitalProject instance
+            year: Projection year
+
+        Returns:
+            Maintenance capex in $M for the given year
+        """
+        if project.maintenance_capex_per_ton == 0:
+            return 0.0
+
+        # No maintenance capex until construction is complete
+        if project.capex_schedule:
+            last_construction_year = max(project.capex_schedule.keys())
+            if year <= last_construction_year:
+                return 0.0  # Still under construction
+
+        # After construction, use steady-state utilization for maintenance
+        utilization = project.base_utilization
+
+        # Effective volume at steady state
+        effective_volume = project.nameplate_capacity * utilization
+
+        # Maintenance capex: volume (kt) × $/ton / 1000 = $M
+        return (effective_volume * project.maintenance_capex_per_ton) / 1000
 
     def build_segment_projection(self, segment: Segment) -> pd.DataFrame:
         """Build full projection for a segment"""
@@ -1679,16 +2410,18 @@ class PriceVolumeModel:
             margin = self.calculate_segment_margin(segment, price)
             base_ebitda = revenue * margin
 
-            # Add project EBITDA (apply execution factor to non-BR2 projects)
+            # Calculate project EBITDA dynamically (responds to scenario prices)
             project_ebitda = 0
             project_capex = 0
             for proj in self.projects.values():
                 if proj.enabled and proj.segment == seg.name:
-                    ebitda_add = proj.ebitda_schedule.get(year, 0)
-                    # BR2 is committed/in-progress, don't haircut it
-                    if proj.name != 'BR2 Mini Mill':
-                        ebitda_add *= self.execution_factor
-                    project_ebitda += ebitda_add
+                    # Use dynamic calculation based on capacity, utilization, price, margin
+                    # Note: execution_factor is applied inside calculate_project_ebitda()
+                    project_ebitda += self.calculate_project_ebitda(
+                        project=proj,
+                        year=year,
+                        segment_price=price
+                    )
                     project_capex += proj.capex_schedule.get(year, 0)
 
             total_ebitda = base_ebitda + project_ebitda
@@ -2424,7 +3157,13 @@ def calculate_probability_weighted_valuation(
         exclude_scenarios = [
             ScenarioType.CUSTOM,
             ScenarioType.WALL_STREET,
-            ScenarioType.NIPPON_COMMITMENTS
+            ScenarioType.NIPPON_COMMITMENTS,
+            # Exclude FUTURES scenarios (separate probability set for futures-based analysis)
+            ScenarioType.FUTURES_DOWNSIDE,
+            ScenarioType.FUTURES_BASE_CASE,
+            ScenarioType.FUTURES_ABOVE_AVERAGE,
+            ScenarioType.FUTURES_OPTIMISTIC,
+            ScenarioType.FUTURES_NO_TARIFF,
         ]
 
     # Filter to scenarios with probability weights

@@ -97,7 +97,7 @@ A severe recession hits the U.S. economy. Automotive production collapses 20-30%
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| HRC US Price Factor | 70% of benchmark | Historical recession range $450-500/ton |
+| HRC US Price Factor | 75% of through-cycle | Historical recession range $450-550/ton |
 | Volume Factor | 75-85% | Demand collapse across segments |
 | USS WACC | 13.5% | +350bps distress premium |
 | Exit Multiple | 3.5x | Distressed valuation |
@@ -139,7 +139,7 @@ Steel markets are weak but not in crisis. Chinese overcapacity continues to pres
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| HRC US Price Factor | 85% of benchmark | Mid-cycle normalization |
+| HRC US Price Factor | 90% of through-cycle | Below-normal pricing |
 | Volume Factor | 90-95% | Modest contraction |
 | USS WACC | 12.0% | Elevated risk premium |
 | Exit Multiple | 4.0x | Below-average market |
@@ -179,7 +179,7 @@ Steel markets normalize to historical median levels - neither boom nor bust. Pri
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| HRC US Price Factor | 90% of benchmark | Historical median |
+| HRC US Price Factor | 100% of through-cycle | Historical median equilibrium |
 | Volume Factor | 90-100% | Mid-cycle utilization |
 | USS WACC | 10.9% | Company cost of capital |
 | Exit Multiple | 4.5x | Sector average |
@@ -219,7 +219,7 @@ Strong market conditions similar to 2017-2018. Section 232 tariffs provide prici
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| HRC US Price Factor | 95% of benchmark | Strong but not peak pricing |
+| HRC US Price Factor | 115% of through-cycle | Strong but not peak pricing |
 | Volume Factor | 98-100% | Near capacity utilization |
 | USS WACC | 10.9% | Standard cost of capital |
 | Exit Multiple | 5.0x | Above-average market |
@@ -258,7 +258,7 @@ Conditions similar to the 2021-2022 boom. Supply chain disruptions constrain sup
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| HRC US Price Factor | 100% of benchmark | Peak pricing |
+| HRC US Price Factor | 125% of through-cycle | Peak pricing |
 | Annual Price Growth | 2.0% | Sustained favorable trends |
 | USS WACC | 10.9% | Standard cost of capital |
 | Exit Multiple | 5.5x | Peak market valuation |
@@ -301,7 +301,7 @@ The Wall Street scenario validates our model against third-party fairness opinio
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| HRC US Price Factor | 97% of benchmark | Analyst consensus |
+| HRC US Price Factor | 120% of through-cycle | Analyst consensus |
 | USS WACC | 12.5% | Midpoint of analyst range |
 | Exit Multiple | 4.75x | Analyst estimates |
 
@@ -409,22 +409,30 @@ What question are you trying to answer?
 
 ### S.1 Price Factor Parameters
 
-| Scenario | HRC US | CRC US | Coated US | HRC EU | OCTG | Annual Growth |
-|----------|--------|--------|-----------|--------|------|---------------|
-| Severe Downturn | 70% | 70% | 70% | 65% | 50% | -2.0% |
-| Downside | 85% | 85% | 85% | 80% | 85% | 0.0% |
-| Base Case | 90% | 90% | 90% | 85% | 80% | +1.0% |
-| Above Average | 95% | 95% | 95% | 90% | 95% | +1.5% |
-| Optimistic | 100% | 100% | 100% | 100% | 100% | +2.0% |
-| Wall Street | 97% | 97% | 97% | 97% | 97% | 0.0% |
-| NSA Mandated CapEx | 95% | 95% | 95% | 90% | 95% | +1.0% |
+*Note: As of 2026-02-06, all price factors are expressed against through-cycle equilibrium benchmarks (not 2023 elevated levels). Factor 1.0 = through-cycle normal. Section 232 tariff effects are modeled separately via `tariff_rate`.*
 
-**Benchmark Prices (2023):**
-- HRC US Midwest: $680/ton
-- CRC US: $850/ton
-- Coated/Galvanized: $950/ton
-- HRC EU: $620/ton
-- OCTG: $2,800/ton
+| Scenario | HRC US | CRC US | Coated US | HRC EU | OCTG | Annual Growth | Tariff Rate |
+|----------|--------|--------|-----------|--------|------|---------------|-------------|
+| Severe Downturn | 75% | 75% | 75% | 70% | 55% | -2.0% | 25% |
+| Downside | 90% | 90% | 90% | 85% | 85% | 0.0% | 25% |
+| Base Case | 100% | 100% | 100% | 100% | 100% | +1.0% | 25% |
+| Above Average | 115% | 110% | 110% | 115% | 115% | +1.0% | 25% |
+| Optimistic | 125% | 115% | 115% | 120% | 120% | +1.5% | 25% |
+| Wall Street | 120% | 110% | 110% | 115% | 110% | 0.0% | 25% |
+| NSA Mandated CapEx | 105% | 105% | 105% | 100% | 105% | +1.0% | 25% |
+| Tariff Removal | 100% | 100% | 100% | 100% | 100% | +1.0% | 0% |
+| Tariff Reduced | 100% | 100% | 100% | 100% | 100% | +1.0% | 10% |
+| Tariff Escalation | 100% | 100% | 100% | 100% | 100% | +1.0% | 50% |
+
+**Benchmark Prices (Through-Cycle Equilibrium = Avg(Pre-COVID, Post-Spike)):**
+- HRC US Midwest: $738/ton (was $916 in 2023)
+- CRC US: $994/ton (was $1,127 in 2023)
+- Coated/Galvanized: $1,113/ton (was $1,263 in 2023)
+- HRC EU: $611/ton (was $717 in 2023)
+- OCTG: $2,388/ton (was $2,750 in 2023)
+
+**Section 232 Tariff Adjustment:**
+At current 25% rate, adjustment = 1.0 (no change). At 0% removal: HRC -15%, EU -4.5%, OCTG -9%. Uses conservative 15% HRC uplift (between OLS 7% and empirical 18%).
 
 ### S.2 Volume Factor Parameters
 
@@ -636,4 +644,4 @@ USD WACC = JPY WACC + (US 10Y - Japan 10Y)
 *RAMBAS Team Capstone Project*
 *Analysis Date: February 2026*
 *Historical Data Period: 1990-2023 (34 years)*
-*Model Version: Updated with WACC integration and price-volume methodology*
+*Model Version: Updated with through-cycle benchmark rebasing, Section 232 tariff modeling, and WACC integration*

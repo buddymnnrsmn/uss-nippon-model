@@ -350,18 +350,20 @@ class TestGracefulFallbacks:
 
     def test_get_benchmark_prices_with_fallback(self):
         """Test get_benchmark_prices falls back gracefully"""
-        from price_volume_model import get_benchmark_prices, _HARDCODED_BENCHMARK_PRICES
+        from price_volume_model import get_benchmark_prices, _HARDCODED_BENCHMARK_PRICES, BENCHMARK_PRICES_THROUGH_CYCLE
 
-        # Should work with use_bloomberg=False - returns hardcoded fallbacks
-        prices = get_benchmark_prices(use_bloomberg=False)
+        # Default: returns through-cycle baseline
+        prices = get_benchmark_prices()
+        assert prices == BENCHMARK_PRICES_THROUGH_CYCLE
+
+        # With use_through_cycle=False, use_bloomberg=False: returns hardcoded fallbacks
+        prices = get_benchmark_prices(use_bloomberg=False, use_through_cycle=False)
         assert prices == _HARDCODED_BENCHMARK_PRICES
 
-        # Should also work with use_bloomberg=True (uses Bloomberg 2023 data)
-        prices_bb = get_benchmark_prices(use_bloomberg=True)
+        # Should also work with use_bloomberg=True (uses Bloomberg 2023 data or hardcoded)
+        prices_bb = get_benchmark_prices(use_bloomberg=True, use_through_cycle=False)
         assert isinstance(prices_bb, dict)
         assert 'hrc_us' in prices_bb
-        # Bloomberg 2023 prices are different from hardcoded
-        # (unless Bloomberg is unavailable, in which case they fall back)
 
 
 # =============================================================================
@@ -716,11 +718,11 @@ class TestScenarioCalibrationIntegration:
         base_bloomberg = presets_bloomberg[ScenarioType.BASE_CASE]
         base_hybrid = presets_hybrid[ScenarioType.BASE_CASE]
 
-        # All should use same mid-cycle factors (0.9x HRC, 0.8x OCTG)
-        assert base_none.price_scenario.hrc_us_factor == 0.9
-        assert base_fixed.price_scenario.hrc_us_factor == 0.9
-        assert base_bloomberg.price_scenario.hrc_us_factor == 0.9
-        assert base_hybrid.price_scenario.hrc_us_factor == 0.9
+        # All should use same through-cycle factors (1.0x HRC — rebased baseline)
+        assert base_none.price_scenario.hrc_us_factor == 1.0
+        assert base_fixed.price_scenario.hrc_us_factor == 1.0
+        assert base_bloomberg.price_scenario.hrc_us_factor == 1.0
+        assert base_hybrid.price_scenario.hrc_us_factor == 1.0
 
     def test_calibration_status_function(self):
         """Test get_calibration_mode_status function"""

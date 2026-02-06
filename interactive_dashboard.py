@@ -32,6 +32,8 @@ from price_volume_model import (
     get_scenario_presets, get_segment_configs, compare_scenarios,
     calculate_probability_weighted_valuation,
     get_capital_projects, BENCHMARK_PRICES_2023,
+    BENCHMARK_PRICES_THROUGH_CYCLE, TARIFF_CONFIG,
+    calculate_tariff_adjustment, get_tariff_decomposition,
     get_synergy_presets, SynergyAssumptions, OperatingSynergies,
     TechnologyTransfer, RevenueSynergies, IntegrationCosts, SynergyRampSchedule,
     WACC_MODULE_AVAILABLE, get_wacc_module_status,
@@ -170,6 +172,224 @@ def render_calculation_button(
     return clicked
 
 
+@st.cache_data
+def load_uss_stock_data():
+    """Load USS daily stock price data for price comparison analysis."""
+    path = Path(__file__).parent / "market-data" / "exports" / "processed" / "stock_uss.csv"
+    if not path.exists():
+        return None
+    df = pd.read_csv(path)
+    df['date'] = pd.to_datetime(df['date'])
+    return df.sort_values('date').reset_index(drop=True)
+
+
+# USS Price Comparison Constants
+USS_NIPPON_ANNOUNCEMENT_DATE = '2023-12-18'
+USS_PRE_RUMOR_END = '2023-12-12'
+USS_RUMOR_PERIOD_START = '2023-12-13'
+USS_LAST_TRADING_DAY_BEFORE = '2023-12-15'
+USS_NIPPON_OFFER_PRICE = 55.00
+USS_CLIFFS_OFFER_PRICE = 54.00
+USS_LBO_ESTIMATE_LOW = 35.00  # PE LBO floor estimate
+USS_LBO_ESTIMATE_HIGH = 42.00  # PE LBO ceiling estimate
+USS_ANALYST_CONSENSUS = 45.00  # Wall Street consensus price target (pre-deal)
+USS_DATA_START_YEAR = '2005-01-01'  # Start from 2005 for relevant history
+
+# Key market epochs for context
+USS_MARKET_EPOCHS = [
+    {'name': 'GFC', 'start': '2007-10-01', 'end': '2009-03-31', 'color': 'rgba(255,107,107,0.15)'},
+    {'name': 'COVID', 'start': '2020-02-01', 'end': '2020-06-30', 'color': 'rgba(255,193,7,0.15)'},
+]
+
+
+def create_price_history_chart(df, start_date, end_date):
+    """Create USS stock price history chart with all reference lines and epoch markers."""
+    mask = (df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))
+    filtered_df = df[mask].copy()
+
+    if filtered_df.empty:
+        return None
+
+    fig = go.Figure()
+
+    # Add epoch shading (GFC, COVID) if within range
+    for epoch in USS_MARKET_EPOCHS:
+        epoch_start = pd.to_datetime(epoch['start'])
+        epoch_end = pd.to_datetime(epoch['end'])
+        if pd.to_datetime(start_date) <= epoch_end and pd.to_datetime(end_date) >= epoch_start:
+            # Clip to visible range
+            vis_start = max(pd.to_datetime(start_date), epoch_start)
+            vis_end = min(pd.to_datetime(end_date), epoch_end)
+            fig.add_vrect(
+                x0=vis_start.strftime('%Y-%m-%d'),
+                x1=vis_end.strftime('%Y-%m-%d'),
+                fillcolor=epoch['color'],
+                layer="below",
+                line_width=0,
+                annotation_text=epoch['name'],
+                annotation_position="top left",
+                annotation=dict(font_size=10, font_color="gray")
+            )
+
+    # Main price line
+    fig.add_trace(go.Scatter(
+        x=filtered_df['date'],
+        y=filtered_df['value'],
+        mode='lines',
+        name='USS Stock Price',
+        line=dict(color='#3498db', width=2),
+        hovertemplate='<b>%{x|%Y-%m-%d}</b><br>Price: $%{y:.2f}<extra></extra>'
+    ))
+
+    # Always show all reference lines (no toggles)
+    # Nippon Offer - Green
+    fig.add_hline(
+        y=USS_NIPPON_OFFER_PRICE,
+        line_dash="dash",
+        line_color="#27ae60",
+        annotation_text=f"Nippon Offer ${USS_NIPPON_OFFER_PRICE:.0f}",
+        annotation_position="top right"
+    )
+
+    # Cliffs Offer - Orange
+    fig.add_hline(
+        y=USS_CLIFFS_OFFER_PRICE,
+        line_dash="dash",
+        line_color="#e67e22",
+        annotation_text=f"Cliffs Offer ${USS_CLIFFS_OFFER_PRICE:.0f}",
+        annotation_position="right"
+    )
+
+    # Analyst Consensus - Purple
+    fig.add_hline(
+        y=USS_ANALYST_CONSENSUS,
+        line_dash="dot",
+        line_color="#9b59b6",
+        annotation_text=f"Analyst Target ${USS_ANALYST_CONSENSUS:.0f}",
+        annotation_position="right"
+    )
+
+    # LBO Range - Gray band
+    fig.add_hrect(
+        y0=USS_LBO_ESTIMATE_LOW,
+        y1=USS_LBO_ESTIMATE_HIGH,
+        fillcolor="rgba(128,128,128,0.1)",
+        line_width=0,
+        annotation_text=f"LBO Range ${USS_LBO_ESTIMATE_LOW:.0f}-${USS_LBO_ESTIMATE_HIGH:.0f}",
+        annotation_position="bottom right",
+        annotation=dict(font_size=9, font_color="gray")
+    )
+
+    # Pre-rumor end vertical line (Dec 12, 2023)
+    pre_rumor_date = pd.to_datetime(USS_PRE_RUMOR_END)
+    if pd.to_datetime(start_date) <= pre_rumor_date <= pd.to_datetime(end_date):
+        fig.add_shape(
+            type="line",
+            x0=USS_PRE_RUMOR_END,
+            x1=USS_PRE_RUMOR_END,
+            y0=0,
+            y1=1,
+            yref="paper",
+            line=dict(color="#e74c3c", width=1.5, dash="dashdot")
+        )
+        fig.add_annotation(
+            x=USS_PRE_RUMOR_END,
+            y=0.95,
+            yref="paper",
+            text="Pre-Rumor End",
+            showarrow=False,
+            xshift=-5,
+            textangle=-90,
+            font=dict(color="#e74c3c", size=9)
+        )
+
+    # Announcement date vertical line (Dec 18, 2023)
+    announcement_date = pd.to_datetime(USS_NIPPON_ANNOUNCEMENT_DATE)
+    if pd.to_datetime(start_date) <= announcement_date <= pd.to_datetime(end_date):
+        fig.add_shape(
+            type="line",
+            x0=USS_NIPPON_ANNOUNCEMENT_DATE,
+            x1=USS_NIPPON_ANNOUNCEMENT_DATE,
+            y0=0,
+            y1=1,
+            yref="paper",
+            line=dict(color="#2ecc71", width=2, dash="dot")
+        )
+        fig.add_annotation(
+            x=USS_NIPPON_ANNOUNCEMENT_DATE,
+            y=1,
+            yref="paper",
+            text="Nippon Announcement",
+            showarrow=False,
+            yshift=10,
+            font=dict(color="#2ecc71", size=10)
+        )
+
+    fig.update_layout(
+        title="USS Stock Price History with Key Reference Points",
+        xaxis_title="Date",
+        yaxis_title="Stock Price ($)",
+        hovermode='x unified',
+        height=500,
+        showlegend=True,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+
+    return fig
+
+
+def create_period_comparison_chart(df):
+    """Create enhanced bar chart comparing multiple periods with all reference lines."""
+    # Calculate period averages
+    pre_rumor_mask = df['date'] <= pd.to_datetime(USS_PRE_RUMOR_END)
+    rumor_mask = (df['date'] >= pd.to_datetime(USS_RUMOR_PERIOD_START)) & (df['date'] <= pd.to_datetime(USS_LAST_TRADING_DAY_BEFORE))
+    post_announce_mask = df['date'] >= pd.to_datetime(USS_NIPPON_ANNOUNCEMENT_DATE)
+
+    # Also calculate 2023 YTD (before any deal speculation)
+    ytd_2023_mask = (df['date'] >= pd.to_datetime('2023-01-01')) & (df['date'] <= pd.to_datetime('2023-11-30'))
+
+    pre_avg = df[pre_rumor_mask]['value'].mean() if pre_rumor_mask.any() else 0
+    rumor_avg = df[rumor_mask]['value'].mean() if rumor_mask.any() else 0
+    post_avg = df[post_announce_mask]['value'].mean() if post_announce_mask.any() else 0
+    ytd_avg = df[ytd_2023_mask]['value'].mean() if ytd_2023_mask.any() else 0
+
+    fig = go.Figure()
+
+    # Multi-period comparison
+    periods = ['2023 YTD<br>(Jan-Nov)', 'Pre-Rumor<br>(through Dec 12)', 'Rumor Period<br>(Dec 13-15)', 'Post-Announce<br>(Dec 18+)']
+    values = [ytd_avg, pre_avg, rumor_avg, post_avg]
+    colors = ['#95a5a6', '#3498db', '#f39c12', '#2ecc71']
+
+    fig.add_trace(go.Bar(
+        x=periods,
+        y=values,
+        marker_color=colors,
+        text=[f'${v:.2f}' for v in values],
+        textposition='outside'
+    ))
+
+    # Add all reference lines
+    fig.add_hline(y=USS_NIPPON_OFFER_PRICE, line_dash="dash", line_color="#27ae60",
+                  annotation_text=f"Nippon ${USS_NIPPON_OFFER_PRICE:.0f}")
+    fig.add_hline(y=USS_CLIFFS_OFFER_PRICE, line_dash="dash", line_color="#e67e22",
+                  annotation_text=f"Cliffs ${USS_CLIFFS_OFFER_PRICE:.0f}")
+    fig.add_hline(y=USS_ANALYST_CONSENSUS, line_dash="dot", line_color="#9b59b6",
+                  annotation_text=f"Analyst ${USS_ANALYST_CONSENSUS:.0f}")
+
+    # LBO range shading
+    fig.add_hrect(y0=USS_LBO_ESTIMATE_LOW, y1=USS_LBO_ESTIMATE_HIGH,
+                  fillcolor="rgba(128,128,128,0.1)", line_width=0)
+
+    fig.update_layout(
+        title="Average Price by Period vs Offer Benchmarks",
+        yaxis_title="Average Stock Price ($)",
+        height=400,
+        showlegend=False
+    )
+
+    return fig
+
+
 # =============================================================================
 # PAGE CONFIG
 # =============================================================================
@@ -216,6 +436,7 @@ def render_sidebar():
         - [PE LBO Comparison](#pe-lbo-comparison)
         - [Valuation Football Field](#valuation-football-field)
         - [Value Bridge](#value-bridge)
+        - [USS Price Comparison](#uss-price-comparison)
 
         **Financial Projections**
         - [FCF Projection](#fcf-projection)
@@ -306,6 +527,7 @@ def render_sidebar():
         st.session_state.eu_factor = preset.price_scenario.hrc_eu_factor
         st.session_state.octg_factor = preset.price_scenario.octg_factor
         st.session_state.annual_price_growth = preset.price_scenario.annual_price_growth * 100
+        st.session_state.tariff_rate = getattr(preset.price_scenario, 'tariff_rate', 0.25)
         # Reset volume
         st.session_state.fr_vf = preset.volume_scenario.flat_rolled_volume_factor
         st.session_state.mm_vf = preset.volume_scenario.mini_mill_volume_factor
@@ -507,12 +729,9 @@ def render_sidebar():
     # Steel Price Benchmarks
     st.sidebar.header("Steel Price Benchmarks")
 
-    # Always use Bloomberg 2023 prices as defaults (fallback to BENCHMARK_PRICES_2023 if unavailable)
-    benchmark_defaults = BENCHMARK_PRICES_2023  # This now uses Bloomberg 2023 annual avg data if available
-    if BLOOMBERG_AVAILABLE:
-        st.sidebar.caption("Baseline: Bloomberg 2023 Annual Avg")
-    else:
-        st.sidebar.caption("Baseline: Hardcoded Fallbacks")
+    # Through-cycle baseline (structural equilibrium, not 2023 elevated)
+    benchmark_defaults = BENCHMARK_PRICES_2023  # Now through-cycle
+    st.sidebar.caption("Baseline: Through-Cycle Equilibrium (factor 1.0 = mid-cycle)")
 
     if st.sidebar.button("↺ Reset to Default", key="reset_benchmarks", help="Reset benchmark prices to defaults"):
         st.session_state.reset_section = "benchmarks"
@@ -584,6 +803,23 @@ def render_sidebar():
         key="annual_price_growth",
         help="Year-over-year price escalation applied to all products"
     ) / 100
+
+    # Section 232 Tariff Controls
+    with st.sidebar.expander("Section 232 Tariff", expanded=False):
+        tariff_rate = st.slider(
+            "Tariff Rate",
+            0.0, 0.50,
+            st.session_state.get('tariff_rate', getattr(preset.price_scenario, 'tariff_rate', 0.25)),
+            0.05,
+            format="%.0f%%",
+            key="tariff_rate",
+            help="Section 232 steel import tariff rate. 25% = current. 0% = removal. 50% = escalation."
+        )
+        if abs(tariff_rate - 0.25) > 0.01:
+            hrc_adj = calculate_tariff_adjustment(tariff_rate, 'hrc_us')
+            st.caption(f"HRC tariff adjustment: {hrc_adj:.2f}x (vs 1.00x at 25%)")
+        else:
+            st.caption("Current rate (25%) — no adjustment")
 
     st.sidebar.markdown("---")
 
@@ -999,7 +1235,8 @@ def render_sidebar():
         coated_us_factor=hrc_factor,
         hrc_eu_factor=eu_factor,
         octg_factor=octg_factor,
-        annual_price_growth=annual_price_growth
+        annual_price_growth=annual_price_growth,
+        tariff_rate=tariff_rate,
     )
 
     volume_scenario = VolumeScenario(
@@ -1062,18 +1299,9 @@ def main():
     scenario, scenario_name, execution_factor, custom_benchmarks = render_sidebar()
 
     # =========================================================================
-    # INITIALIZE SESSION STATE FOR CACHED CALCULATIONS
+    # INITIALIZE SESSION STATE
     # =========================================================================
-    calc_states = [
-        'calc_football_field',
-        'calc_scenario_comparison',
-        'calc_probability_weighted',
-        'calc_price_sensitivity',
-        'calc_wacc_sensitivity',
-        'calc_lbo',
-        'cached_scenario_hash',
-        'stale_sections'
-    ]
+    calc_states = ['calc_football_field', 'calc_lbo', 'cached_scenario_hash', 'stale_sections']
 
     for state in calc_states:
         if state not in st.session_state:
@@ -1082,39 +1310,13 @@ def main():
             else:
                 st.session_state[state] = None
 
-    # =========================================================================
-    # CACHE INVALIDATION SYSTEM
-    # =========================================================================
+    # Track scenario hash for cache invalidation
     current_hash = create_scenario_hash(scenario, execution_factor, custom_benchmarks)
-
-    # Invalidate all caches if scenario changed
     if st.session_state.cached_scenario_hash != current_hash:
-        # Mark existing caches as stale before clearing
-        for key in ['calc_football_field', 'calc_scenario_comparison',
-                    'calc_probability_weighted', 'calc_price_sensitivity',
-                    'calc_wacc_sensitivity', 'calc_lbo']:
-            if st.session_state[key] is not None:
-                st.session_state.stale_sections.add(key)
-
-        # Clear cached calculations from session state
         st.session_state.calc_football_field = None
-        st.session_state.calc_scenario_comparison = None
-        st.session_state.calc_probability_weighted = None
-        st.session_state.calc_price_sensitivity = None
-        st.session_state.calc_wacc_sensitivity = None
         st.session_state.calc_lbo = None
         st.session_state.cached_scenario_hash = current_hash
-
-        # Clear old disk caches
         cp.clear_old_caches(current_hash)
-    else:
-        # Load from disk if session state is empty but disk cache exists
-        for key in ['calc_scenario_comparison', 'calc_probability_weighted',
-                    'calc_price_sensitivity', 'calc_wacc_sensitivity']:
-            if st.session_state[key] is None:
-                cached_data = cp.load_calculation_cache(key, current_hash)
-                if cached_data is not None:
-                    st.session_state[key] = cached_data
 
     # Run the model with execution factor and custom benchmarks
     progress_bar = st.progress(0, text="Loading financial model...")
@@ -1144,159 +1346,6 @@ def main():
     val_uss = analysis['val_uss']
     val_nippon = analysis['val_nippon']
     financing_impact = analysis.get('financing_impact', {})
-
-    # =========================================================================
-    # BULK OPERATIONS SECTION (in sidebar)
-    # =========================================================================
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Bulk Operations")
-
-    col1, col2 = st.sidebar.columns(2)
-
-    with col1:
-        if st.button("Calculate All", type="primary", key="btn_calc_all", use_container_width=True):
-            st.session_state.trigger_calc_all = True
-
-    with col2:
-        if st.button("Clear All", type="secondary", key="btn_clear_all", use_container_width=True):
-            st.session_state.calc_scenario_comparison = None
-            st.session_state.calc_probability_weighted = None
-            st.session_state.calc_price_sensitivity = None
-            st.session_state.calc_wacc_sensitivity = None
-            st.session_state.stale_sections.clear()
-            st.success("All calculations cleared")
-            st.rerun()
-
-    # Process Calculate All if triggered
-    if st.session_state.get('trigger_calc_all'):
-        st.sidebar.info("Running all calculations...")
-
-        # List of sections to calculate
-        sections = [
-            ('calc_scenario_comparison', 'Scenario Comparison'),
-            ('calc_probability_weighted', 'Probability-Weighted Valuation'),
-            ('calc_price_sensitivity', 'Steel Price Sensitivity'),
-            ('calc_wacc_sensitivity', 'WACC Sensitivity'),
-        ]
-
-        overall_progress = st.sidebar.progress(0, text="Calculating all sections...")
-
-        for i, (key, name) in enumerate(sections, 1):
-            overall_progress.progress(int((i-1) / len(sections) * 100), text=f"Calculating {name}... ({i}/{len(sections)})")
-
-            # Trigger calculation by setting a flag
-            if key == 'calc_scenario_comparison':
-                progress_bar_sc = st.progress(0, text="Comparing scenarios...")
-                comparison_df = compare_scenarios(execution_factor=execution_factor, custom_benchmarks=custom_benchmarks, progress_bar=progress_bar_sc)
-                progress_bar_sc.empty()
-                st.session_state.calc_scenario_comparison = {
-                    'dataframe': comparison_df,
-                    'timestamp': datetime.now()
-                }
-
-            elif key == 'calc_probability_weighted':
-                progress_bar_pw = st.progress(0, text="Calculating probability-weighted valuation...")
-                pw_results = calculate_probability_weighted_valuation(
-                    custom_benchmarks=custom_benchmarks,
-                    progress_bar=progress_bar_pw,
-                    calibration_mode=st.session_state.get('calibration_mode'),
-                    probability_mode=st.session_state.get('probability_mode')
-                )
-                progress_bar_pw.empty()
-                st.session_state.calc_probability_weighted = {
-                    'results': pw_results,
-                    'timestamp': datetime.now()
-                }
-
-            elif key == 'calc_price_sensitivity':
-                price_factors = np.arange(0.6, 1.5, 0.1)
-                sensitivity_data = []
-                progress_bar_ps = st.progress(0, text="Running steel price sensitivity...")
-
-                for j, pf in enumerate(price_factors, 1):
-                    progress_pct = int((j / len(price_factors)) * 100)
-                    progress_bar_ps.progress(progress_pct, text=f"Testing price level: {pf:.0%} ({j}/{len(price_factors)})")
-
-                    test_price_scenario = SteelPriceScenario(
-                        name="Test", description="Test",
-                        hrc_us_factor=pf, crc_us_factor=pf, coated_us_factor=pf,
-                        hrc_eu_factor=pf, octg_factor=pf,
-                        annual_price_growth=scenario.price_scenario.annual_price_growth
-                    )
-                    test_scenario = ModelScenario(
-                        name="Test", scenario_type=ScenarioType.CUSTOM, description="Test",
-                        price_scenario=test_price_scenario,
-                        volume_scenario=scenario.volume_scenario,
-                        uss_wacc=scenario.uss_wacc,
-                        terminal_growth=scenario.terminal_growth,
-                        exit_multiple=scenario.exit_multiple,
-                        us_10yr=scenario.us_10yr,
-                        japan_10yr=scenario.japan_10yr,
-                        nippon_equity_risk_premium=scenario.nippon_equity_risk_premium,
-                        nippon_credit_spread=scenario.nippon_credit_spread,
-                        nippon_debt_ratio=scenario.nippon_debt_ratio,
-                        nippon_tax_rate=scenario.nippon_tax_rate,
-                        override_irp=scenario.override_irp,
-                        manual_nippon_usd_wacc=scenario.manual_nippon_usd_wacc,
-                        include_projects=scenario.include_projects
-                    )
-                    test_model = PriceVolumeModel(test_scenario, custom_benchmarks=custom_benchmarks)
-                    test_analysis = test_model.run_full_analysis()
-                    sensitivity_data.append({
-                        'Price Factor': f"{pf:.0%}",
-                        'Price Factor Num': pf,
-                        'Nippon Value': test_analysis['val_nippon']['share_price'],
-                        'USS Value': test_analysis['val_uss']['share_price']
-                    })
-
-                sens_df = pd.DataFrame(sensitivity_data)
-                progress_bar_ps.empty()
-
-                price_proj_data = []
-                for seg_name, df in segment_dfs.items():
-                    for _, row in df.iterrows():
-                        price_proj_data.append({
-                            'Year': row['Year'],
-                            'Segment': seg_name,
-                            'Price': row['Price_per_ton']
-                        })
-                price_proj_df = pd.DataFrame(price_proj_data)
-
-                st.session_state.calc_price_sensitivity = {
-                    'sens_df': sens_df,
-                    'price_proj_df': price_proj_df,
-                    'timestamp': datetime.now()
-                }
-
-            elif key == 'calc_wacc_sensitivity':
-                wacc_range = np.arange(0.05, 0.14, 0.005)
-                wacc_sensitivity_data = []
-                progress_bar_wacc = st.progress(0, text="Running WACC sensitivity...")
-
-                for j, w in enumerate(wacc_range, 1):
-                    progress_pct = int((j / len(wacc_range)) * 100)
-                    progress_bar_wacc.progress(progress_pct, text=f"Testing WACC: {w:.1%} ({j}/{len(wacc_range)})")
-                    val = model.calculate_dcf(consolidated, w)
-                    wacc_sensitivity_data.append({
-                        'WACC': w * 100,
-                        'Equity Value': val['share_price']
-                    })
-
-                wacc_sens_df = pd.DataFrame(wacc_sensitivity_data)
-                progress_bar_wacc.empty()
-
-                st.session_state.calc_wacc_sensitivity = {
-                    'wacc_sens_df': wacc_sens_df,
-                    'uss_wacc': scenario.uss_wacc,
-                    'usd_wacc': usd_wacc,
-                    'timestamp': datetime.now()
-                }
-
-        overall_progress.progress(100, text="All calculations complete")
-        del st.session_state.trigger_calc_all
-        overall_progress.empty()
-        st.sidebar.success("All sections calculated successfully")
-        st.rerun()
 
     # =========================================================================
     # EXPORT MODEL SECTION (in sidebar)
@@ -3190,33 +3239,10 @@ def main():
     st.markdown("---")
     st.header("Scenario Comparison", anchor="scenario-comparison")
 
-    # Render button for on-demand calculation
-    calc_button_sc = render_calculation_button(
-        section_name="Scenario Comparison",
-        button_label="Compare Scenarios",
-        session_key="calc_scenario_comparison"
-    )
+    # Auto-calculate scenario comparison
+    comparison_df = compare_scenarios(execution_factor=execution_factor, custom_benchmarks=custom_benchmarks)
 
-    # Calculate if button clicked
-    if calc_button_sc:
-        progress_bar_sc = st.progress(0, text="Comparing scenarios...")
-        comparison_df = compare_scenarios(execution_factor=execution_factor, custom_benchmarks=custom_benchmarks, progress_bar=progress_bar_sc)
-        progress_bar_sc.empty()
-
-        # Store results with timestamp
-        st.session_state.calc_scenario_comparison = {
-            'dataframe': comparison_df,
-            'timestamp': datetime.now()
-        }
-
-        # Persist to disk
-        cp.save_calculation_cache('calc_scenario_comparison', st.session_state.calc_scenario_comparison, current_hash)
-
-        st.rerun()
-
-    # Display results if available
-    if st.session_state.calc_scenario_comparison is not None:
-        comparison_df = st.session_state.calc_scenario_comparison['dataframe']
+    if comparison_df is not None:
 
         # Highlight the current scenario
         comparison_df['Current'] = comparison_df['Scenario'] == scenario_name
@@ -3301,46 +3327,18 @@ def main():
         **Total: 100%**
         """)
 
-    # Render button for on-demand calculation
-    calc_button_pw = render_calculation_button(
-        section_name="Probability-Weighted Valuation",
-        button_label="Calculate Expected Value",
-        session_key="calc_probability_weighted"
-    )
+    # Auto-calculate probability-weighted valuation
+    try:
+        pw_results = calculate_probability_weighted_valuation(
+            custom_benchmarks=custom_benchmarks,
+            calibration_mode=st.session_state.get('calibration_mode'),
+            probability_mode=st.session_state.get('probability_mode')
+        )
+    except Exception as e:
+        st.error(f"Error calculating probability-weighted valuation: {str(e)}")
+        pw_results = None
 
-    # Calculate if button clicked
-    if calc_button_pw:
-        progress_bar_pw = st.progress(0, text="Calculating probability-weighted valuation...")
-        try:
-            pw_results = calculate_probability_weighted_valuation(
-                custom_benchmarks=custom_benchmarks,
-                progress_bar=progress_bar_pw,
-                calibration_mode=st.session_state.get('calibration_mode'),
-                probability_mode=st.session_state.get('probability_mode')
-            )
-            progress_bar_pw.empty()
-
-            # Store results with timestamp
-            st.session_state.calc_probability_weighted = {
-                'results': pw_results,
-                'timestamp': datetime.now()
-            }
-
-            # Persist to disk
-            cp.save_calculation_cache('calc_probability_weighted', st.session_state.calc_probability_weighted, current_hash)
-
-            st.rerun()
-
-        except Exception as e:
-            progress_bar_pw.empty()
-            st.error(f"Error calculating probability-weighted valuation: {str(e)}")
-            import traceback
-            with st.expander("Error Details"):
-                st.code(traceback.format_exc())
-
-    # Display results if available
-    if st.session_state.calc_probability_weighted is not None:
-        pw_results = st.session_state.calc_probability_weighted['results']
+    if pw_results is not None:
 
         # Display results
         col1, col2, col3 = st.columns(3)
@@ -3391,8 +3389,6 @@ def main():
         md_table = "\n".join(md_rows)
         st.markdown(md_table)
         st.caption(f"*{scenario_count} scenarios shown*")
-    else:
-        st.info("Probability-weighted valuation not yet calculated. Click button above to calculate.")
 
     # =========================================================================
     # CAPITAL PROJECTS ANALYSIS
@@ -3404,33 +3400,66 @@ def main():
     # Get all capital projects
     all_projects = get_capital_projects()
 
+    # Helper function to calculate dynamic EBITDA for a project
+    def get_dynamic_project_ebitda(proj, year):
+        """Calculate project EBITDA using dynamic formula based on current scenario prices."""
+        if proj.nameplate_capacity == 0:
+            # Fall back to legacy schedule if no dynamic params
+            return proj.ebitda_schedule.get(year, 0)
+
+        # Get segment price for this year from the model
+        segment_map = {
+            'Mini Mill': Segment.MINI_MILL,
+            'Flat-Rolled': Segment.FLAT_ROLLED,
+            'Tubular': Segment.TUBULAR,
+            'USSE': Segment.USSE
+        }
+        segment_enum = segment_map.get(proj.segment)
+        if segment_enum:
+            segment_price = model.calculate_segment_price(segment_enum, year)
+        else:
+            segment_price = 900  # Default fallback
+
+        return model.calculate_project_ebitda(proj, year, segment_price)
+
+    def get_project_maintenance_capex(proj, year):
+        """Calculate annual maintenance capex for a project."""
+        return model.calculate_project_maintenance_capex(proj, year)
+
     # Project overview table
     st.markdown("### Project Overview")
     st.markdown("""
     **How to read this table:**
     - **Total CapEx**: Total investment required over the project life
-    - **2033 EBITDA**: Steady-state annual EBITDA once project is fully operational
+    - **2033 EBITDA**: Steady-state annual EBITDA once project is fully operational (varies with scenario prices)
     - **Included**: Whether this project is included in the current scenario
+
+    *Note: EBITDA values are calculated dynamically using: Capacity × Utilization × Scenario Price × Margin*
     """)
 
     project_overview = []
     for proj_name, proj in all_projects.items():
         total_capex = sum(proj.capex_schedule.values())
-        final_ebitda = proj.ebitda_schedule.get(2033, 0)
+        # Use dynamic EBITDA calculation (responds to scenario prices)
+        final_ebitda = get_dynamic_project_ebitda(proj, 2033)
         is_included = proj_name in scenario.include_projects
 
-        # Calculate simple NPV at different rates
+        # Calculate simple NPV at different rates with dynamic EBITDA
         def calc_project_npv(wacc):
             npv = 0
             for year in range(2024, 2034):
                 t = year - 2024
                 capex = proj.capex_schedule.get(year, 0)
-                ebitda = proj.ebitda_schedule.get(year, 0)
-                # Assume 25% tax, 60% EBITDA-to-FCF conversion for projects
-                fcf = ebitda * 0.6 - capex
+                # Use dynamic EBITDA calculation
+                ebitda = get_dynamic_project_ebitda(proj, year)
+                # Explicit maintenance capex (sustaining capital after construction)
+                maint_capex = get_project_maintenance_capex(proj, year)
+                # FCF = EBITDA × (1 - tax) - Construction CapEx - Maintenance CapEx
+                fcf = ebitda * 0.75 - capex - maint_capex  # 25% tax rate
                 npv += fcf / ((1 + wacc) ** (t + 0.5))
-            # Add terminal value (5x 2033 EBITDA, 60% FCF conversion)
-            tv = final_ebitda * 0.6 * 5
+            # Add terminal value using comparable-based EV/EBITDA multiple
+            # Source: WRDS peer analysis - EAF peers 7x, Integrated 5x, Tubular 6x
+            tv = final_ebitda * proj.terminal_multiple
             npv += tv / ((1 + wacc) ** 10)
             return npv
 
@@ -3459,21 +3488,39 @@ def main():
 
     proj = all_projects[selected_project]
     total_capex = sum(proj.capex_schedule.values())
-    final_ebitda = proj.ebitda_schedule.get(2033, 0)
+    # Use dynamic EBITDA calculation
+    final_ebitda = get_dynamic_project_ebitda(proj, 2033)
 
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown(f"#### {selected_project}")
-        st.markdown(f"""
-        | Attribute | Value |
-        |-----------|-------|
-        | Segment | {proj.segment} |
-        | Total Investment | ${total_capex:,.0f}M |
-        | Steady-State EBITDA | ${final_ebitda:,.0f}M/year |
-        | Payback (Simple) | {total_capex / max(final_ebitda * 0.6, 1):.1f} years |
-        | Status | {'**Included**' if selected_project in scenario.include_projects else 'Not included'} |
-        """)
+        # Show dynamic parameters if available
+        if proj.nameplate_capacity > 0:
+            st.markdown(f"""
+            | Attribute | Value |
+            |-----------|-------|
+            | Segment | {proj.segment} |
+            | Total Investment | ${total_capex:,.0f}M |
+            | Nameplate Capacity | {proj.nameplate_capacity:,.0f} kt/year |
+            | Base Utilization | {proj.base_utilization*100:.0f}% |
+            | EBITDA Margin | {proj.ebitda_margin*100:.0f}% |
+            | Steady-State EBITDA | ${final_ebitda:,.0f}M/year |
+            | Maintenance CapEx | \\${proj.nameplate_capacity * proj.maintenance_capex_per_ton / 1000:,.0f}M/year (\\${proj.maintenance_capex_per_ton:,.0f}/ton) |
+            | Terminal Multiple | {proj.terminal_multiple:.1f}x EV/EBITDA |
+            | Payback (Simple) | {total_capex / max(final_ebitda * 0.75 - proj.nameplate_capacity * proj.maintenance_capex_per_ton / 1000, 1):.1f} years |
+            | Status | {'**Included**' if selected_project in scenario.include_projects else 'Not included'} |
+            """)
+        else:
+            st.markdown(f"""
+            | Attribute | Value |
+            |-----------|-------|
+            | Segment | {proj.segment} |
+            | Total Investment | ${total_capex:,.0f}M |
+            | Steady-State EBITDA | ${final_ebitda:,.0f}M/year |
+            | Payback (Simple) | {total_capex / max(final_ebitda * 0.6, 1):.1f} years |
+            | Status | {'**Included**' if selected_project in scenario.include_projects else 'Not included'} |
+            """)
 
         # Project descriptions
         project_descriptions = {
@@ -3487,17 +3534,25 @@ def main():
         st.info(project_descriptions.get(selected_project, "Capital investment project"))
 
     with col2:
-        # Cash flow chart
+        # Cash flow chart with dynamic EBITDA and maintenance capex
         years = list(range(2024, 2034))
         capex_values = [proj.capex_schedule.get(y, 0) for y in years]
-        ebitda_values = [proj.ebitda_schedule.get(y, 0) for y in years]
+        maint_values = [get_project_maintenance_capex(proj, y) for y in years]
+        # Use dynamic EBITDA calculation for each year
+        ebitda_values = [get_dynamic_project_ebitda(proj, y) for y in years]
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=years,
             y=[-c for c in capex_values],  # Negative for outflows
-            name='CapEx (Outflow)',
+            name='Construction CapEx',
             marker_color='#ff6b6b'
+        ))
+        fig.add_trace(go.Bar(
+            x=years,
+            y=[-m for m in maint_values],  # Negative for outflows
+            name='Maintenance CapEx',
+            marker_color='#ffa07a'  # Lighter red/orange for maintenance
         ))
         fig.add_trace(go.Bar(
             x=years,
@@ -3514,15 +3569,17 @@ def main():
         )
         fig.add_hline(y=0, line_color="black", line_width=1)
         st.plotly_chart(fig, use_container_width=True)
+        st.caption("*EBITDA varies with scenario price assumptions; Maintenance CapEx = sustaining capital after construction*")
 
     # NPV sensitivity table
     st.markdown("#### NPV Sensitivity to Discount Rate")
-    st.markdown("""
+    st.markdown(f"""
     **How to read this table:**
     - **WACC**: Discount rate used (6% = low risk, 13.5% = high risk)
     - **NPV**: Net Present Value of the project (positive = value-creating)
     - **vs CapEx**: NPV as a percentage of total investment (>0% means project creates value)
     - Projects are more attractive at lower WACCs; Nippon's ~7.5% WACC makes projects more valuable than at USS's ~10.9%
+    - **Terminal Value**: {proj.terminal_multiple:.1f}x EV/EBITDA (sourced from WRDS peer comparables)
     """)
     wacc_range = [0.06, 0.075, 0.09, 0.105, 0.12, 0.135]
     npv_data = []
@@ -3531,10 +3588,15 @@ def main():
         for year in range(2024, 2034):
             t = year - 2024
             capex = proj.capex_schedule.get(year, 0)
-            ebitda = proj.ebitda_schedule.get(year, 0)
-            fcf = ebitda * 0.6 - capex
+            # Use dynamic EBITDA calculation
+            ebitda = get_dynamic_project_ebitda(proj, year)
+            # Explicit maintenance capex
+            maint_capex = get_project_maintenance_capex(proj, year)
+            # FCF = EBITDA × (1 - tax) - Construction CapEx - Maintenance CapEx
+            fcf = ebitda * 0.75 - capex - maint_capex  # 25% tax rate
             npv += fcf / ((1 + w) ** (t + 0.5))
-        tv = final_ebitda * 0.6 * 5
+        # Terminal value using comparable-based EV/EBITDA multiple
+        tv = final_ebitda * proj.terminal_multiple
         npv += tv / ((1 + w) ** 10)
         npv_data.append({
             'WACC': f"{w*100:.1f}%",
@@ -3681,6 +3743,7 @@ def main():
     - Bar length shows the valuation range (low to high) under different assumptions
     - **Green dashed line** = \\$55 Nippon offer price
     - **Red dotted line** = \\$40 PE maximum price (20% IRR threshold)
+    - **Blue dotted line** = Current scenario value (based on selected assumptions)
     - Toggle between USS standalone view and Nippon's acquirer view
 
     **Key Insight:** The \\$55 offer sits above PE alternatives and USS standalone value, yet below Nippon's full intrinsic value.
@@ -4013,6 +4076,232 @@ def main():
             st.warning(f"**Synergies needed:** ${gap_to_offer:.2f}")
 
     # =========================================================================
+    # USS PRICE COMPARISON
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("USS Price Comparison", anchor="uss-price-comparison")
+
+    st.markdown("""
+    Compare USS stock prices across key periods to evaluate the Nippon offer premium.
+    Reference lines show Nippon (\\$55), Cliffs (\\$54), analyst targets (\\$45), and LBO range (\\$35-42).
+    """)
+
+    # Load stock data
+    stock_df = load_uss_stock_data()
+
+    if stock_df is not None and not stock_df.empty:
+        # Period selection controls - simplified to single row
+        price_col1, price_col2 = st.columns([2, 2])
+
+        with price_col1:
+            period_options = {
+                "Since 2005 (Full Relevant History)": "since_2005",
+                "Around Announcement (Nov 2023 - Jan 2024)": "around_announcement",
+                "Post-Announcement (Dec 18, 2023+)": "post_announcement",
+                "Pre-Rumor (Before Dec 12, 2023)": "pre_rumor",
+                "Custom Range": "custom"
+            }
+            selected_period = st.selectbox(
+                "Select Period",
+                options=list(period_options.keys()),
+                index=0,  # Default to Since 2005
+                help="Choose a pre-defined period or select Custom for specific dates"
+            )
+            period_key = period_options[selected_period]
+
+        # Determine date range based on selection
+        min_date = stock_df['date'].min().date()
+        max_date = stock_df['date'].max().date()
+        data_start_2005 = pd.to_datetime(USS_DATA_START_YEAR).date()
+
+        if period_key == "since_2005":
+            start_date = data_start_2005
+            end_date = max_date
+        elif period_key == "pre_rumor":
+            start_date = data_start_2005
+            end_date = pd.to_datetime(USS_PRE_RUMOR_END).date()
+        elif period_key == "post_announcement":
+            start_date = pd.to_datetime(USS_NIPPON_ANNOUNCEMENT_DATE).date()
+            end_date = max_date
+        elif period_key == "around_announcement":
+            start_date = pd.to_datetime('2023-11-01').date()
+            end_date = pd.to_datetime('2024-01-31').date()
+        else:  # custom
+            start_date = data_start_2005
+            end_date = max_date
+
+        with price_col2:
+            if period_key == "custom":
+                custom_col1, custom_col2 = st.columns(2)
+                with custom_col1:
+                    start_date = st.date_input(
+                        "Start Date",
+                        value=data_start_2005,
+                        min_value=min_date,
+                        max_value=max_date
+                    )
+                with custom_col2:
+                    end_date = st.date_input(
+                        "End Date",
+                        value=max_date,
+                        min_value=min_date,
+                        max_value=max_date
+                    )
+            else:
+                st.markdown(f"**Period:** {start_date} to {end_date}")
+
+        # Filter data for selected period
+        mask = (stock_df['date'] >= pd.to_datetime(start_date)) & (stock_df['date'] <= pd.to_datetime(end_date))
+        period_df = stock_df[mask].copy()
+
+        if not period_df.empty:
+            # Metrics row
+            avg_price = period_df['value'].mean()
+            min_price = period_df['value'].min()
+            max_price = period_df['value'].max()
+
+            # Calculate period return
+            first_price = period_df['value'].iloc[0]
+            last_price = period_df['value'].iloc[-1]
+            period_return = ((last_price / first_price) - 1) * 100 if first_price > 0 else 0
+
+            # Calculate gap to offer (positive = below offer)
+            gap_to_nippon = USS_NIPPON_OFFER_PRICE - avg_price
+
+            metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+            with metric_col1:
+                st.metric(
+                    "Average Price",
+                    f"${avg_price:.2f}",
+                    delta=f"{gap_to_nippon:+.2f} below Nippon offer" if gap_to_nippon > 0 else f"{-gap_to_nippon:.2f} above Nippon offer",
+                    delta_color="inverse" if gap_to_nippon > 0 else "normal"
+                )
+            with metric_col2:
+                st.metric("Minimum Price", f"${min_price:.2f}")
+            with metric_col3:
+                st.metric("Maximum Price", f"${max_price:.2f}")
+            with metric_col4:
+                st.metric(
+                    "Period Return",
+                    f"{period_return:+.1f}%",
+                    delta=f"{len(period_df)} trading days"
+                )
+
+            # Main price chart - no toggles, always shows all reference lines
+            price_chart = create_price_history_chart(stock_df, start_date, end_date)
+            if price_chart:
+                st.plotly_chart(price_chart, use_container_width=True)
+
+            # Period comparison (show for since_2005, around_announcement, or periods spanning the announcement)
+            announcement_date = pd.to_datetime(USS_NIPPON_ANNOUNCEMENT_DATE)
+            show_comparison = period_key in ["since_2005", "around_announcement"] or \
+                              (pd.to_datetime(start_date) < announcement_date < pd.to_datetime(end_date))
+
+            if show_comparison:
+                st.subheader("Period Analysis & Comparison")
+
+                comp_col1, comp_col2 = st.columns([1, 1])
+
+                with comp_col1:
+                    comparison_chart = create_period_comparison_chart(stock_df)
+                    st.plotly_chart(comparison_chart, use_container_width=True)
+
+                with comp_col2:
+                    # Enhanced statistics table with more periods
+                    pre_rumor_mask = stock_df['date'] <= pd.to_datetime(USS_PRE_RUMOR_END)
+                    rumor_mask = (stock_df['date'] >= pd.to_datetime(USS_RUMOR_PERIOD_START)) & \
+                                 (stock_df['date'] <= pd.to_datetime(USS_LAST_TRADING_DAY_BEFORE))
+                    post_announce_mask = stock_df['date'] >= pd.to_datetime(USS_NIPPON_ANNOUNCEMENT_DATE)
+                    ytd_2023_mask = (stock_df['date'] >= pd.to_datetime('2023-01-01')) & \
+                                    (stock_df['date'] <= pd.to_datetime('2023-11-30'))
+
+                    pre_data = stock_df[pre_rumor_mask]['value']
+                    rumor_data = stock_df[rumor_mask]['value']
+                    post_data = stock_df[post_announce_mask]['value']
+                    ytd_data = stock_df[ytd_2023_mask]['value']
+
+                    def safe_stat(data, func, fmt="$"):
+                        if len(data) > 0:
+                            val = func(data)
+                            return f"{fmt}{val:.2f}" if fmt == "$" else f"{val:.2f}"
+                        return "N/A"
+
+                    stats_data = {
+                        'Metric': ['Average', 'Median', 'Min', 'Max', 'Volatility', 'Days'],
+                        '2023 YTD': [
+                            safe_stat(ytd_data, lambda x: x.mean()),
+                            safe_stat(ytd_data, lambda x: x.median()),
+                            safe_stat(ytd_data, lambda x: x.min()),
+                            safe_stat(ytd_data, lambda x: x.max()),
+                            safe_stat(ytd_data, lambda x: x.std(), ""),
+                            f"{len(ytd_data):,}"
+                        ],
+                        'Pre-Rumor': [
+                            safe_stat(pre_data, lambda x: x.mean()),
+                            safe_stat(pre_data, lambda x: x.median()),
+                            safe_stat(pre_data, lambda x: x.min()),
+                            safe_stat(pre_data, lambda x: x.max()),
+                            safe_stat(pre_data, lambda x: x.std(), ""),
+                            f"{len(pre_data):,}"
+                        ],
+                        'Rumor': [
+                            safe_stat(rumor_data, lambda x: x.mean()),
+                            safe_stat(rumor_data, lambda x: x.median()),
+                            safe_stat(rumor_data, lambda x: x.min()),
+                            safe_stat(rumor_data, lambda x: x.max()),
+                            safe_stat(rumor_data, lambda x: x.std(), ""),
+                            f"{len(rumor_data):,}"
+                        ],
+                        'Post-Deal': [
+                            safe_stat(post_data, lambda x: x.mean()),
+                            safe_stat(post_data, lambda x: x.median()),
+                            safe_stat(post_data, lambda x: x.min()),
+                            safe_stat(post_data, lambda x: x.max()),
+                            safe_stat(post_data, lambda x: x.std(), ""),
+                            f"{len(post_data):,}"
+                        ]
+                    }
+                    st.dataframe(pd.DataFrame(stats_data), use_container_width=True, hide_index=True)
+
+                    # Premium analysis table
+                    st.markdown("**Premium Analysis vs Offers:**")
+                    pre_avg = pre_data.mean() if len(pre_data) > 0 else 0
+                    post_avg = post_data.mean() if len(post_data) > 0 else 0
+
+                    premium_data = {
+                        'Benchmark': ['Nippon Offer', 'Cliffs Offer', 'Analyst Target', 'LBO Mid'],
+                        'Price': [f"${USS_NIPPON_OFFER_PRICE:.0f}", f"${USS_CLIFFS_OFFER_PRICE:.0f}",
+                                  f"${USS_ANALYST_CONSENSUS:.0f}", f"${(USS_LBO_ESTIMATE_LOW+USS_LBO_ESTIMATE_HIGH)/2:.0f}"],
+                        'vs Pre-Rumor': [
+                            f"+{((USS_NIPPON_OFFER_PRICE/pre_avg)-1)*100:.1f}%" if pre_avg > 0 else "N/A",
+                            f"+{((USS_CLIFFS_OFFER_PRICE/pre_avg)-1)*100:.1f}%" if pre_avg > 0 else "N/A",
+                            f"+{((USS_ANALYST_CONSENSUS/pre_avg)-1)*100:.1f}%" if pre_avg > 0 else "N/A",
+                            f"+{(((USS_LBO_ESTIMATE_LOW+USS_LBO_ESTIMATE_HIGH)/2/pre_avg)-1)*100:.1f}%" if pre_avg > 0 else "N/A"
+                        ],
+                        'vs Post-Deal': [
+                            f"+{((USS_NIPPON_OFFER_PRICE/post_avg)-1)*100:.1f}%" if post_avg > 0 else "N/A",
+                            f"+{((USS_CLIFFS_OFFER_PRICE/post_avg)-1)*100:.1f}%" if post_avg > 0 else "N/A",
+                            f"+{((USS_ANALYST_CONSENSUS/post_avg)-1)*100:.1f}%" if post_avg > 0 else "N/A",
+                            f"{(((USS_LBO_ESTIMATE_LOW+USS_LBO_ESTIMATE_HIGH)/2/post_avg)-1)*100:+.1f}%" if post_avg > 0 else "N/A"
+                        ]
+                    }
+                    st.dataframe(pd.DataFrame(premium_data), use_container_width=True, hide_index=True)
+
+            # Expandable raw data table
+            with st.expander("View Raw Price Data"):
+                display_df = period_df.copy()
+                display_df['date'] = display_df['date'].dt.strftime('%Y-%m-%d')
+                display_df.columns = ['Date', 'Price ($)']
+                st.dataframe(display_df, use_container_width=True, hide_index=True, height=300)
+
+        else:
+            st.warning("No data available for the selected date range.")
+
+    else:
+        st.warning("USS stock price data not available. Ensure the file exists at market-data/exports/processed/stock_uss.csv")
+
+    # =========================================================================
     # FCF PROJECTION
     # =========================================================================
 
@@ -4138,136 +4427,94 @@ def main():
     - Green dashed line = \\$55 Nippon offer price (breakeven around 88% price factor)
     """)
 
-    # Render button for on-demand calculation
-    calc_button_ps = render_calculation_button(
-        section_name="Steel Price Sensitivity",
-        button_label="Run Price Sensitivity",
-        session_key="calc_price_sensitivity"
-    )
+    # Auto-calculate price sensitivity
+    price_factors = np.arange(0.6, 1.5, 0.1)
+    sensitivity_data = []
 
-    # Calculate if button clicked
-    if calc_button_ps:
-        col1, col2 = st.columns(2)
+    for pf in price_factors:
+        # Create modified scenario
+        test_price_scenario = SteelPriceScenario(
+            name="Test",
+            description="Test",
+            hrc_us_factor=pf,
+            crc_us_factor=pf,
+            coated_us_factor=pf,
+            hrc_eu_factor=pf,
+            octg_factor=pf,
+            annual_price_growth=scenario.price_scenario.annual_price_growth
+        )
 
-        with col1:
-            # Price factor sensitivity
-            price_factors = np.arange(0.6, 1.5, 0.1)
-            sensitivity_data = []
+        test_scenario = ModelScenario(
+            name="Test",
+            scenario_type=ScenarioType.CUSTOM,
+            description="Test",
+            price_scenario=test_price_scenario,
+            volume_scenario=scenario.volume_scenario,
+            uss_wacc=scenario.uss_wacc,
+            terminal_growth=scenario.terminal_growth,
+            exit_multiple=scenario.exit_multiple,
+            us_10yr=scenario.us_10yr,
+            japan_10yr=scenario.japan_10yr,
+            nippon_equity_risk_premium=scenario.nippon_equity_risk_premium,
+            nippon_credit_spread=scenario.nippon_credit_spread,
+            nippon_debt_ratio=scenario.nippon_debt_ratio,
+            nippon_tax_rate=scenario.nippon_tax_rate,
+            override_irp=scenario.override_irp,
+            manual_nippon_usd_wacc=scenario.manual_nippon_usd_wacc,
+            include_projects=scenario.include_projects
+        )
 
-            # Create progress bar for price sensitivity
-            progress_bar_ps = st.progress(0, text="Running steel price sensitivity analysis...")
+        test_model = PriceVolumeModel(test_scenario, custom_benchmarks=custom_benchmarks)
+        test_analysis = test_model.run_full_analysis()
 
-            for i, pf in enumerate(price_factors, 1):
-                progress_pct = int((i / len(price_factors)) * 100)
-                progress_bar_ps.progress(progress_pct, text=f"Testing price level: {pf:.0%} of baseline ({i}/{len(price_factors)})")
-            # Create modified scenario
-            test_price_scenario = SteelPriceScenario(
-                name="Test",
-                description="Test",
-                hrc_us_factor=pf,
-                crc_us_factor=pf,
-                coated_us_factor=pf,
-                hrc_eu_factor=pf,
-                octg_factor=pf,
-                annual_price_growth=scenario.price_scenario.annual_price_growth
-            )
+        sensitivity_data.append({
+            'Price Factor': f"{pf:.0%}",
+            'Price Factor Num': pf,
+            'Nippon Value': test_analysis['val_nippon']['share_price'],
+            'USS Value': test_analysis['val_uss']['share_price']
+        })
 
-            test_scenario = ModelScenario(
-                name="Test",
-                scenario_type=ScenarioType.CUSTOM,
-                description="Test",
-                price_scenario=test_price_scenario,
-                volume_scenario=scenario.volume_scenario,
-                uss_wacc=scenario.uss_wacc,
-                terminal_growth=scenario.terminal_growth,
-                exit_multiple=scenario.exit_multiple,
-                us_10yr=scenario.us_10yr,
-                japan_10yr=scenario.japan_10yr,
-                nippon_equity_risk_premium=scenario.nippon_equity_risk_premium,
-                nippon_credit_spread=scenario.nippon_credit_spread,
-                nippon_debt_ratio=scenario.nippon_debt_ratio,
-                nippon_tax_rate=scenario.nippon_tax_rate,
-                override_irp=scenario.override_irp,
-                manual_nippon_usd_wacc=scenario.manual_nippon_usd_wacc,
-                include_projects=scenario.include_projects
-            )
+    sens_df = pd.DataFrame(sensitivity_data)
 
-            test_model = PriceVolumeModel(test_scenario, custom_benchmarks=custom_benchmarks)
-            test_analysis = test_model.run_full_analysis()
-
-            sensitivity_data.append({
-                'Price Factor': f"{pf:.0%}",
-                'Price Factor Num': pf,
-                'Nippon Value': test_analysis['val_nippon']['share_price'],
-                'USS Value': test_analysis['val_uss']['share_price']
+    # Build price projection data
+    price_proj_data = []
+    for seg_name, df in segment_dfs.items():
+        for _, row in df.iterrows():
+            price_proj_data.append({
+                'Year': row['Year'],
+                'Segment': seg_name,
+                'Price': row['Price_per_ton']
             })
+    price_proj_df = pd.DataFrame(price_proj_data)
 
-            sens_df = pd.DataFrame(sensitivity_data)
+    # Display results
+    col1, col2 = st.columns(2)
 
-            # Clear progress bar
-            progress_bar_ps.empty()
+    with col1:
+        fig = px.line(
+            sens_df,
+            x='Price Factor',
+            y='Nippon Value',
+            title='Share Value vs Steel Price Level',
+            markers=True
+        )
+        fig.add_hline(y=55, line_dash="dash", line_color="green", annotation_text="$55 Offer")
+        fig.add_hline(y=0, line_color="black", line_width=1)
+        fig.update_layout(yaxis_title='Equity Value ($/sh)')
+        st.plotly_chart(fig, use_container_width=True)
 
-        with col2:
-            # Volume and price projections
-            st.subheader("Price Projections by Segment")
-
-            price_proj_data = []
-            for seg_name, df in segment_dfs.items():
-                for _, row in df.iterrows():
-                    price_proj_data.append({
-                        'Year': row['Year'],
-                        'Segment': seg_name,
-                        'Price': row['Price_per_ton']
-                    })
-
-            price_proj_df = pd.DataFrame(price_proj_data)
-
-        # Store results with timestamp
-        st.session_state.calc_price_sensitivity = {
-            'sens_df': sens_df,
-            'price_proj_df': price_proj_df,
-            'timestamp': datetime.now()
-        }
-
-        # Persist to disk
-        cp.save_calculation_cache('calc_price_sensitivity', st.session_state.calc_price_sensitivity, current_hash)
-
-        st.rerun()
-
-    # Display results if available
-    if st.session_state.calc_price_sensitivity is not None:
-        sens_df = st.session_state.calc_price_sensitivity['sens_df']
-        price_proj_df = st.session_state.calc_price_sensitivity['price_proj_df']
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            fig = px.line(
-                sens_df,
-                x='Price Factor',
-                y='Nippon Value',
-                title='Share Value vs Steel Price Level',
-                markers=True
-            )
-            fig.add_hline(y=55, line_dash="dash", line_color="green", annotation_text="$55 Offer")
-            fig.add_hline(y=0, line_color="black", line_width=1)
-            fig.update_layout(yaxis_title='Equity Value ($/sh)')
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col2:
-            st.subheader("Price Projections by Segment")
-            fig = px.line(
-                price_proj_df,
-                x='Year',
-                y='Price',
-                color='Segment',
-                title='Realized Price by Segment ($/ton)',
-                markers=True,
-                color_discrete_sequence=['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4']
-            )
-            st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Steel price sensitivity not yet calculated. Click button above to calculate.")
+    with col2:
+        st.subheader("Price Projections by Segment")
+        fig = px.line(
+            price_proj_df,
+            x='Year',
+            y='Price',
+            color='Segment',
+            title='Realized Price by Segment ($/ton)',
+            markers=True,
+            color_discrete_sequence=['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4']
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
     # =========================================================================
     # WACC SENSITIVITY
@@ -4286,79 +4533,43 @@ def main():
     - The gap between blue and red lines shows the "WACC advantage" Nippon gains from its lower cost of capital
     """)
 
-    # Render button for on-demand calculation
-    calc_button_wacc = render_calculation_button(
-        section_name="WACC Sensitivity",
-        button_label="Run WACC Sensitivity",
-        session_key="calc_wacc_sensitivity"
+    # Auto-calculate WACC sensitivity
+    wacc_range = np.arange(0.05, 0.14, 0.005)
+    wacc_sensitivity_data = []
+
+    for w in wacc_range:
+        val = model.calculate_dcf(consolidated, w)
+        wacc_sensitivity_data.append({
+            'WACC': w * 100,
+            'Equity Value': val['share_price']
+        })
+
+    wacc_sens_df = pd.DataFrame(wacc_sensitivity_data)
+
+    # Display results
+    fig = px.line(
+        wacc_sens_df,
+        x='WACC',
+        y='Equity Value',
+        title='Equity Value per Share vs WACC',
+        markers=True
     )
 
-    # Calculate if button clicked
-    if calc_button_wacc:
-        wacc_range = np.arange(0.05, 0.14, 0.005)
-        wacc_sensitivity_data = []
+    # Add reference lines
+    fig.add_hline(y=55, line_dash="dash", line_color="green",
+                  annotation_text="Nippon Offer ($55)")
+    fig.add_vline(x=scenario.uss_wacc*100, line_dash="dash", line_color="blue",
+                  annotation_text=f"USS WACC ({scenario.uss_wacc*100:.1f}%)")
+    fig.add_vline(x=usd_wacc*100, line_dash="dash", line_color="red",
+                  annotation_text=f"Nippon USD WACC ({usd_wacc*100:.2f}%)")
 
-        # Create progress bar for WACC sensitivity
-        progress_bar_wacc = st.progress(0, text="Running WACC sensitivity analysis...")
+    fig.update_layout(
+        xaxis_title='WACC (%)',
+        yaxis_title='Equity Value ($/sh)',
+        height=400
+    )
 
-        for i, w in enumerate(wacc_range, 1):
-            progress_pct = int((i / len(wacc_range)) * 100)
-            progress_bar_wacc.progress(progress_pct, text=f"Testing WACC: {w:.1%} ({i}/{len(wacc_range)})")
-            val = model.calculate_dcf(consolidated, w)
-            wacc_sensitivity_data.append({
-                'WACC': w * 100,
-                'Equity Value': val['share_price']
-            })
-
-        wacc_sens_df = pd.DataFrame(wacc_sensitivity_data)
-
-        # Clear progress bar
-        progress_bar_wacc.empty()
-
-        # Store results with timestamp
-        st.session_state.calc_wacc_sensitivity = {
-            'wacc_sens_df': wacc_sens_df,
-            'uss_wacc': scenario.uss_wacc,
-            'usd_wacc': usd_wacc,
-            'timestamp': datetime.now()
-        }
-
-        # Persist to disk
-        cp.save_calculation_cache('calc_wacc_sensitivity', st.session_state.calc_wacc_sensitivity, current_hash)
-
-        st.rerun()
-
-    # Display results if available
-    if st.session_state.calc_wacc_sensitivity is not None:
-        wacc_sens_df = st.session_state.calc_wacc_sensitivity['wacc_sens_df']
-        stored_uss_wacc = st.session_state.calc_wacc_sensitivity['uss_wacc']
-        stored_usd_wacc = st.session_state.calc_wacc_sensitivity['usd_wacc']
-
-        fig = px.line(
-            wacc_sens_df,
-            x='WACC',
-            y='Equity Value',
-            title='Equity Value per Share vs WACC',
-            markers=True
-        )
-
-        # Add reference lines
-        fig.add_hline(y=55, line_dash="dash", line_color="green",
-                      annotation_text="Nippon Offer ($55)")
-        fig.add_vline(x=stored_uss_wacc*100, line_dash="dash", line_color="blue",
-                      annotation_text=f"USS WACC ({stored_uss_wacc*100:.1f}%)")
-        fig.add_vline(x=stored_usd_wacc*100, line_dash="dash", line_color="red",
-                      annotation_text=f"Nippon USD WACC ({stored_usd_wacc*100:.2f}%)")
-
-        fig.update_layout(
-            xaxis_title='WACC (%)',
-            yaxis_title='Equity Value ($/sh)',
-            height=400
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("WACC sensitivity not yet calculated. Click button above to calculate.")
+    st.plotly_chart(fig, use_container_width=True)
 
     # =========================================================================
     # WACC COMPONENT DETAILS
@@ -4675,14 +4886,16 @@ def main():
                 if proj_name in projects_info:
                     proj = projects_info[proj_name]
                     total_capex = sum(proj.capex_schedule.values())
-                    final_ebitda = proj.ebitda_schedule.get(2033, 0)
+                    # Use dynamic EBITDA calculation (same as main capital projects section)
+                    final_ebitda = get_dynamic_project_ebitda(proj, 2033)
                     project_rows.append(f"| {proj_name} | {proj.segment} | ${total_capex:,.0f}M | ${final_ebitda:,.0f}M |")
 
             st.markdown(f"""
-| Project | Segment | Total CapEx | 2033 EBITDA |
+| Project | Segment | Total CapEx | 2033 EBITDA* |
 |---------|---------|-------------|-------------|
 {chr(10).join(project_rows)}
             """)
+            st.caption("*EBITDA calculated dynamically based on scenario price assumptions*")
             if execution_factor < 1.0:
                 st.markdown(f"*Execution factor: {execution_factor:.0%} applied to incremental projects (excludes BR2)*")
         else:

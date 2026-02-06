@@ -71,19 +71,34 @@ sensitivity_analysis/
 ### Input Variables
 
 The Monte Carlo engine models uncertainty in:
-- **Steel Prices**: HRC, CRC, Coated, OCTG (lognormal distributions)
-- **Volumes**: Flat-Rolled, Mini Mill, Tubular (normal/triangular)
-- **Discount Rate**: USS WACC, Japan risk-free rate (normal)
+- **Steel Prices**: HRC, CRC, Coated, OCTG, HRC EU (lognormal distributions)
+- **Volumes**: Flat-Rolled, Mini Mill, USSE, Tubular (normal/triangular)
+- **Discount Rate**: USS WACC, Japan risk-free rate, US 10Y, Nippon ERP (normal)
 - **Terminal Value**: Growth rate, exit multiple (triangular)
 - **Execution Risk**: Project success rates (beta)
+- **Tariff Risk**: Tariff probability (beta), alternative rate (triangular)
+- **Other**: Annual price growth, margin factor, capex intensity, working capital
 
 ### Correlation Structure
 
 Preserves relationships:
-- HRC ↔ CRC prices: 0.95 correlation
-- HRC price ↔ Volume: 0.40 correlation
-- OCTG ↔ Tubular volume: 0.75 correlation
-- US WACC ↔ Japan rates: -0.30 correlation
+- HRC ↔ CRC prices: 0.97 correlation
+- HRC price ↔ Volume: 0.56 correlation
+- OCTG ↔ Tubular volume: 0.73 correlation
+- HRC US ↔ HRC EU: 0.70 correlation
+- US 10Y ↔ USS WACC: 0.60 correlation
+- Tariff Prob ↔ HRC Price: -0.35 (tariff removal → lower prices)
+- Tariff Prob ↔ FR Volume: -0.25 (tariff removal → lower demand)
+
+### Latest Results (10,000 sims, 25 variables incl. tariff risk, 2026-02-06)
+
+| Metric | USS Standalone | Nippon View |
+|--------|---------------|-------------|
+| Mean | $61.2 | $85.0 |
+| Median | $57.3 | $79.8 |
+| P5 / P95 | $25 / $111 | $36 / $152 |
+| P(< $55 offer) | 46.3% | 20.6% |
+| Synergy Premium | — | ~$23/share |
 
 ### Output Metrics
 
@@ -96,10 +111,10 @@ Preserves relationships:
 
 ## Performance
 
-Typical runtime (MacBook Pro M1):
-- 1,000 iterations: ~1 minute
-- 10,000 iterations: ~10 minutes
-- 50,000 iterations: ~50 minutes
+Typical runtime (4-worker parallel execution):
+- 1,000 iterations: ~20 seconds
+- 5,000 iterations: ~100 seconds
+- 10,000 iterations: ~3.5 minutes
 
 Latin Hypercube Sampling provides 95% accuracy with 10,000 iterations (vs 50,000+ for random sampling).
 
@@ -160,10 +175,11 @@ The engine includes validation checks:
 - [x] Correlation modeling
 - [x] Risk metrics
 
-### Phase 2: Enhanced Analytics (In Progress)
-- [ ] Tornado diagrams
-- [ ] Two-way sensitivity tables
-- [ ] Distribution visualizations
+### Phase 2: Enhanced Analytics (Complete)
+- [x] Tornado diagrams (correlation-based sensitivity)
+- [x] Dual-perspective distributions (USS vs Nippon)
+- [x] 13 automated visualization charts
+- [x] Through-cycle distribution calibration
 - [ ] Export to Excel/PDF
 
 ### Phase 3: Time-Series (Planned)
@@ -199,4 +215,4 @@ Internal use only - RAMBAS Team Capstone Project
 
 Questions or issues? Contact the RAMBAS team.
 
-**Last Updated:** 2026-01-31
+**Last Updated:** 2026-02-06

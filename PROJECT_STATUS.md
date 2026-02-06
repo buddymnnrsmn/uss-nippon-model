@@ -1,6 +1,6 @@
 # Project Status
 
-**Last Updated:** 2026-02-05
+**Last Updated:** 2026-02-06
 
 ---
 
@@ -9,10 +9,10 @@
 A Python-based DCF valuation model analyzing Nippon Steel's $55/share acquisition offer for U.S. Steel Corporation. Built for the RAMBAS Team Capstone Project.
 
 **Core Capabilities:**
-- **Valuation Engine** — Price × Volume methodology across 4 business segments (Flat-Rolled, Mini Mill, USSE, Tubular), projecting 5-year cash flows with dual valuation: USS standalone (10.7% verified WACC) vs Nippon view (7.95% IRP-adjusted WACC). WACC calculations sourced from verifiable public data with full audit trails.
-- **Scenario Framework** — 7 scenarios calibrated to 34-year historical data with probability weights. Supports three calibration modes (Fixed, Bloomberg, Hybrid) and two probability distribution modes (Fixed, Bloomberg) for weighted-average valuation.
+- **Valuation Engine** — Price × Volume methodology across 4 business segments (Flat-Rolled, Mini Mill, USSE, Tubular), projecting 5-year cash flows with dual valuation: USS standalone (10.7% verified WACC) vs Nippon view (7.95% IRP-adjusted WACC). WACC calculations sourced from verifiable public data with full audit trails. Benchmarks rebased to through-cycle equilibrium ($738 HRC) with explicit Section 232 tariff modeling.
+- **Scenario Framework** — 10 scenarios (7 core + 3 tariff) calibrated to 34-year historical data with probability weights. Supports three calibration modes (Fixed, Bloomberg, Hybrid) and two probability distribution modes (Fixed, Bloomberg) for weighted-average valuation. Section 232 tariff rate adjustable (0-50%) with automatic price impact propagation.
 - **Interactive Dashboard** — Streamlit interface with on-demand calculations, caching, and real-time progress tracking
-- **Monte Carlo Simulation** — Probabilistic valuation with Latin Hypercube Sampling, correlation modeling, and risk metrics (VaR, CVaR)
+- **Monte Carlo Simulation** — Probabilistic valuation with Latin Hypercube Sampling, 25 correlated variables (including tariff risk), and risk metrics (VaR, CVaR)
 - **Breakup Fee Analysis** — $565M fee modeling with adjustable probability sliders and expected value calculations
 - **LBO Analysis** — Leveraged buyout perspective establishing valuation floor
 - **Audit Infrastructure** — Input traceability, source verification, and automated validation
@@ -34,10 +34,9 @@ Run with: `streamlit run interactive_dashboard.py`
 | Item | Blocked By | Notes |
 |------|------------|-------|
 | **Premium Steel Market Opportunity** | Bloomberg data | Model 5 premium segments (EV automotive, electrical, green, offshore wind, aerospace/defense) as Nippon technology synergies. Design spec in `market-data/premium-steel-market-opportunity.md`. Ready for implementation once data is gathered. |
-| Monte Carlo Phase 2: Enhanced Analytics | — | Tornado diagrams, two-way sensitivity tables, Excel/PDF export. Ready to start. |
-| Bloomberg data integration | Data access | Infrastructure built (`market-data/`). Scenario calibration modes and probability distributions implemented. Remaining: live data feeds, Monte Carlo calibration. Guide in `market-data/BLOOMBERG_DATA_GUIDE.md`. |
+| Bloomberg data integration | Data access | Infrastructure built (`market-data/`). Scenario calibration modes and probability distributions implemented. Remaining: live data feeds. Guide in `market-data/BLOOMBERG_DATA_GUIDE.md`. |
 | Source data audit completion | Manual effort | Tracker in `audit-verification/data_collection/`. Requires extracting values from 10-K, steel price sources. |
-| Monte Carlo dashboard integration | Phase 2 completion | Add interactive Monte Carlo controls to Streamlit dashboard. |
+| Monte Carlo dashboard integration | — | Add interactive Monte Carlo controls to Streamlit dashboard. |
 
 ---
 
@@ -124,6 +123,8 @@ Run with: `streamlit run interactive_dashboard.py`
 
 | Item | Date | Notes |
 |------|------|-------|
+| Section 232 tariff model & benchmark rebasing | 2026-02-06 | Rebased benchmarks from 2023 Bloomberg to through-cycle equilibrium (HRC $916→$738). Explicit tariff adjustment function (0-50% rate). 3 new tariff scenarios. 2 new MC variables (tariff_probability, tariff_rate_if_changed) with Cholesky-correlated sampling. 34 new tests passing, backtest 5/5. |
+| Valuation calibration fix | 2026-02-06 | Halved margin sensitivity, reduced annual price growth, tightened margin cap (30%→22%). Base case USS $39.04, Nippon $55.66 — matches pre-deal $39 and deal $55. |
 | Bloomberg scenario calibration & probability distributions | 2026-02-05 | Three price calibration modes (Fixed ±15%, Bloomberg percentiles, Hybrid conservative) and two probability distribution modes (Fixed symmetric, Bloomberg historical). Dashboard UI in "Scenario Calibration" expander. 53 tests passing. |
 | SCENARIO_RATIONALE documentation update | 2026-02-03 | Updated all scenario valuations with current model outputs. Added WACC data sources section (S.5) with verifiable inputs from Federal Reserve, Duff & Phelps, USS 10-K, Bank of Japan. Exported to PDF and Word formats. |
 | Documentation export workflows | 2026-02-03 | Created `WORKFLOW_REFERENCE.md` documenting how to run model scenarios, export to PDF (WeasyPrint), export to Word (python-docx), and access WACC audit trails. |

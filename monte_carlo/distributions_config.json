@@ -1,0 +1,453 @@
+{
+  "version": "1.1.0",
+  "calibration_date": "2026-02-05",
+  "calibration_timestamp": "2026-02-05T06:36:55.995535",
+  "data_cutoff_date": "2023-12-18",
+  "data_sources": {
+    "market_data": "/workspaces/claude-in-docker/FinancialModel/market-data/exports/processed",
+    "peer_data": "/workspaces/claude-in-docker/FinancialModel/local/wrds_cache"
+  },
+  "variables": {
+    "hrc_price_factor": {
+      "distribution_type": "lognormal",
+      "parameters": {
+        "mean": -0.0162,
+        "std": 0.18
+      },
+      "data_source": "hrc_us_futures.csv (through-cycle volatility), mean-reverting to 1.0",
+      "n_observations": 1251,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Through-cycle σ=0.18 excludes 2021-2022 COVID spike anomaly"
+      },
+      "rationale": "Mean-reverting to through-cycle baseline (E[X]=1.0). Through-cycle σ=0.18 vs full-period σ=0.264. Bloomberg data: pre-COVID σ=0.208, post-COVID σ=0.388, ex-COVID σ=0.235. Chosen σ is conservative vs pre-COVID (forward-looking 10yr horizon averages out extremes).",
+      "sample_statistics": {
+        "theoretical_mean": 1.0,
+        "bloomberg_full_sigma": 0.264,
+        "bloomberg_pre_covid_sigma": 0.208,
+        "bloomberg_ex_covid_sigma": 0.235,
+        "chosen_sigma": 0.18,
+        "p05_approx": 0.73,
+        "p95_approx": 1.32
+      }
+    },
+    "crc_price_factor": {
+      "distribution_type": "lognormal",
+      "parameters": {
+        "mean": -0.0128,
+        "std": 0.16
+      },
+      "data_source": "crc_us_spot.csv (through-cycle volatility), mean-reverting to 1.0",
+      "n_observations": 259,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Through-cycle σ=0.16 excludes COVID spike"
+      },
+      "rationale": "Mean-reverting to through-cycle baseline (E[X]=1.0). Through-cycle volatility (σ=0.16). High correlation with HRC."
+    },
+    "octg_price_factor": {
+      "distribution_type": "lognormal",
+      "parameters": {
+        "mean": -0.0242,
+        "std": 0.22
+      },
+      "data_source": "octg_us_spot.csv (through-cycle volatility), mean-reverting to 1.0",
+      "n_observations": 256,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Through-cycle σ=0.22 reflects oil/gas cyclicality without COVID anomaly"
+      },
+      "rationale": "Mean-reverting to through-cycle baseline (E[X]=1.0). Through-cycle σ=0.22 retains higher vol than flat-rolled due to oil/gas cyclicality."
+    },
+    "coated_price_factor": {
+      "distribution_type": "lognormal",
+      "parameters": {
+        "mean": -0.0113,
+        "std": 0.15
+      },
+      "data_source": "derived from CRC (through-cycle), mean-reverting to 1.0",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Through-cycle σ=0.15, slightly less volatile than CRC"
+      },
+      "rationale": "Mean-reverting to through-cycle baseline (E[X]=1.0). Through-cycle σ=0.15, slightly less volatile than CRC due to value-added premium stability."
+    },
+    "flat_rolled_volume": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 0.9999999999999998,
+        "std": 0.08073581760963654
+      },
+      "data_source": "capacity_us.csv",
+      "n_observations": 464,
+      "goodness_of_fit": {
+        "ks_statistic": 0.09082219185970819,
+        "ks_p_value": 0.0008825273540949638,
+        "aic": -1015.6047532831898,
+        "bic": -1007.3249841787373,
+        "log_likelihood": 509.8023766415949
+      },
+      "rationale": "Based on 464 weekly US capacity utilization readings. Normal distribution reflects symmetric demand shocks.",
+      "sample_statistics": {
+        "mean": 0.9999999999999998,
+        "std": 0.08064877088070388
+      }
+    },
+    "mini_mill_volume": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 1.0,
+        "std": 0.0605518632072274
+      },
+      "data_source": "derived from capacity_us.csv",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "derived": true
+      },
+      "rationale": "Mini-mills are less cyclical than integrated. Volatility reduced by 25% from flat-rolled."
+    },
+    "tubular_volume": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": 0.65,
+        "mode": 1.00,
+        "max": 1.35
+      },
+      "data_source": "rig_count.csv (through-cycle range)",
+      "n_observations": 107,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Range tightened from raw rig count data to exclude extreme COVID/shale collapse scenarios"
+      },
+      "rationale": "Tubular demand driven by oil/gas drilling activity. Through-cycle range [0.65, 1.35] excludes extreme rig count collapse (2020) and boom (2014). Mean = 1.0.",
+      "sample_statistics": {
+        "mean": 1.0,
+        "std": 0.144,
+        "min": 0.65,
+        "max": 1.35
+      }
+    },
+    "uss_wacc": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 10.9,
+        "std": 0.8
+      },
+      "data_source": "ust_10y.csv, spread_bbb.csv",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "composite": true
+      },
+      "rationale": "Composite of 10Y Treasury yield distribution and BBB credit spread. Mean of 10.9% reflects current calculation; std of 0.8% reflects combined rate and spread uncertainty."
+    },
+    "japan_rf_rate": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 0.75,
+        "std": 0.3
+      },
+      "data_source": "assumed based on JGB 10Y",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "assumed": true
+      },
+      "rationale": "Japan 10Y JGB yields anchored by BOJ policy. Low volatility reflects yield curve control history."
+    },
+    "terminal_growth": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": -0.5,
+        "mode": 1.0,
+        "max": 2.5
+      },
+      "data_source": "expert judgment",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true
+      },
+      "rationale": "Terminal growth bounded by long-term industry outlook. Min=-0.5% (secular decline), Mode=1.0% (GDP match), Max=2.5% (reinvestment)."
+    },
+    "exit_multiple": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": 3.5,
+        "mode": 4.5,
+        "max": 6.5
+      },
+      "data_source": "steel peer trading analysis",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true
+      },
+      "rationale": "Steel sector EV/EBITDA multiples. Min=3.5x (trough), Mode=4.5x (mid-cycle), Max=6.5x (peak). Reflects commodity cyclicality."
+    },
+    "gary_works_execution": {
+      "distribution_type": "beta",
+      "parameters": {
+        "alpha": 8,
+        "beta": 3,
+        "min": 0.4,
+        "max": 1.0
+      },
+      "data_source": "M&A execution literature",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true
+      },
+      "rationale": "Gary Works BF reline is proven technology. Beta(8,3) gives mean ~73% success, skewed toward full execution. Based on historical BF project execution rates."
+    },
+    "mon_valley_execution": {
+      "distribution_type": "beta",
+      "parameters": {
+        "alpha": 9,
+        "beta": 2,
+        "min": 0.5,
+        "max": 1.0
+      },
+      "data_source": "M&A execution literature",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true
+      },
+      "rationale": "Mon Valley HSM is equipment upgrade, lower complexity. Beta(9,2) gives mean ~82% success with high confidence."
+    },
+    "flat_rolled_margin_factor": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": 0.85,
+        "mode": 1.0,
+        "max": 1.15
+      },
+      "data_source": "peer_fundamentals.csv (through-cycle)",
+      "n_observations": 57,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Range tightened to ±15% — margins are more stable than prices"
+      },
+      "rationale": "Based on peer EBITDA margin observations. Through-cycle range [0.85, 1.15] reflects margin stability relative to price volatility. Margins compress in downturns but are partially offset by cost adjustments."
+    },
+    "operating_synergy_factor": {
+      "distribution_type": "beta",
+      "parameters": {
+        "alpha": 8,
+        "beta": 3,
+        "min": 0.5,
+        "max": 1.0
+      },
+      "data_source": "M&A synergy realization studies",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true
+      },
+      "rationale": "M&A literature shows 70-85% operating synergy realization rate. Beta(8,3) gives mean ~82% with positive skew toward success."
+    },
+    "revenue_synergy_factor": {
+      "distribution_type": "beta",
+      "parameters": {
+        "alpha": 3,
+        "beta": 4,
+        "min": 0.3,
+        "max": 0.9
+      },
+      "data_source": "M&A synergy realization studies",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true
+      },
+      "rationale": "Revenue synergies historically harder to achieve than cost synergies. Beta(3,4) gives mean ~55% with wider uncertainty band."
+    },
+    "working_capital_efficiency": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 1.0,
+        "std": 0.08
+      },
+      "data_source": "peer analysis",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "assumed": true
+      },
+      "rationale": "Working capital efficiency varies with commodity cycles. Normal with 8% volatility reflects typical industry variation."
+    },
+    "capex_intensity_factor": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": 0.8,
+        "mode": 1.0,
+        "max": 1.3
+      },
+      "data_source": "peer capex analysis",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "assumed": true
+      },
+      "rationale": "CapEx intensity varies with cycle and strategic priorities. Triangular captures potential for above/below-plan spending."
+    },
+    "us_10yr": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 4.25,
+        "std": 0.50
+      },
+      "data_source": "ust_10y.csv",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "derived": true
+      },
+      "rationale": "US 10Y Treasury rate affects IRP WACC calculation. Based on recent rate volatility (2023-2024 range ~3.5-5%)."
+    },
+    "nippon_erp": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 4.75,
+        "std": 0.50
+      },
+      "data_source": "expert judgment",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "assumed": true
+      },
+      "rationale": "Nippon equity risk premium. Japanese market ERP estimates range 4-6% in academic literature."
+    },
+    "annual_price_growth": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 1.0,
+        "std": 1.0
+      },
+      "data_source": "historical steel price trends",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "assumed": true
+      },
+      "rationale": "Annual steel price growth rate (%). Mean of 1.0% reflects long-term inflation-linked growth for commodity steel. Std of 1% allows for -1% to +3% in 95% of cases."
+    },
+    "usse_volume": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 1.0,
+        "std": 0.10
+      },
+      "data_source": "European steel demand data",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "assumed": true
+      },
+      "rationale": "USSE (European) volume factor. Higher volatility than US due to energy cost exposure and import competition."
+    },
+    "hrc_eu_factor": {
+      "distribution_type": "lognormal",
+      "parameters": {
+        "mean": -0.0113,
+        "std": 0.15
+      },
+      "data_source": "hrc_eu_spot.csv (through-cycle volatility), mean-reverting to 1.0",
+      "n_observations": 592,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Through-cycle σ=0.15 from Bloomberg data (full-period σ=0.156, pre-COVID σ=0.116)"
+      },
+      "rationale": "Mean-reverting to through-cycle baseline (E[X]=1.0). EU HRC is less volatile than US (σ=0.15 vs 0.18) due to different market structure and import competition."
+    },
+    "tariff_probability": {
+      "distribution_type": "beta",
+      "parameters": {
+        "alpha": 8,
+        "beta": 2,
+        "min": 0.0,
+        "max": 1.0
+      },
+      "data_source": "expert judgment - policy risk assessment",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true
+      },
+      "rationale": "P(tariffs maintained at 25%) ~80%. Beta(8,2) gives mean=0.80, right-skewed toward tariff maintenance. Reflects political inertia and bipartisan support for steel tariffs."
+    },
+    "tariff_rate_if_changed": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": 0.0,
+        "mode": 0.10,
+        "max": 0.25
+      },
+      "data_source": "expert judgment - trade policy scenarios",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true
+      },
+      "rationale": "If tariff policy changes, most likely outcome is reduction to ~10% (compromise rate). Full removal (0%) is tail risk. Max at current 25% (no increase modeled here since tariff_probability handles that)."
+    }
+  },
+  "correlations": {
+    "hrc_price_factor": {
+      "crc_price_factor": 0.9696756965604892,
+      "octg_price_factor": 0.4978557121519224,
+      "flat_rolled_volume": 0.5563255946279376,
+      "hrc_eu_factor": 0.70,
+      "annual_price_growth": 0.30
+    },
+    "crc_price_factor": {
+      "hrc_price_factor": 0.9696756965604892,
+      "coated_price_factor": 0.92
+    },
+    "octg_price_factor": {
+      "hrc_price_factor": 0.4978557121519224,
+      "tubular_volume": 0.7288289402507373
+    },
+    "flat_rolled_volume": {
+      "hrc_price_factor": 0.5563255946279376,
+      "mini_mill_volume": 0.7,
+      "usse_volume": 0.50
+    },
+    "tubular_volume": {
+      "octg_price_factor": 0.75
+    },
+    "gary_works_execution": {
+      "mon_valley_execution": 0.6
+    },
+    "us_10yr": {
+      "uss_wacc": 0.60,
+      "japan_rf_rate": 0.40
+    },
+    "japan_rf_rate": {
+      "us_10yr": 0.40,
+      "uss_wacc": -0.30
+    },
+    "hrc_eu_factor": {
+      "hrc_price_factor": 0.70,
+      "usse_volume": 0.40,
+      "tariff_probability": -0.10
+    },
+    "tariff_probability": {
+      "hrc_price_factor": -0.35,
+      "crc_price_factor": -0.35,
+      "coated_price_factor": -0.30,
+      "octg_price_factor": -0.20,
+      "flat_rolled_volume": -0.25,
+      "mini_mill_volume": -0.15,
+      "hrc_eu_factor": -0.10
+    }
+  },
+  "metadata": {
+    "n_variables": 25,
+    "distribution_types_used": [
+      "triangular",
+      "lognormal",
+      "normal",
+      "beta"
+    ],
+    "lookback_start": "2019-01-01",
+    "data_cutoff": "2023-12-18",
+    "notes": [
+      "Data cutoff: 2023-12-18 (USS Board approved Nippon deal)",
+      "Lookback window: 2019-01-01 to 2023-12-18",
+      "Price factors fitted to pre-deal historical data only",
+      "Lognormal used for prices (non-negative, mean-reverting)",
+      "Beta used for execution success (bounded 0-1, skewed)",
+      "Triangular used for expert judgment (min/mode/max)",
+      "Correlations from Bloomberg data where available"
+    ]
+  }
+}
