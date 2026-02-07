@@ -718,11 +718,25 @@ def main():
     decomp_df = decompose_price_volume(revenue_df, indicators, steel_prices)
     if len(decomp_df) > 0:
         print(f"  Decomposed {len(decomp_df)} indicators")
-        top_partial = decomp_df.nlargest(5, 'r_partial', keep='first')
-        print("\n  Top volume predictors (after removing price):")
+
+        # Rank by partial r (volume effect) — primary ranking criterion
+        decomp_df['abs_partial_r'] = decomp_df['r_partial'].abs()
+        top_partial = decomp_df.nlargest(5, 'abs_partial_r', keep='first')
+        print("\n  Top volume predictors (ranked by |partial r|, after removing price):")
         for _, row in top_partial.iterrows():
             sig = '*' if row['p_partial'] < 0.05 else ''
-            print(f"    {row['indicator']:25s} partial_r={row['r_partial']:.3f}{sig}  volume_r={row['r_volume']:.3f}")
+            print(f"    {row['indicator']:25s} |partial_r|={row['abs_partial_r']:.3f}{sig}  "
+                  f"full_r={row['r_full']:.3f}  volume_r={row['r_volume']:.3f}")
+
+        # Load composite scores if available
+        composite_path = Path('audit-verification/composite_indicator_scores.csv')
+        if composite_path.exists():
+            composite_df = pd.read_csv(composite_path)
+            decomp_df = decomp_df.merge(
+                composite_df[['indicator', 'composite_score']],
+                on='indicator', how='left'
+            )
+            print("\n  Composite scores loaded for demand ranking")
 
     # Phase 3: Multivariate model
     print("\nPhase 3: Multivariate model...")

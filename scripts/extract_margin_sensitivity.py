@@ -25,40 +25,10 @@ OUTPUT_CSV = os.path.join(
     BASE_DIR, "audit-verification", "data_collection", "margin_sensitivity_analysis.csv"
 )
 
-# USS segment data from 10-K filings (FY2019-2023)
-# Sources: USS 10-K annual reports, segment disclosures
-# Revenue and EBITDA in $M, shipments in kt, realized price in $/ton
-USS_SEGMENT_DATA = {
-    "Flat-Rolled": [
-        # year, revenue_mm, ebitda_mm, shipments_kt, realized_price
-        (2019, 8543, 651, 9600, 890),
-        (2020, 5996, -106, 7200, 833),
-        (2021, 11276, 3394, 8400, 1342),
-        (2022, 11863, 2801, 8100, 1465),
-        (2023, 9402, 1016, 8700, 1081),
-    ],
-    "Mini Mill": [
-        (2019, 1712, 196, 2300, 744),
-        (2020, 1388, 114, 2000, 694),
-        (2021, 3267, 1135, 2400, 1361),
-        (2022, 3852, 1143, 2500, 1541),
-        (2023, 3108, 539, 2700, 1151),
-    ],
-    "USSE": [
-        (2019, 3054, 47, 4200, 727),
-        (2020, 2163, -162, 3400, 636),
-        (2021, 4223, 651, 4000, 1056),
-        (2022, 4460, 564, 3800, 1174),
-        (2023, 3481, 150, 3900, 893),
-    ],
-    "Tubular": [
-        (2019, 1456, 47, 900, 1618),
-        (2020, 740, -167, 500, 1480),
-        (2021, 1167, 64, 700, 1667),
-        (2022, 2647, 832, 900, 2941),
-        (2023, 2714, 701, 800, 3393),
-    ],
-}
+# USS segment data — imported from centralized shared module
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from data.uss_segment_data import USS_SEGMENT_DATA
 
 
 def compute_margin_sensitivity(segment_name, data):

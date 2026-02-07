@@ -73,7 +73,7 @@ Note: Tariff risk variables (tariff_probability, tariff_rate_if_changed) add ~4p
 | 10Y Treasury | `market-data/exports/processed/ust_10y.csv` | ~1,000 | 2020 - Dec 2023 |
 | BBB Spread | `market-data/exports/processed/spread_bbb.csv` | ~1,000 | 2020 - Dec 2023 |
 | Rig Count | `market-data/exports/processed/rig_count.csv` | ~465 | 2015 - Dec 2023 |
-| Correlation Matrix | `market-data/exports/processed/correlation_matrix.csv` | Pre-computed | - |
+| Correlation Matrix (Levels) | `market-data/exports/processed/correlation_matrix_LEVELS.csv` | Pre-computed (level-based, not return-based) | - |
 | Peer Fundamentals | `local/wrds_cache/peer_fundamentals.csv` | 57 | 2019 - 2023 |
 
 ---
@@ -433,7 +433,8 @@ Tariff adjustment function: At 25% (current) → factor 1.0; at 0% (removal) →
 
 ### Source
 
-Correlations loaded from `correlation_matrix.csv` (pre-computed from Bloomberg data)
+Correlations loaded from `correlation_matrix_LEVELS.csv` (pre-computed from Bloomberg data, LEVEL-based).
+**Note:** MC engine uses return-based correlations from `distributions_config.json`, not level correlations.
 
 ### Key Correlations
 

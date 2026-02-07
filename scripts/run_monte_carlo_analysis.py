@@ -29,6 +29,78 @@ CHARTS_DIR = Path(__file__).parent.parent / 'charts'
 DATA_DIR = Path(__file__).parent.parent / 'data'
 
 
+def report_calibration_quality(config_path: Path = None) -> tuple:
+    """Categorize MC variables by calibration quality and compute aggregate score.
+
+    Categories:
+        recalibrated (1.0): Fitted to observed data with documented methodology
+        derived (0.75): Derived from another calibrated variable
+        expert (0.5): Expert judgment with stated rationale
+        assumed (0.25): Assumed with minimal justification
+
+    Returns (quality_dict, aggregate_score)
+    """
+    import json
+    if config_path is None:
+        config_path = Path(__file__).parent.parent / 'monte_carlo' / 'distributions_config.json'
+
+    if not config_path.exists():
+        print("  WARNING: distributions_config.json not found")
+        return {}, 0.0
+
+    with open(config_path) as f:
+        config = json.load(f)
+
+    variables = config.get('variables', {})
+    weights = {'recalibrated': 1.0, 'derived': 0.75, 'expert': 0.5, 'assumed': 0.25}
+    categories = {}
+
+    for var_name, var_info in variables.items():
+        gof = var_info.get('goodness_of_fit', {})
+        if gof.get('recalibrated'):
+            cat = 'recalibrated'
+        elif gof.get('derived'):
+            cat = 'derived'
+        elif gof.get('expert'):
+            cat = 'expert'
+        elif gof.get('composite'):
+            cat = 'derived'
+        elif gof.get('assumed'):
+            cat = 'assumed'
+        else:
+            # Check n_observations
+            if var_info.get('n_observations', 0) > 0:
+                cat = 'recalibrated'
+            else:
+                cat = 'assumed'
+        categories[var_name] = cat
+
+    # Compute aggregate score
+    if categories:
+        total_weight = sum(weights[c] for c in categories.values())
+        score = total_weight / len(categories)
+    else:
+        score = 0.0
+
+    # Print summary
+    counts = {}
+    for cat in ['recalibrated', 'derived', 'expert', 'assumed']:
+        vars_in_cat = [v for v, c in categories.items() if c == cat]
+        counts[cat] = len(vars_in_cat)
+
+    print("\n--- MC Calibration Quality Report ---")
+    print(f"  Total variables: {len(categories)}")
+    for cat in ['recalibrated', 'derived', 'expert', 'assumed']:
+        pct = counts[cat] / len(categories) * 100 if categories else 0
+        vars_list = [v for v, c in categories.items() if c == cat]
+        print(f"  {cat:14s}: {counts[cat]:2d} ({pct:5.1f}%) — weight {weights[cat]:.2f}")
+        if len(vars_list) <= 6:
+            print(f"    {', '.join(vars_list)}")
+    print(f"  Aggregate quality score: {score:.3f} (1.0 = all recalibrated)")
+
+    return categories, score
+
+
 def run_simulation(n_simulations: int = 10000, n_workers: int = 1) -> tuple:
     """Run Monte Carlo simulation and return engine with results"""
     print("=" * 70)
@@ -47,6 +119,9 @@ def run_simulation(n_simulations: int = 10000, n_workers: int = 1) -> tuple:
 
     results = mc.run_simulation(verbose=True)
     mc.calculate_statistics()
+
+    # Report calibration quality
+    report_calibration_quality()
 
     return mc, results
 
@@ -397,7 +472,7 @@ def plot_scenario_comparison(mc: MonteCarloEngine, save_path: Path, verbose: boo
     data = [low_price, mid_price, high_price]
     labels = ['Low Steel Prices\n(Bottom 25%)', 'Mid Steel Prices\n(Middle 50%)', 'High Steel Prices\n(Top 25%)']
 
-    bp = ax.boxplot(data, labels=labels, patch_artist=True)
+    bp = ax.boxplot(data, tick_labels=labels, patch_artist=True)
 
     colors = ['#ff6b6b', '#ffd93d', '#6bcb77']
     for patch, color in zip(bp['boxes'], colors):
@@ -763,7 +838,7 @@ def create_summary_dashboard(mc: MonteCarloEngine, save_path: Path, verbose: boo
     low = values[hrc < np.percentile(hrc, 33)]
     mid = values[(hrc >= np.percentile(hrc, 33)) & (hrc <= np.percentile(hrc, 67))]
     high = values[hrc > np.percentile(hrc, 67)]
-    bp = ax7.boxplot([low, mid, high], labels=['Low\nPrices', 'Mid\nPrices', 'High\nPrices'], patch_artist=True)
+    bp = ax7.boxplot([low, mid, high], tick_labels=['Low\nPrices', 'Mid\nPrices', 'High\nPrices'], patch_artist=True)
     for patch, color in zip(bp['boxes'], ['#ff6b6b', '#ffd93d', '#6bcb77']):
         patch.set_facecolor(color)
         patch.set_alpha(0.7)

@@ -883,6 +883,11 @@ class ModelScenario:
     use_bloomberg_prices: bool = False  # Toggle Bloomberg prices vs 2023 baseline
     bloomberg_price_override: Optional[Dict[str, float]] = None  # Manual price override from Bloomberg
 
+    # Realization factor overrides (optional, from MC sampling)
+    # Keys: 'flat_rolled', 'mini_mill', 'usse', 'tubular'
+    # Values: multiplicative factors (e.g., 1.044 means 4.4% premium to benchmark)
+    realization_factors: Optional[Dict[str, float]] = None
+
 
 # =============================================================================
 # BENCHMARK INTEGRATION
@@ -2446,8 +2451,20 @@ class PriceVolumeModel:
             # Fallback to single benchmark for backward compatibility
             benchmark_price = self.get_benchmark_price(seg.benchmark_type, year)
 
-        # Apply segment premium and specific growth
-        realized_price = benchmark_price * (1 + seg.price_premium_to_benchmark)
+        # Apply segment premium (may be overridden by MC realization factors)
+        premium = seg.price_premium_to_benchmark
+        if self.scenario.realization_factors:
+            # Map segment enum to realization_factors key
+            seg_key_map = {
+                Segment.FLAT_ROLLED: 'flat_rolled',
+                Segment.MINI_MILL: 'mini_mill',
+                Segment.USSE: 'usse',
+                Segment.TUBULAR: 'tubular',
+            }
+            rf_key = seg_key_map.get(segment)
+            if rf_key and rf_key in self.scenario.realization_factors:
+                premium = self.scenario.realization_factors[rf_key] - 1.0
+        realized_price = benchmark_price * (1 + premium)
 
         # Apply EUR/USD FX adjustment for USSE segment
         # USSE revenues are EUR-denominated; benchmark is in USD at base rate 1.08

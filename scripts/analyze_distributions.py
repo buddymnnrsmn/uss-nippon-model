@@ -662,10 +662,10 @@ def analyze_new_variables(fitter: DistributionFitter) -> dict:
 
 def load_correlation_matrix() -> dict:
     """Load pre-computed correlation matrix and convert to model correlations"""
-    filepath = DATA_DIR / 'correlation_matrix.csv'
+    filepath = DATA_DIR / 'correlation_matrix_LEVELS.csv'
 
     if not filepath.exists():
-        print("  Warning: correlation_matrix.csv not found, using defaults")
+        print("  Warning: correlation_matrix_LEVELS.csv not found, using defaults")
         return get_default_correlations()
 
     corr_df = pd.read_csv(filepath, index_col=0)

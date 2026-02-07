@@ -434,6 +434,66 @@
         "calibration_note": "σ=0.10 reflects 10% quarterly variation in durable goods orders"
       },
       "rationale": "Durable goods orders factor. σ=0.10 reflects 10% quarterly variation. Forward manufacturing demand signal. Partial r=0.65 with revenue."
+    },
+    "fr_realization_factor": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": 0.90,
+        "mode": 1.044,
+        "max": 1.20
+      },
+      "data_source": "USS 10-K FY2019-2023, empirical realized/benchmark range",
+      "n_observations": 5,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Mode=1.044 (4.4% premium), range from FY2019-2023 empirical variation"
+      },
+      "rationale": "Flat-Rolled realization factor. Triangular(0.90, 1.044, 1.20) centered on current model premium. Premiums compress in downturns, expand in tight markets."
+    },
+    "mm_realization_factor": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": 0.85,
+        "mode": 0.986,
+        "max": 1.15
+      },
+      "data_source": "USS 10-K FY2019-2023, empirical realized/benchmark range",
+      "n_observations": 5,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Mode=0.986 (-1.4% discount), range from FY2019-2023 empirical variation"
+      },
+      "rationale": "Mini Mill realization factor. Triangular(0.85, 0.986, 1.15). Mini Mill product mix produces slight discount to benchmark."
+    },
+    "usse_realization_factor": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": 0.85,
+        "mode": 1.044,
+        "max": 1.25
+      },
+      "data_source": "USS 10-K FY2019-2023, empirical realized/benchmark range",
+      "n_observations": 5,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Mode=1.044 (4.4% premium), wider range reflects EU market uncertainty"
+      },
+      "rationale": "USSE realization factor. Triangular(0.85, 1.044, 1.25). European market has wider premium variation due to import competition and energy costs."
+    },
+    "tubular_realization_factor": {
+      "distribution_type": "triangular",
+      "parameters": {
+        "min": 0.90,
+        "mode": 1.314,
+        "max": 1.80
+      },
+      "data_source": "USS 10-K FY2019-2023, empirical realized/benchmark range",
+      "n_observations": 5,
+      "goodness_of_fit": {
+        "recalibrated": true,
+        "calibration_note": "Mode=1.314 (31.4% premium), widest range reflects OCTG contract lag and premium volatility"
+      },
+      "rationale": "Tubular realization factor. Triangular(0.90, 1.314, 1.80). OCTG has largest premium variation due to 2-quarter contract lag and energy sector cyclicality."
     }
   },
   "correlations": {
@@ -506,10 +566,23 @@
       "flat_rolled_volume": 0.35,
       "mini_mill_volume": 0.30,
       "hrc_price_factor": 0.25
+    },
+    "fr_realization_factor": {
+      "hrc_price_factor": 0.30,
+      "crc_price_factor": 0.30
+    },
+    "mm_realization_factor": {
+      "hrc_price_factor": 0.30
+    },
+    "usse_realization_factor": {
+      "hrc_eu_factor": 0.30
+    },
+    "tubular_realization_factor": {
+      "octg_price_factor": 0.30
     }
   },
   "metadata": {
-    "n_variables": 29,
+    "n_variables": 33,
     "distribution_types_used": [
       "triangular",
       "lognormal",

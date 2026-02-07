@@ -197,6 +197,14 @@ def _simulate_batch(args):
         if proj_list is None:
             proj_list = list(base_scenario.include_projects) if base_scenario else []
 
+        # Realization factors (convert from MC triangular samples to premium overrides)
+        realization_factors = {
+            'flat_rolled': sample.get('fr_realization_factor', 1.044),
+            'mini_mill': sample.get('mm_realization_factor', 0.986),
+            'usse': sample.get('usse_realization_factor', 1.044),
+            'tubular': sample.get('tubular_realization_factor', 1.314),
+        }
+
         scenario = ModelScenario(
             name="MC Sample", scenario_type=ScenarioType.CUSTOM,
             description="Sampled from distributions",
@@ -211,6 +219,7 @@ def _simulate_batch(args):
             nippon_tax_rate=base_tax_rate,
             include_projects=proj_list,
             synergies=None,
+            realization_factors=realization_factors,
         )
 
         margin_factor = sample.get('flat_rolled_margin_factor', 1.0)
@@ -1066,6 +1075,37 @@ class MonteCarloEngine:
             })
         )
 
+        # =====================================================================
+        # REALIZATION FACTORS - Segment price premiums/discounts to benchmark
+        # =====================================================================
+
+        rf_configs = {
+            'fr_realization_factor': ('Flat-Rolled Realization', 1.044,
+                                       {'hrc_price_factor': 0.30, 'crc_price_factor': 0.30}),
+            'mm_realization_factor': ('Mini Mill Realization', 0.986,
+                                       {'hrc_price_factor': 0.30}),
+            'usse_realization_factor': ('USSE Realization', 1.044,
+                                         {'hrc_eu_factor': 0.30}),
+            'tubular_realization_factor': ('Tubular Realization', 1.314,
+                                            {'octg_price_factor': 0.30}),
+        }
+
+        for rf_name, (rf_desc, rf_base, rf_corr) in rf_configs.items():
+            rf_type, rf_params = get_config_or_default(
+                rf_name, 'triangular', {'min': 0.85, 'mode': rf_base, 'max': 1.20}
+            )
+            variables[rf_name] = InputVariable(
+                name=rf_name,
+                description=f'{rf_desc} Factor (realized/benchmark)',
+                distribution=Distribution(
+                    name=rf_desc,
+                    dist_type=rf_type,
+                    params=rf_params,
+                ),
+                base_value=rf_base,
+                correlations=get_correlations(rf_name, rf_corr),
+            )
+
         return variables
 
     def _build_correlation_matrix(self) -> Tuple[np.ndarray, List[str]]:
@@ -1536,6 +1576,14 @@ class MonteCarloEngine:
             else:
                 include_projects = []
 
+        # Realization factors (convert from MC triangular samples to premium overrides)
+        realization_factors = {
+            'flat_rolled': sample.get('fr_realization_factor', 1.044),
+            'mini_mill': sample.get('mm_realization_factor', 0.986),
+            'usse': sample.get('usse_realization_factor', 1.044),
+            'tubular': sample.get('tubular_realization_factor', 1.314),
+        }
+
         scenario = ModelScenario(
             name="Monte Carlo Sample",
             scenario_type=ScenarioType.CUSTOM,
@@ -1553,6 +1601,7 @@ class MonteCarloEngine:
             nippon_tax_rate=base_tax_rate,
             include_projects=include_projects,
             synergies=None,
+            realization_factors=realization_factors,
         )
 
         # Collect adjustment factors for post-hoc application

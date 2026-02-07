@@ -158,8 +158,8 @@
 
     "derived_data": {
         "correlation_matrix": {
-            "file": "correlation_matrix.csv",
-            "description": "Pre-computed correlation matrix for Monte Carlo",
+            "file": "correlation_matrix_LEVELS.csv",
+            "description": "Pre-computed LEVEL correlation matrix (use return-based for MC)",
             "use_for": "monte_carlo_calibration"
         },
         "ev_forecast": {

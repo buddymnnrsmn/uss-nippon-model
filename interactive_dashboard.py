@@ -4036,10 +4036,29 @@ def render_tab_risk(ctx):
             st.session_state[granger_cache_key] = None
 
     gc_df = st.session_state.get(granger_cache_key)
+
+    # Load decomposition for partial_r column
+    decomp_cache_key = "demand_decomp_loaded"
+    if decomp_cache_key not in st.session_state:
+        try:
+            from pathlib import Path as P
+            dp = P('audit-verification/demand_price_volume_decomposition.csv')
+            st.session_state[decomp_cache_key] = pd.read_csv(dp) if dp.exists() else None
+        except Exception:
+            st.session_state[decomp_cache_key] = None
+    decomp_df = st.session_state.get(decomp_cache_key)
+
     if gc_df is not None and len(gc_df) > 0:
-        # Show table of significant results
         display_gc = gc_df[['indicator', 'lag', 'f_stat', 'f_pvalue', 'n']].copy()
         display_gc.columns = ['Indicator', 'Best Lag (Q)', 'F-Statistic', 'p-value', 'n']
+
+        # Add partial_r from decomposition
+        if decomp_df is not None and len(decomp_df) > 0:
+            partial_map = dict(zip(decomp_df['indicator'], decomp_df['r_partial']))
+            display_gc['Partial r'] = display_gc['Indicator'].map(partial_map).apply(
+                lambda x: f"{x:.3f}" if pd.notna(x) else "N/A"
+            )
+
         display_gc['Significant'] = display_gc['p-value'].apply(
             lambda p: 'Yes (p<0.05)' if p < 0.05 else 'Marginal' if p < 0.10 else 'No'
         )
@@ -4055,8 +4074,44 @@ def render_tab_risk(ctx):
 
         *Granger causality establishes temporal precedence, not true causal mechanism.*
         """)
+
+        st.warning("**Regime-dependent indicators:** WTI Crude and Durable Goods show strong "
+                   "post-COVID predictive power but were weak pre-COVID. Treat as regime-dependent.")
+        st.info("Housing Starts and Building Permits show high full correlation (r~0.77) but "
+                "partial r < 0.15 — their correlation with revenue is driven by price co-movement, "
+                "not independent volume demand.")
     else:
         st.info("Run `python scripts/advanced_demand_analysis.py` to generate Granger causality results.")
+
+    # Composite Indicator Ranking
+    comp_cache_key = "composite_scores_loaded"
+    if comp_cache_key not in st.session_state:
+        try:
+            from pathlib import Path as P
+            cp = P('audit-verification/composite_indicator_scores.csv')
+            st.session_state[comp_cache_key] = pd.read_csv(cp) if cp.exists() else None
+        except Exception:
+            st.session_state[comp_cache_key] = None
+
+    comp_df = st.session_state.get(comp_cache_key)
+    if comp_df is not None and len(comp_df) > 0:
+        st.subheader("Composite Indicator Ranking")
+        st.markdown("Stability-weighted composite score: `|partial_r| x granger_weight x stability_weight`")
+
+        top_comp = comp_df.head(10).copy()
+        if len(top_comp) > 0:
+            import matplotlib.pyplot as plt
+            fig, ax = plt.subplots(figsize=(8, 4))
+            colors = ['#2ecc71' if s > 0.1 else '#f39c12' if s > 0.01 else '#e74c3c'
+                       for s in top_comp['composite_score']]
+            ax.barh(top_comp['indicator'][::-1], top_comp['composite_score'][::-1],
+                    color=colors[::-1], edgecolor='white')
+            ax.set_xlabel('Composite Score')
+            ax.set_title('Demand Indicator Quality Ranking')
+            ax.grid(axis='x', alpha=0.3)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
 
     # Subperiod Stability
     st.subheader("Subperiod Stability: Pre-COVID vs Post-COVID")
@@ -4212,6 +4267,121 @@ def render_tab_risk(ctx):
 
     except Exception as e:
         st.info(f"Macro scenario analysis unavailable: {e}")
+
+    # =========================================================================
+    # DATA QUALITY PANEL
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Data Quality & Calibration", anchor="data-quality")
+
+    dq_col1, dq_col2, dq_col3 = st.columns(3)
+
+    # MC Calibration Summary
+    with dq_col1:
+        st.subheader("MC Variable Calibration")
+        try:
+            import json as _json
+            from pathlib import Path as P
+            cfg_path = P('monte_carlo/distributions_config.json')
+            if cfg_path.exists():
+                with open(cfg_path) as f:
+                    mc_cfg = _json.load(f)
+                mc_vars = mc_cfg.get('variables', {})
+                cat_counts = {'recalibrated': 0, 'derived': 0, 'expert': 0, 'assumed': 0}
+                for v in mc_vars.values():
+                    gof = v.get('goodness_of_fit', {})
+                    if gof.get('recalibrated'):
+                        cat_counts['recalibrated'] += 1
+                    elif gof.get('derived') or gof.get('composite'):
+                        cat_counts['derived'] += 1
+                    elif gof.get('expert'):
+                        cat_counts['expert'] += 1
+                    else:
+                        cat_counts['assumed'] += 1
+                total = sum(cat_counts.values())
+                st.metric("Total MC Variables", total)
+                for cat, cnt in cat_counts.items():
+                    pct = cnt / total * 100 if total else 0
+                    icon = {'recalibrated': '=', 'derived': '~', 'expert': '?', 'assumed': '!'}[cat]
+                    st.text(f"  [{icon}] {cat}: {cnt} ({pct:.0f}%)")
+            else:
+                st.info("MC config not found")
+        except Exception:
+            st.info("Could not load MC calibration data")
+
+    # Segment Data Coverage
+    with dq_col2:
+        st.subheader("Segment Data Coverage")
+        try:
+            from data.uss_segment_data import get_segment_summary
+            summary = get_segment_summary()
+            for seg, info in summary.items():
+                wrds_q = info['wrds_quarterly']
+                ann = info['hardcoded_annual']
+                yr_range = info.get('wrds_year_range')
+                yr_str = f"FY{yr_range[0]}-{yr_range[1]}" if yr_range else "N/A"
+                st.text(f"  {seg}: {wrds_q}Q / {ann}A ({yr_str})")
+        except Exception:
+            st.text("  4 segments x 5 years (FY2019-2023) hardcoded")
+            st.text("  Run fetch_uss_segment_data.py for WRDS quarterly")
+
+    # Correlation Method Note
+    with dq_col3:
+        st.subheader("Method Notes")
+        st.info("MC uses **return-based** correlations (not level-based). "
+                "Level correlations overstate co-movement.")
+        st.info("Realization factors now sampled as triangular distributions "
+                "(4 new MC variables), not point estimates.")
+
+    # Unstable Indicator Flags
+    stab_data = st.session_state.get("demand_stability_loaded")
+    if stab_data is not None and len(stab_data) > 0:
+        unstable = stab_data[~stab_data['stable']]
+        if len(unstable) > 0:
+            st.warning(f"**{len(unstable)} unstable demand indicators** across subperiods: "
+                       f"{', '.join(unstable['indicator'].tolist())}. "
+                       "Treat WTI and Durable Goods as regime-dependent.")
+
+    # Segment Correlation Forest Plot
+    st.subheader("Segment-Price Correlation Confidence Intervals")
+    seg_corr_cache = "seg_corr_forest_loaded"
+    if seg_corr_cache not in st.session_state:
+        try:
+            from pathlib import Path as P
+            sc_path = P('audit-verification/segment_annual_correlations.csv')
+            st.session_state[seg_corr_cache] = pd.read_csv(sc_path) if sc_path.exists() else None
+        except Exception:
+            st.session_state[seg_corr_cache] = None
+
+    seg_corr_df = st.session_state.get(seg_corr_cache)
+    if seg_corr_df is not None and 'ci_lo_boot' in seg_corr_df.columns:
+        import matplotlib.pyplot as plt
+
+        plot_df = seg_corr_df[seg_corr_df['metric'] == 'Revenue'].copy()
+        if len(plot_df) > 0:
+            fig, ax = plt.subplots(figsize=(8, 3))
+            y_pos = range(len(plot_df))
+            colors = ['#2ecc71' if row['quality'] == 'reliable' else '#f39c12'
+                       for _, row in plot_df.iterrows()]
+
+            ax.barh(list(y_pos), plot_df['r'].values, height=0.4, color=colors, alpha=0.7)
+            ax.errorbar(plot_df['r'].values, list(y_pos),
+                        xerr=[plot_df['r'].values - plot_df['ci_lo_boot'].values,
+                              plot_df['ci_hi_boot'].values - plot_df['r'].values],
+                        fmt='none', ecolor='black', capsize=3)
+            ax.axvline(0, color='gray', linestyle='--', alpha=0.5)
+            ax.set_yticks(list(y_pos))
+            ax.set_yticklabels(plot_df['segment'].values)
+            ax.set_xlabel('Pearson r (Revenue vs Benchmark Price)')
+            ax.set_title('Segment Correlations with Bootstrap 95% CI (Annual, n=5)')
+            ax.legend(['CI excludes 0 (reliable)', 'CI includes 0 (directional)'],
+                      loc='lower right', fontsize=8)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
+    else:
+        st.info("Run `python scripts/revenue_price_correlation.py` to generate segment correlations with bootstrap CIs.")
 
 
 def render_tab_strategic(ctx):

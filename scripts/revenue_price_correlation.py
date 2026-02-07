@@ -29,71 +29,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
 # ---------------------------------------------------------------------------
-# Data: USS 10-K Segment Data (2019-2023) — from extract_margin_sensitivity.py
+# Data: Centralized segment data (shared module eliminates duplication)
 # ---------------------------------------------------------------------------
-USS_SEGMENT_DATA = {
-    "Flat-Rolled": [
-        # year, revenue_mm, ebitda_mm, shipments_kt, realized_price
-        (2019, 8543, 651, 9600, 890),
-        (2020, 5996, -106, 7200, 833),
-        (2021, 11276, 3394, 8400, 1342),
-        (2022, 11863, 2801, 8100, 1465),
-        (2023, 9402, 1016, 8700, 1081),
-    ],
-    "Mini Mill": [
-        (2019, 1712, 196, 2300, 744),
-        (2020, 1388, 114, 2000, 694),
-        (2021, 3267, 1135, 2400, 1361),
-        (2022, 3852, 1143, 2500, 1541),
-        (2023, 3108, 539, 2700, 1151),
-    ],
-    "USSE": [
-        (2019, 3054, 47, 4200, 727),
-        (2020, 2163, -162, 3400, 636),
-        (2021, 4223, 651, 4000, 1056),
-        (2022, 4460, 564, 3800, 1174),
-        (2023, 3481, 150, 3900, 893),
-    ],
-    "Tubular": [
-        (2019, 1456, 47, 900, 1618),
-        (2020, 740, -167, 500, 1480),
-        (2021, 1167, 64, 700, 1667),
-        (2022, 2647, 832, 900, 2941),
-        (2023, 2714, 701, 800, 3393),
-    ],
-}
-
-# Segment-to-price mappings (matching price_volume_model.py product mix)
-SEGMENT_PRICE_MAP = {
-    "Flat-Rolled": {"HRC US": 0.21, "CRC US": 0.40, "Coated (CRC proxy)": 0.39},
-    "Mini Mill": {"HRC US": 0.55, "CRC US": 0.16, "Coated (CRC proxy)": 0.29},
-    "USSE": {"HRC EU": 0.51, "CRC US": 0.08, "Coated (CRC proxy)": 0.40},
-    "Tubular": {"OCTG US": 1.0},
-}
-
-# Model realization factors and margin sensitivities (from price_volume_model.py)
-MODEL_ASSUMPTIONS = {
-    "Flat-Rolled": {
-        "base_price": 1030, "benchmark_weighted": 987,
-        "realization_premium": 0.044, "margin_sensitivity": 2.0,
-        "base_margin": 0.12,
-    },
-    "Mini Mill": {
-        "base_price": 875, "benchmark_weighted": 888,
-        "realization_premium": -0.014, "margin_sensitivity": 2.5,
-        "base_margin": 0.17,
-    },
-    "USSE": {
-        "base_price": 873, "benchmark_weighted": 836,
-        "realization_premium": 0.044, "margin_sensitivity": 2.0,
-        "base_margin": 0.09,
-    },
-    "Tubular": {
-        "base_price": 3137, "benchmark_weighted": 2388,
-        "realization_premium": 0.314, "margin_sensitivity": 1.0,
-        "base_margin": 0.26,
-    },
-}
+from data.uss_segment_data import USS_SEGMENT_DATA, SEGMENT_PRICE_MAP, MODEL_ASSUMPTIONS
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +104,41 @@ def aggregate_prices_annual(price_df: pd.DataFrame) -> pd.Series:
 # ---------------------------------------------------------------------------
 # Correlation Analysis
 # ---------------------------------------------------------------------------
+
+def bootstrap_correlation_ci(x, y, n_boot: int = 10000, alpha: float = 0.05,
+                              rng: np.random.RandomState = None) -> Tuple[float, float]:
+    """Bootstrap confidence interval for Pearson r.
+
+    Returns (ci_lo, ci_hi) from percentile bootstrap.
+    """
+    x, y = np.array(x, dtype=float), np.array(y, dtype=float)
+    mask = ~(np.isnan(x) | np.isnan(y))
+    x, y = x[mask], y[mask]
+    n = len(x)
+    if n < 3:
+        return (np.nan, np.nan)
+
+    if rng is None:
+        rng = np.random.RandomState(42)
+
+    boot_r = np.empty(n_boot)
+    for i in range(n_boot):
+        idx = rng.randint(0, n, size=n)
+        bx, by = x[idx], y[idx]
+        # Skip degenerate samples
+        if np.std(bx) < 1e-10 or np.std(by) < 1e-10:
+            boot_r[i] = np.nan
+        else:
+            boot_r[i] = np.corrcoef(bx, by)[0, 1]
+
+    boot_r = boot_r[~np.isnan(boot_r)]
+    if len(boot_r) < 100:
+        return (np.nan, np.nan)
+
+    ci_lo = np.percentile(boot_r, 100 * alpha / 2)
+    ci_hi = np.percentile(boot_r, 100 * (1 - alpha / 2))
+    return (ci_lo, ci_hi)
+
 
 def pearson_with_ci(x, y, alpha: float = 0.05) -> Dict:
     """Pearson correlation with p-value and confidence interval via Fisher z-transform."""
@@ -260,22 +233,50 @@ def segment_annual_analysis(
 
         # Revenue vs benchmark price
         rev_corr = pearson_with_ci(df_seg['benchmark_price'], df_seg['revenue'])
-        rev_corr.update({'segment': seg_name, 'metric': 'Revenue', 'benchmark': price_key})
+        boot_lo, boot_hi = bootstrap_correlation_ci(df_seg['benchmark_price'], df_seg['revenue'])
+        rev_corr.update({
+            'segment': seg_name, 'metric': 'Revenue', 'benchmark': price_key,
+            'ci_lo_boot': boot_lo, 'ci_hi_boot': boot_hi,
+            'ci_width': boot_hi - boot_lo if not np.isnan(boot_lo) else np.nan,
+            'ci_method': 'bootstrap+fisher',
+            'quality': 'reliable' if (not np.isnan(boot_lo) and boot_lo > 0) or (not np.isnan(boot_hi) and boot_hi < 0) else 'directional',
+        })
         rows.append(rev_corr)
 
         # Margin vs benchmark price
         margin_corr = pearson_with_ci(df_seg['benchmark_price'], df_seg['margin'])
-        margin_corr.update({'segment': seg_name, 'metric': 'EBITDA Margin', 'benchmark': price_key})
+        boot_lo, boot_hi = bootstrap_correlation_ci(df_seg['benchmark_price'], df_seg['margin'])
+        margin_corr.update({
+            'segment': seg_name, 'metric': 'EBITDA Margin', 'benchmark': price_key,
+            'ci_lo_boot': boot_lo, 'ci_hi_boot': boot_hi,
+            'ci_width': boot_hi - boot_lo if not np.isnan(boot_lo) else np.nan,
+            'ci_method': 'bootstrap+fisher',
+            'quality': 'reliable' if (not np.isnan(boot_lo) and boot_lo > 0) or (not np.isnan(boot_hi) and boot_hi < 0) else 'directional',
+        })
         rows.append(margin_corr)
 
         # Revenue per ton vs benchmark price
         rpt_corr = pearson_with_ci(df_seg['benchmark_price'], df_seg['rev_per_ton'])
-        rpt_corr.update({'segment': seg_name, 'metric': 'Rev/Ton', 'benchmark': price_key})
+        boot_lo, boot_hi = bootstrap_correlation_ci(df_seg['benchmark_price'], df_seg['rev_per_ton'])
+        rpt_corr.update({
+            'segment': seg_name, 'metric': 'Rev/Ton', 'benchmark': price_key,
+            'ci_lo_boot': boot_lo, 'ci_hi_boot': boot_hi,
+            'ci_width': boot_hi - boot_lo if not np.isnan(boot_lo) else np.nan,
+            'ci_method': 'bootstrap+fisher',
+            'quality': 'reliable' if (not np.isnan(boot_lo) and boot_lo > 0) or (not np.isnan(boot_hi) and boot_hi < 0) else 'directional',
+        })
         rows.append(rpt_corr)
 
         # Realized price vs benchmark (realization factor validation)
         real_corr = pearson_with_ci(df_seg['benchmark_price'], df_seg['realized_price'])
-        real_corr.update({'segment': seg_name, 'metric': 'Realized Price', 'benchmark': price_key})
+        boot_lo, boot_hi = bootstrap_correlation_ci(df_seg['benchmark_price'], df_seg['realized_price'])
+        real_corr.update({
+            'segment': seg_name, 'metric': 'Realized Price', 'benchmark': price_key,
+            'ci_lo_boot': boot_lo, 'ci_hi_boot': boot_hi,
+            'ci_width': boot_hi - boot_lo if not np.isnan(boot_lo) else np.nan,
+            'ci_method': 'bootstrap+fisher',
+            'quality': 'reliable' if (not np.isnan(boot_lo) and boot_lo > 0) or (not np.isnan(boot_hi) and boot_hi < 0) else 'directional',
+        })
         rows.append(real_corr)
 
     return pd.DataFrame(rows)
@@ -318,6 +319,71 @@ def validate_model_assumptions(prices: Dict[str, pd.DataFrame]) -> pd.DataFrame:
                 'model_base_margin': model['base_margin'],
                 'model_margin_sensitivity': model['margin_sensitivity'],
             })
+
+    return pd.DataFrame(rows)
+
+
+def segment_quarterly_analysis(
+    prices: Dict[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """
+    Quarterly segment revenue vs relevant price benchmarks using WRDS data.
+    Much more statistically robust than annual n=5 analysis (~80 obs for FR/USSE/Tubular).
+    """
+    from data.uss_segment_data import load_wrds_quarterly, SEGMENT_PRICE_MAP
+
+    wrds_df = load_wrds_quarterly()
+    if wrds_df is None or len(wrds_df) == 0:
+        print("  No WRDS quarterly segment data available; skipping quarterly segment analysis")
+        return pd.DataFrame()
+
+    rows = []
+    for seg_name in wrds_df['segment'].unique():
+        seg_df = wrds_df[wrds_df['segment'] == seg_name].copy()
+        if len(seg_df) < 5:
+            continue
+
+        price_map = SEGMENT_PRICE_MAP.get(seg_name, {})
+        primary_price = max(price_map, key=price_map.get) if price_map else 'HRC US'
+        price_key = 'CRC US' if 'Coated' in primary_price else primary_price
+
+        if price_key not in prices:
+            continue
+
+        q_prices = aggregate_prices_quarterly(prices[price_key])
+        merged = seg_df.merge(q_prices, on=['fiscal_year', 'fiscal_quarter'], how='inner')
+
+        if len(merged) < 5:
+            continue
+
+        # Revenue vs benchmark
+        rev_corr = pearson_with_ci(merged['price_avg'], merged['revenue'])
+        boot_lo, boot_hi = bootstrap_correlation_ci(merged['price_avg'], merged['revenue'])
+        rev_corr.update({
+            'segment': seg_name, 'metric': 'Revenue', 'benchmark': price_key,
+            'frequency': 'quarterly',
+            'ci_lo_boot': boot_lo, 'ci_hi_boot': boot_hi,
+            'ci_width': boot_hi - boot_lo if not np.isnan(boot_lo) else np.nan,
+            'quality': 'reliable' if (not np.isnan(boot_lo) and boot_lo > 0) else 'directional',
+        })
+        rows.append(rev_corr)
+
+        # Operating profit margin vs benchmark (if operating_profit available)
+        if 'operating_profit' in merged.columns and merged['operating_profit'].notna().sum() >= 5:
+            merged_clean = merged.dropna(subset=['operating_profit', 'revenue'])
+            merged_clean = merged_clean[merged_clean['revenue'] > 0]
+            if len(merged_clean) >= 5:
+                margins = merged_clean['operating_profit'] / merged_clean['revenue']
+                margin_corr = pearson_with_ci(merged_clean['price_avg'], margins)
+                boot_lo, boot_hi = bootstrap_correlation_ci(merged_clean['price_avg'], margins)
+                margin_corr.update({
+                    'segment': seg_name, 'metric': 'Op. Margin', 'benchmark': price_key,
+                    'frequency': 'quarterly',
+                    'ci_lo_boot': boot_lo, 'ci_hi_boot': boot_hi,
+                    'ci_width': boot_hi - boot_lo if not np.isnan(boot_lo) else np.nan,
+                    'quality': 'reliable' if (not np.isnan(boot_lo) and boot_lo > 0) else 'directional',
+                })
+                rows.append(margin_corr)
 
     return pd.DataFrame(rows)
 
@@ -580,7 +646,8 @@ def generate_report(
     # Segment analysis
     lines.append("## 2. Segment-Level Correlations (Annual, 2019-2023)")
     lines.append("")
-    lines.append("**Note:** Only 5 annual observations — directional indicators, not statistically robust.")
+    lines.append("**Note:** Annual analysis uses 5 observations (FY2019-2023) — directional only. "
+                 "See quarterly segment analysis below for statistically robust results.")
     lines.append("")
     lines.append("| Segment | Metric | Benchmark | r | p-value | n |")
     lines.append("|---------|--------|-----------|:-:|:-------:|:-:|")
@@ -705,10 +772,21 @@ def main():
         print(f"  {pt}: best r={best['r']:.3f} at lag={int(best['lag_quarters'])}Q "
               f"(R²={best['r_squared']:.3f}, p={best['p']:.4f})")
 
-    # Step 2: Segment analysis
+    # Step 2: Segment analysis (annual)
     print("\nRunning segment-level annual analysis...")
     segment_results = segment_annual_analysis(prices)
-    print(f"  Computed {len(segment_results)} segment × metric correlations")
+    print(f"  Computed {len(segment_results)} segment × metric correlations (annual, with bootstrap CIs)")
+
+    # Step 2b: Segment analysis (quarterly, WRDS)
+    print("\nRunning segment-level quarterly analysis (WRDS)...")
+    segment_q_results = segment_quarterly_analysis(prices)
+    if len(segment_q_results) > 0:
+        print(f"  Computed {len(segment_q_results)} segment × metric correlations (quarterly)")
+        for seg in segment_q_results['segment'].unique():
+            n = segment_q_results[segment_q_results['segment'] == seg]['n'].max()
+            print(f"    {seg}: n={int(n)}")
+    else:
+        print("  No WRDS quarterly data; skipped")
 
     # Step 3: Model validation
     print("\nValidating model assumptions...")
@@ -729,6 +807,10 @@ def main():
 
     segment_results.to_csv(output_dir / 'segment_annual_correlations.csv', index=False)
     print(f"  Saved {output_dir / 'segment_annual_correlations.csv'}")
+
+    if len(segment_q_results) > 0:
+        segment_q_results.to_csv(output_dir / 'segment_quarterly_correlations.csv', index=False)
+        print(f"  Saved {output_dir / 'segment_quarterly_correlations.csv'}")
 
     validation_df.to_csv(output_dir / 'realization_factor_validation.csv', index=False)
     print(f"  Saved {output_dir / 'realization_factor_validation.csv'}")

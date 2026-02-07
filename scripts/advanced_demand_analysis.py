@@ -215,6 +215,68 @@ def subperiod_stability(
     return df, pd.DataFrame(stability_flags)
 
 
+def compute_composite_indicator_score(
+    granger_df: pd.DataFrame,
+    stability_df: pd.DataFrame,
+    decomposition_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Compute stability-weighted composite score for each demand indicator.
+
+    Formula: score = |partial_r| * granger_weight * stability_weight
+    - granger_weight: 1.0 if p<0.05, 0.5 if p<0.10, 0.0 otherwise
+    - stability_weight: 1.0 if stable, 0.5 if unstable but no sign flip, 0.25 if sign flip
+
+    Returns DataFrame sorted by composite score (descending).
+    """
+    rows = []
+
+    # Get unique indicators from decomposition (which has partial_r)
+    if decomposition_df is None or len(decomposition_df) == 0:
+        return pd.DataFrame()
+
+    for _, dec_row in decomposition_df.iterrows():
+        name = dec_row['indicator']
+        partial_r = abs(dec_row.get('r_partial', 0))
+
+        # Granger weight
+        granger_weight = 0.0
+        if granger_df is not None and len(granger_df) > 0:
+            gc_match = granger_df[granger_df['indicator'] == name]
+            if len(gc_match) > 0:
+                p_val = gc_match.iloc[0].get('f_pvalue', 1.0)
+                if p_val < 0.05:
+                    granger_weight = 1.0
+                elif p_val < 0.10:
+                    granger_weight = 0.5
+
+        # Stability weight
+        stability_weight = 0.5  # default for unknown
+        if stability_df is not None and len(stability_df) > 0:
+            stab_match = stability_df[stability_df['indicator'] == name]
+            if len(stab_match) > 0:
+                stab_row = stab_match.iloc[0]
+                if stab_row.get('sign_flip', False):
+                    stability_weight = 0.25
+                elif stab_row.get('stable', False):
+                    stability_weight = 1.0
+                else:
+                    stability_weight = 0.5
+
+        composite = partial_r * granger_weight * stability_weight
+
+        rows.append({
+            'indicator': name,
+            'partial_r': partial_r,
+            'granger_weight': granger_weight,
+            'stability_weight': stability_weight,
+            'composite_score': round(composite, 4),
+        })
+
+    df = pd.DataFrame(rows).sort_values('composite_score', ascending=False).reset_index(drop=True)
+    return df
+
+
 # ---------------------------------------------------------------------------
 # 3. Rolling Window Analysis
 # ---------------------------------------------------------------------------
@@ -1010,6 +1072,23 @@ def main():
     if not stability_df.empty:
         stability_df.to_csv(output_dir / 'subperiod_stability.csv', index=False)
         print(f"  Saved subperiod_stability.csv")
+
+    # Composite indicator scoring
+    decomp_path = output_dir / 'demand_price_volume_decomposition.csv'
+    if decomp_path.exists():
+        decomp_df = pd.read_csv(decomp_path)
+        composite_df = compute_composite_indicator_score(gc_summary, stability_df, decomp_df)
+        if len(composite_df) > 0:
+            composite_df.to_csv(output_dir / 'composite_indicator_scores.csv', index=False)
+            print(f"  Saved composite_indicator_scores.csv ({len(composite_df)} indicators)")
+            print("\n  Composite Indicator Rankings:")
+            for _, row in composite_df.head(8).iterrows():
+                print(f"    {row['indicator']:25s} score={row['composite_score']:.4f} "
+                      f"(|partial_r|={row['partial_r']:.3f}, granger={row['granger_weight']:.1f}, "
+                      f"stability={row['stability_weight']:.2f})")
+    else:
+        print(f"  Skipping composite scoring: {decomp_path} not found "
+              "(run demand_driver_analysis.py first)")
 
     # Save VAR results as JSON-friendly dict
     import json
