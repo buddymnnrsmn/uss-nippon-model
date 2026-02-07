@@ -1,0 +1,727 @@
+category,series_name,period,value
+,        Aerospace,Unnamed: 10,80.5353
+,        Aerospace,Unnamed: 11,75.65040833
+,        Aerospace,Unnamed: 12,91.34596667
+,        Aerospace,Unnamed: 13,99.77654167
+,        Aerospace,Unnamed: 14,100.0
+,        Aerospace,Unnamed: 15,95.3035
+,        Aerospace,Unnamed: 16,102.3248583
+,        Aerospace,Unnamed: 17,102.2476167
+,        Aerospace,Unnamed: 18,98.59585833
+,        Aerospace,Unnamed: 19,95.77585833
+,        Aerospace,Unnamed: 20,86.64626667
+,        Aerospace,Unnamed: 21,86.75210833
+,        Aerospace,Unnamed: 22,85.63329167
+,        Aerospace,Unnamed: 23,94.04543333
+,        Aerospace,Unnamed: 24,92.265175
+,        Aerospace,Unnamed: 25,78.56885
+,        Aerospace,Unnamed: 26,73.9907
+,        Aerospace,Unnamed: 27,66.446525
+,        Aerospace,Unnamed: 28,67.45950833
+,        Aerospace,Unnamed: 29,70.61834167
+,        Aerospace,Unnamed: 30,74.585025
+,        Aerospace,Unnamed: 31,70.15524167
+,        Aerospace,Unnamed: 32,79.93803333
+,        Aerospace,Unnamed: 33,83.0599
+,        Aerospace,Unnamed: 34,71.66173333
+,        Aerospace,Unnamed: 35,64.21451667
+,        Aerospace,Unnamed: 36,61.800725
+,        Aerospace,Unnamed: 37,65.04096667
+,        Aerospace,Unnamed: 38,72.453875
+,        Aerospace,Unnamed: 39,77.72211667
+,        Aerospace,Unnamed: 40,84.008525
+,        Aerospace,Unnamed: 41,87.067175
+,        Aerospace,Unnamed: 42,86.75370833
+,        Aerospace,Unnamed: 43,81.81299167
+,        Aerospace,Unnamed: 44,77.75938333
+,        Aerospace,Unnamed: 6,92.79995833
+,        Aerospace,Unnamed: 7,84.95773333
+,        Aerospace,Unnamed: 8,84.61659167
+,        Aerospace,Unnamed: 9,80.32198333
+,        Appliances,Unnamed: 10,99.072525
+,        Appliances,Unnamed: 11,91.75954167
+,        Appliances,Unnamed: 12,93.68889167
+,        Appliances,Unnamed: 13,98.2914
+,        Appliances,Unnamed: 14,100.0000083
+,        Appliances,Unnamed: 15,101.5061167
+,        Appliances,Unnamed: 16,100.0478083
+,        Appliances,Unnamed: 17,95.86330833
+,        Appliances,Unnamed: 18,94.277675
+,        Appliances,Unnamed: 19,92.36951667
+,        Appliances,Unnamed: 20,89.7774
+,        Appliances,Unnamed: 21,90.26404167
+,        Appliances,Unnamed: 22,91.30651667
+,        Appliances,Unnamed: 23,120.0548583
+,        Appliances,Unnamed: 24,137.952675
+,        Appliances,Unnamed: 25,147.0383583
+,        Appliances,Unnamed: 26,151.655975
+,        Appliances,Unnamed: 27,148.7659917
+,        Appliances,Unnamed: 28,144.2696
+,        Appliances,Unnamed: 29,144.128325
+,        Appliances,Unnamed: 30,140.806325
+,        Appliances,Unnamed: 31,146.9311333
+,        Appliances,Unnamed: 32,143.0635833
+,        Appliances,Unnamed: 33,138.45045
+,        Appliances,Unnamed: 34,129.8282083
+,        Appliances,Unnamed: 35,124.0993833
+,        Appliances,Unnamed: 36,122.9205917
+,        Appliances,Unnamed: 37,123.3899667
+,        Appliances,Unnamed: 38,115.2893417
+,        Appliances,Unnamed: 39,109.1567667
+,        Appliances,Unnamed: 40,103.2257583
+,        Appliances,Unnamed: 41,110.7635583
+,        Appliances,Unnamed: 42,113.666075
+,        Appliances,Unnamed: 43,112.6529333
+,        Appliances,Unnamed: 44,110.671375
+,        Appliances,Unnamed: 6,82.025725
+,        Appliances,Unnamed: 7,84.41986667
+,        Appliances,Unnamed: 8,88.50875
+,        Appliances,Unnamed: 9,94.53100833
+,        Auto Products,Unnamed: 10,103.4675667
+,        Auto Products,Unnamed: 11,94.24603333
+,        Auto Products,Unnamed: 12,101.254825
+,        Auto Products,Unnamed: 13,103.859675
+,        Auto Products,Unnamed: 14,100.0
+,        Auto Products,Unnamed: 15,101.6584917
+,        Auto Products,Unnamed: 16,99.81515833
+,        Auto Products,Unnamed: 17,95.13095833
+,        Auto Products,Unnamed: 18,87.73025833
+,        Auto Products,Unnamed: 19,81.66418333
+,        Auto Products,Unnamed: 20,77.88518333
+,        Auto Products,Unnamed: 21,72.526925
+,        Auto Products,Unnamed: 22,59.43965
+,        Auto Products,Unnamed: 23,76.08241667
+,        Auto Products,Unnamed: 24,90.66789167
+,        Auto Products,Unnamed: 25,87.74655
+,        Auto Products,Unnamed: 26,90.06871667
+,        Auto Products,Unnamed: 27,92.56678333
+,        Auto Products,Unnamed: 28,95.15591667
+,        Auto Products,Unnamed: 29,89.49921667
+,        Auto Products,Unnamed: 30,81.20221667
+,        Auto Products,Unnamed: 31,84.71926667
+,        Auto Products,Unnamed: 32,88.57314167
+,        Auto Products,Unnamed: 33,77.636275
+,        Auto Products,Unnamed: 34,72.39393333
+,        Auto Products,Unnamed: 35,65.82970833
+,        Auto Products,Unnamed: 36,64.53628333
+,        Auto Products,Unnamed: 37,62.8738
+,        Auto Products,Unnamed: 38,57.4334
+,        Auto Products,Unnamed: 39,52.08055
+,        Auto Products,Unnamed: 40,45.68238333
+,        Auto Products,Unnamed: 41,50.04866667
+,        Auto Products,Unnamed: 42,53.25203333
+,        Auto Products,Unnamed: 43,51.63720833
+,        Auto Products,Unnamed: 44,49.51478333
+,        Auto Products,Unnamed: 6,101.2703083
+,        Auto Products,Unnamed: 7,106.4120083
+,        Auto Products,Unnamed: 8,109.4707667
+,        Auto Products,Unnamed: 9,111.3298
+,        Business Equipment,Unnamed: 10,88.467225
+,        Business Equipment,Unnamed: 11,83.68485
+,        Business Equipment,Unnamed: 12,95.97254167
+,        Business Equipment,Unnamed: 13,103.4663833
+,        Business Equipment,Unnamed: 14,100.0
+,        Business Equipment,Unnamed: 15,95.52745
+,        Business Equipment,Unnamed: 16,100.7534
+,        Business Equipment,Unnamed: 17,102.9488
+,        Business Equipment,Unnamed: 18,101.043
+,        Business Equipment,Unnamed: 19,101.0529417
+,        Business Equipment,Unnamed: 20,91.90256667
+,        Business Equipment,Unnamed: 21,86.668675
+,        Business Equipment,Unnamed: 22,80.784925
+,        Business Equipment,Unnamed: 23,97.33659167
+,        Business Equipment,Unnamed: 24,99.40315833
+,        Business Equipment,Unnamed: 25,93.692625
+,        Business Equipment,Unnamed: 26,85.49118333
+,        Business Equipment,Unnamed: 27,79.53616667
+,        Business Equipment,Unnamed: 28,75.66044167
+,        Business Equipment,Unnamed: 29,75.25728333
+,        Business Equipment,Unnamed: 30,80.69995
+,        Business Equipment,Unnamed: 31,85.563225
+,        Business Equipment,Unnamed: 32,79.90738333
+,        Business Equipment,Unnamed: 33,75.56660833
+,        Business Equipment,Unnamed: 34,67.8343
+,        Business Equipment,Unnamed: 35,58.81025833
+,        Business Equipment,Unnamed: 36,53.26479167
+,        Business Equipment,Unnamed: 37,48.46226667
+,        Business Equipment,Unnamed: 38,45.39880833
+,        Business Equipment,Unnamed: 39,43.21995
+,        Business Equipment,Unnamed: 40,41.51734167
+,        Business Equipment,Unnamed: 41,42.15434167
+,        Business Equipment,Unnamed: 42,40.66355833
+,        Business Equipment,Unnamed: 43,39.34889167
+,        Business Equipment,Unnamed: 44,35.60421667
+,        Business Equipment,Unnamed: 6,93.09825833
+,        Business Equipment,Unnamed: 7,88.97234167
+,        Business Equipment,Unnamed: 8,91.731975
+,        Business Equipment,Unnamed: 9,91.760675
+,        Construction,Unnamed: 10,100.1715833
+,        Construction,Unnamed: 11,95.90371667
+,        Construction,Unnamed: 12,100.2479
+,        Construction,Unnamed: 13,101.7275917
+,        Construction,Unnamed: 14,99.99999167
+,        Construction,Unnamed: 15,98.78181667
+,        Construction,Unnamed: 16,98.034875
+,        Construction,Unnamed: 17,97.497975
+,        Construction,Unnamed: 18,94.55440833
+,        Construction,Unnamed: 19,91.63284167
+,        Construction,Unnamed: 20,87.96663333
+,        Construction,Unnamed: 21,85.96203333
+,        Construction,Unnamed: 22,83.12091667
+,        Construction,Unnamed: 23,107.9783667
+,        Construction,Unnamed: 24,118.9363583
+,        Construction,Unnamed: 25,119.8559167
+,        Construction,Unnamed: 26,116.9700833
+,        Construction,Unnamed: 27,111.572425
+,        Construction,Unnamed: 28,108.9110417
+,        Construction,Unnamed: 29,109.1361833
+,        Construction,Unnamed: 30,109.185225
+,        Construction,Unnamed: 31,114.29545
+,        Construction,Unnamed: 32,112.0006333
+,        Construction,Unnamed: 33,109.2692667
+,        Construction,Unnamed: 34,103.793725
+,        Construction,Unnamed: 35,99.06945
+,        Construction,Unnamed: 36,94.629875
+,        Construction,Unnamed: 37,92.5367
+,        Construction,Unnamed: 38,86.25443333
+,        Construction,Unnamed: 39,82.60804167
+,        Construction,Unnamed: 40,79.263225
+,        Construction,Unnamed: 41,83.73868333
+,        Construction,Unnamed: 42,84.37633333
+,        Construction,Unnamed: 43,84.79939167
+,        Construction,Unnamed: 44,82.99739167
+,        Construction,Unnamed: 6,99.58509167
+,        Construction,Unnamed: 7,97.305725
+,        Construction,Unnamed: 8,99.08706667
+,        Construction,Unnamed: 9,101.7452833
+,        Durable Goods,Unnamed: 10,104.799675
+,        Durable Goods,Unnamed: 11,95.67045833
+,        Durable Goods,Unnamed: 12,100.68755
+,        Durable Goods,Unnamed: 13,102.8745417
+,        Durable Goods,Unnamed: 14,100.0
+,        Durable Goods,Unnamed: 15,102.3942917
+,        Durable Goods,Unnamed: 16,100.5609083
+,        Durable Goods,Unnamed: 17,97.30119167
+,        Durable Goods,Unnamed: 18,92.95378333
+,        Durable Goods,Unnamed: 19,88.50595
+,        Durable Goods,Unnamed: 20,86.12246667
+,        Durable Goods,Unnamed: 21,82.71119167
+,        Durable Goods,Unnamed: 22,74.51385833
+,        Durable Goods,Unnamed: 23,93.61263333
+,        Durable Goods,Unnamed: 24,105.4226417
+,        Durable Goods,Unnamed: 25,105.3929833
+,        Durable Goods,Unnamed: 26,105.5907917
+,        Durable Goods,Unnamed: 27,105.0599417
+,        Durable Goods,Unnamed: 28,104.6412333
+,        Durable Goods,Unnamed: 29,100.861475
+,        Durable Goods,Unnamed: 30,94.88513333
+,        Durable Goods,Unnamed: 31,99.32660833
+,        Durable Goods,Unnamed: 32,99.354925
+,        Durable Goods,Unnamed: 33,91.13490833
+,        Durable Goods,Unnamed: 34,84.97901667
+,        Durable Goods,Unnamed: 35,78.72008333
+,        Durable Goods,Unnamed: 36,76.41174167
+,        Durable Goods,Unnamed: 37,73.42376667
+,        Durable Goods,Unnamed: 38,67.15034167
+,        Durable Goods,Unnamed: 39,62.0425
+,        Durable Goods,Unnamed: 40,56.90330833
+,        Durable Goods,Unnamed: 41,60.41094167
+,        Durable Goods,Unnamed: 42,62.33849167
+,        Durable Goods,Unnamed: 43,60.96068333
+,        Durable Goods,Unnamed: 44,58.240125
+,        Durable Goods,Unnamed: 6,97.8184
+,        Durable Goods,Unnamed: 7,101.5881417
+,        Durable Goods,Unnamed: 8,104.5256667
+,        Durable Goods,Unnamed: 9,107.2182167
+,        Electric Equipment,Unnamed: 10,100.8160583
+,        Electric Equipment,Unnamed: 11,96.16613333
+,        Electric Equipment,Unnamed: 12,100.23615
+,        Electric Equipment,Unnamed: 13,101.180725
+,        Electric Equipment,Unnamed: 14,99.99998333
+,        Electric Equipment,Unnamed: 15,100.7891667
+,        Electric Equipment,Unnamed: 16,101.120675
+,        Electric Equipment,Unnamed: 17,101.6668667
+,        Electric Equipment,Unnamed: 18,99.87365833
+,        Electric Equipment,Unnamed: 19,100.0771833
+,        Electric Equipment,Unnamed: 20,97.71971667
+,        Electric Equipment,Unnamed: 21,93.37073333
+,        Electric Equipment,Unnamed: 22,89.796975
+,        Electric Equipment,Unnamed: 23,113.97185
+,        Electric Equipment,Unnamed: 24,118.70155
+,        Electric Equipment,Unnamed: 25,113.9286
+,        Electric Equipment,Unnamed: 26,113.1900167
+,        Electric Equipment,Unnamed: 27,111.2976917
+,        Electric Equipment,Unnamed: 28,109.365175
+,        Electric Equipment,Unnamed: 29,112.26105
+,        Electric Equipment,Unnamed: 30,121.8669167
+,        Electric Equipment,Unnamed: 31,135.227075
+,        Electric Equipment,Unnamed: 32,128.8029667
+,        Electric Equipment,Unnamed: 33,126.7340917
+,        Electric Equipment,Unnamed: 34,122.1638
+,        Electric Equipment,Unnamed: 35,117.7774917
+,        Electric Equipment,Unnamed: 36,114.3215
+,        Electric Equipment,Unnamed: 37,111.602175
+,        Electric Equipment,Unnamed: 38,104.0584333
+,        Electric Equipment,Unnamed: 39,97.98024167
+,        Electric Equipment,Unnamed: 40,92.40751667
+,        Electric Equipment,Unnamed: 41,97.46325833
+,        Electric Equipment,Unnamed: 42,100.0273333
+,        Electric Equipment,Unnamed: 43,101.796575
+,        Electric Equipment,Unnamed: 44,97.01134167
+,        Electric Equipment,Unnamed: 6,96.8741
+,        Electric Equipment,Unnamed: 7,98.25744167
+,        Electric Equipment,Unnamed: 8,97.2592
+,        Electric Equipment,Unnamed: 9,96.90533333
+,        FW Dodge Construction Index,Unnamed: 10,180.85
+,        FW Dodge Construction Index,Unnamed: 11,154.3333333
+,        FW Dodge Construction Index,Unnamed: 12,167.6666667
+,        FW Dodge Construction Index,Unnamed: 13,162.4166667
+,        FW Dodge Construction Index,Unnamed: 14,150.1666667
+,        FW Dodge Construction Index,Unnamed: 15,136.25
+,        FW Dodge Construction Index,Unnamed: 16,132.5
+,        FW Dodge Construction Index,Unnamed: 17,118.1666667
+,        FW Dodge Construction Index,Unnamed: 18,106.5833333
+,        FW Dodge Construction Index,Unnamed: 19,96.0
+,        FW Dodge Construction Index,Unnamed: 20,87.5
+,        FW Dodge Construction Index,Unnamed: 21,87.0
+,        FW Dodge Construction Index,Unnamed: 22,85.75
+,        FW Dodge Construction Index,Unnamed: 23,110.4166667
+,        FW Dodge Construction Index,Unnamed: 24,126.9139167
+,        FW Dodge Construction Index,Unnamed: 25,144.6154167
+,        FW Dodge Construction Index,Unnamed: 26,141.652
+,        FW Dodge Construction Index,Unnamed: 27,124.918
+,        FW Dodge Construction Index,Unnamed: 28,112.9205
+,        FW Dodge Construction Index,Unnamed: 29,107.0728333
+,        FW Dodge Construction Index,Unnamed: 30,105.2013333
+,        FW Dodge Construction Index,Unnamed: 31,100.1166667
+,        FW Dodge Construction Index,Unnamed: 32,94.71158333
+,        FW Dodge Construction Index,Unnamed: 33,86.1115
+,        FW Dodge Construction Index,Unnamed: 34,76.80541667
+,        FW Dodge Construction Index,Unnamed: 35,69.85433333
+,        FW Dodge Construction Index,Unnamed: 36,65.01383333
+,        FW Dodge Construction Index,Unnamed: 37,62.65916667
+,        FW Dodge Construction Index,Unnamed: 38,57.59233333
+,        FW Dodge Construction Index,Unnamed: 39,53.35008333
+,        FW Dodge Construction Index,Unnamed: 40,48.94516667
+,        FW Dodge Construction Index,Unnamed: 41,52.101
+,        FW Dodge Construction Index,Unnamed: 42,57.58433333
+,        FW Dodge Construction Index,Unnamed: 43,55.4975
+,        FW Dodge Construction Index,Unnamed: 44,54.82408333
+,        FW Dodge Construction Index,Unnamed: 6,272.3333333
+,        FW Dodge Construction Index,Unnamed: 7,240.0833333
+,        FW Dodge Construction Index,Unnamed: 8,227.75
+,        FW Dodge Construction Index,Unnamed: 9,222.6666667
+,        Fabricated Metals,Unnamed: 10,96.71975833
+,        Fabricated Metals,Unnamed: 11,93.12914167
+,        Fabricated Metals,Unnamed: 12,102.377675
+,        Fabricated Metals,Unnamed: 13,104.508075
+,        Fabricated Metals,Unnamed: 14,99.99999167
+,        Fabricated Metals,Unnamed: 15,98.82813333
+,        Fabricated Metals,Unnamed: 16,102.587025
+,        Fabricated Metals,Unnamed: 17,106.141325
+,        Fabricated Metals,Unnamed: 18,104.2237583
+,        Fabricated Metals,Unnamed: 19,102.413525
+,        Fabricated Metals,Unnamed: 20,99.40923333
+,        Fabricated Metals,Unnamed: 21,92.87918333
+,        Fabricated Metals,Unnamed: 22,87.21818333
+,        Fabricated Metals,Unnamed: 23,113.3597167
+,        Fabricated Metals,Unnamed: 24,117.6332
+,        Fabricated Metals,Unnamed: 25,112.8116667
+,        Fabricated Metals,Unnamed: 26,106.9507667
+,        Fabricated Metals,Unnamed: 27,102.2093167
+,        Fabricated Metals,Unnamed: 28,101.751625
+,        Fabricated Metals,Unnamed: 29,102.9205417
+,        Fabricated Metals,Unnamed: 30,105.2162833
+,        Fabricated Metals,Unnamed: 31,113.3871333
+,        Fabricated Metals,Unnamed: 32,109.1103833
+,        Fabricated Metals,Unnamed: 33,108.2999583
+,        Fabricated Metals,Unnamed: 34,104.8994583
+,        Fabricated Metals,Unnamed: 35,100.3585083
+,        Fabricated Metals,Unnamed: 36,96.88794167
+,        Fabricated Metals,Unnamed: 37,91.273375
+,        Fabricated Metals,Unnamed: 38,83.96820833
+,        Fabricated Metals,Unnamed: 39,80.910275
+,        Fabricated Metals,Unnamed: 40,78.4804
+,        Fabricated Metals,Unnamed: 41,82.18623333
+,        Fabricated Metals,Unnamed: 42,83.160825
+,        Fabricated Metals,Unnamed: 43,83.80939167
+,        Fabricated Metals,Unnamed: 44,79.77404167
+,        Fabricated Metals,Unnamed: 6,93.8187
+,        Fabricated Metals,Unnamed: 7,93.5973
+,        Fabricated Metals,Unnamed: 8,96.255575
+,        Fabricated Metals,Unnamed: 9,98.0898
+,        Industrial,Unnamed: 10,97.76563333
+,        Industrial,Unnamed: 11,91.856275
+,        Industrial,Unnamed: 12,101.6436333
+,        Industrial,Unnamed: 13,104.6349583
+,        Industrial,Unnamed: 14,99.99999167
+,        Industrial,Unnamed: 15,97.07915
+,        Industrial,Unnamed: 16,103.1824167
+,        Industrial,Unnamed: 17,110.8104167
+,        Industrial,Unnamed: 18,110.5348583
+,        Industrial,Unnamed: 19,113.696025
+,        Industrial,Unnamed: 20,106.4876667
+,        Industrial,Unnamed: 21,97.05135
+,        Industrial,Unnamed: 22,89.61563333
+,        Industrial,Unnamed: 23,112.2348
+,        Industrial,Unnamed: 24,114.6117667
+,        Industrial,Unnamed: 25,110.295975
+,        Industrial,Unnamed: 26,105.9924083
+,        Industrial,Unnamed: 27,100.4528333
+,        Industrial,Unnamed: 28,97.78368333
+,        Industrial,Unnamed: 29,98.188425
+,        Industrial,Unnamed: 30,99.98661667
+,        Industrial,Unnamed: 31,109.8791583
+,        Industrial,Unnamed: 32,103.8205917
+,        Industrial,Unnamed: 33,106.2997833
+,        Industrial,Unnamed: 34,103.2507083
+,        Industrial,Unnamed: 35,97.07255833
+,        Industrial,Unnamed: 36,93.36536667
+,        Industrial,Unnamed: 37,87.39050833
+,        Industrial,Unnamed: 38,81.67100833
+,        Industrial,Unnamed: 39,76.44854167
+,        Industrial,Unnamed: 40,75.11583333
+,        Industrial,Unnamed: 41,79.39245
+,        Industrial,Unnamed: 42,79.949025
+,        Industrial,Unnamed: 43,77.43496667
+,        Industrial,Unnamed: 44,71.16335833
+,        Industrial,Unnamed: 6,88.506125
+,        Industrial,Unnamed: 7,89.59908333
+,        Industrial,Unnamed: 8,94.11659167
+,        Industrial,Unnamed: 9,97.53175833
+,        Machinery,Unnamed: 10,97.40565
+,        Machinery,Unnamed: 11,90.54821667
+,        Machinery,Unnamed: 12,101.4816917
+,        Machinery,Unnamed: 13,104.57935
+,        Machinery,Unnamed: 14,99.99999167
+,        Machinery,Unnamed: 15,95.81399167
+,        Machinery,Unnamed: 16,103.766075
+,        Machinery,Unnamed: 17,112.7532583
+,        Machinery,Unnamed: 18,111.3259
+,        Machinery,Unnamed: 19,116.7251917
+,        Machinery,Unnamed: 20,107.94305
+,        Machinery,Unnamed: 21,95.85078333
+,        Machinery,Unnamed: 22,85.8315
+,        Machinery,Unnamed: 23,110.293675
+,        Machinery,Unnamed: 24,113.2647833
+,        Machinery,Unnamed: 25,108.6635917
+,        Machinery,Unnamed: 26,103.662875
+,        Machinery,Unnamed: 27,97.54360833
+,        Machinery,Unnamed: 28,93.57229167
+,        Machinery,Unnamed: 29,94.00118333
+,        Machinery,Unnamed: 30,97.788325
+,        Machinery,Unnamed: 31,109.5193583
+,        Machinery,Unnamed: 32,104.3489
+,        Machinery,Unnamed: 33,106.6576
+,        Machinery,Unnamed: 34,104.1568333
+,        Machinery,Unnamed: 35,98.44180833
+,        Machinery,Unnamed: 36,94.62945
+,        Machinery,Unnamed: 37,87.76094167
+,        Machinery,Unnamed: 38,79.90128333
+,        Machinery,Unnamed: 39,74.27604167
+,        Machinery,Unnamed: 40,74.39048333
+,        Machinery,Unnamed: 41,79.42863333
+,        Machinery,Unnamed: 42,81.40248333
+,        Machinery,Unnamed: 43,78.526525
+,        Machinery,Unnamed: 44,71.1145
+,        Machinery,Unnamed: 6,91.26393333
+,        Machinery,Unnamed: 7,90.239975
+,        Machinery,Unnamed: 8,94.53953333
+,        Machinery,Unnamed: 9,97.68658333
+,        Primary Metals,Unnamed: 10,96.04384167
+,        Primary Metals,Unnamed: 11,86.60260833
+,        Primary Metals,Unnamed: 12,97.32339167
+,        Primary Metals,Unnamed: 13,103.1870417
+,        Primary Metals,Unnamed: 14,100.0
+,        Primary Metals,Unnamed: 15,100.9928583
+,        Primary Metals,Unnamed: 16,105.6704167
+,        Primary Metals,Unnamed: 17,113.5071583
+,        Primary Metals,Unnamed: 18,112.7398917
+,        Primary Metals,Unnamed: 19,109.1468333
+,        Primary Metals,Unnamed: 20,111.3744167
+,        Primary Metals,Unnamed: 21,103.8096
+,        Primary Metals,Unnamed: 22,84.61205
+,        Primary Metals,Unnamed: 23,113.7182083
+,        Primary Metals,Unnamed: 24,113.514125
+,        Primary Metals,Unnamed: 25,111.2192083
+,        Primary Metals,Unnamed: 26,108.1693583
+,        Primary Metals,Unnamed: 27,111.1566167
+,        Primary Metals,Unnamed: 28,102.3320167
+,        Primary Metals,Unnamed: 29,104.2850333
+,        Primary Metals,Unnamed: 30,104.1887917
+,        Primary Metals,Unnamed: 31,114.5425333
+,        Primary Metals,Unnamed: 32,118.6768833
+,        Primary Metals,Unnamed: 33,118.8523167
+,        Primary Metals,Unnamed: 34,116.8641167
+,        Primary Metals,Unnamed: 35,112.107875
+,        Primary Metals,Unnamed: 36,109.6068167
+,        Primary Metals,Unnamed: 37,108.3988833
+,        Primary Metals,Unnamed: 38,100.8424167
+,        Primary Metals,Unnamed: 39,96.19311667
+,        Primary Metals,Unnamed: 40,93.53511667
+,        Primary Metals,Unnamed: 41,99.57651667
+,        Primary Metals,Unnamed: 42,100.7570583
+,        Primary Metals,Unnamed: 43,103.0987917
+,        Primary Metals,Unnamed: 44,92.23805833
+,        Primary Metals,Unnamed: 6,98.43914167
+,        Primary Metals,Unnamed: 7,96.806625
+,        Primary Metals,Unnamed: 8,99.774675
+,        Primary Metals,Unnamed: 9,100.4386167
+,        Transit Equipment,Unnamed: 10,59.98273333
+,        Transit Equipment,Unnamed: 11,55.59854167
+,        Transit Equipment,Unnamed: 12,79.036875
+,        Transit Equipment,Unnamed: 13,100.5709083
+,        Transit Equipment,Unnamed: 14,100.0
+,        Transit Equipment,Unnamed: 15,93.6951
+,        Transit Equipment,Unnamed: 16,102.118175
+,        Transit Equipment,Unnamed: 17,97.53459167
+,        Transit Equipment,Unnamed: 18,89.242575
+,        Transit Equipment,Unnamed: 19,84.07116667
+,        Transit Equipment,Unnamed: 20,69.153875
+,        Transit Equipment,Unnamed: 21,66.86218333
+,        Transit Equipment,Unnamed: 22,59.891125
+,        Transit Equipment,Unnamed: 23,73.85100833
+,        Transit Equipment,Unnamed: 24,81.43706667
+,        Transit Equipment,Unnamed: 25,78.74586667
+,        Transit Equipment,Unnamed: 26,67.30598333
+,        Transit Equipment,Unnamed: 27,61.71944167
+,        Transit Equipment,Unnamed: 28,59.28175833
+,        Transit Equipment,Unnamed: 29,62.27065833
+,        Transit Equipment,Unnamed: 30,68.41321667
+,        Transit Equipment,Unnamed: 31,71.06195
+,        Transit Equipment,Unnamed: 32,82.49853333
+,        Transit Equipment,Unnamed: 33,83.49930833
+,        Transit Equipment,Unnamed: 34,71.0102
+,        Transit Equipment,Unnamed: 35,59.77689167
+,        Transit Equipment,Unnamed: 36,56.37781667
+,        Transit Equipment,Unnamed: 37,56.701725
+,        Transit Equipment,Unnamed: 38,58.78544167
+,        Transit Equipment,Unnamed: 39,63.090725
+,        Transit Equipment,Unnamed: 40,64.84873333
+,        Transit Equipment,Unnamed: 41,63.19700833
+,        Transit Equipment,Unnamed: 42,59.23428333
+,        Transit Equipment,Unnamed: 43,56.49875833
+,        Transit Equipment,Unnamed: 44,50.69458333
+,        Transit Equipment,Unnamed: 6,87.763975
+,        Transit Equipment,Unnamed: 7,74.06783333
+,        Transit Equipment,Unnamed: 8,75.13316667
+,        Transit Equipment,Unnamed: 9,67.29096667
+,        U.S Housing Starts ('000 Units),Unnamed: 10,1603.166667
+,        U.S Housing Starts ('000 Units),Unnamed: 11,1394.333333
+,        U.S Housing Starts ('000 Units),Unnamed: 12,1291.5
+,        U.S Housing Starts ('000 Units),Unnamed: 13,1246.833333
+,        U.S Housing Starts ('000 Units),Unnamed: 14,1204.666667
+,        U.S Housing Starts ('000 Units),Unnamed: 15,1177.083333
+,        U.S Housing Starts ('000 Units),Unnamed: 16,1106.75
+,        U.S Housing Starts ('000 Units),Unnamed: 17,1000.25
+,        U.S Housing Starts ('000 Units),Unnamed: 18,928.1666667
+,        U.S Housing Starts ('000 Units),Unnamed: 19,783.75
+,        U.S Housing Starts ('000 Units),Unnamed: 20,611.9166667
+,        U.S Housing Starts ('000 Units),Unnamed: 21,585.5
+,        U.S Housing Starts ('000 Units),Unnamed: 22,554.0
+,        U.S Housing Starts ('000 Units),Unnamed: 23,900.0
+,        U.S Housing Starts ('000 Units),Unnamed: 24,1341.833333
+,        U.S Housing Starts ('000 Units),Unnamed: 25,1811.916667
+,        U.S Housing Starts ('000 Units),Unnamed: 26,2072.916667
+,        U.S Housing Starts ('000 Units),Unnamed: 27,1949.5
+,        U.S Housing Starts ('000 Units),Unnamed: 28,1853.75
+,        U.S Housing Starts ('000 Units),Unnamed: 29,1710.25
+,        U.S Housing Starts ('000 Units),Unnamed: 30,1601.166667
+,        U.S Housing Starts ('000 Units),Unnamed: 31,1573.333333
+,        U.S Housing Starts ('000 Units),Unnamed: 32,1651.916667
+,        U.S Housing Starts ('000 Units),Unnamed: 33,1615.166667
+,        U.S Housing Starts ('000 Units),Unnamed: 34,1474.583333
+,        U.S Housing Starts ('000 Units),Unnamed: 35,1468.666667
+,        U.S Housing Starts ('000 Units),Unnamed: 36,1361.0
+,        U.S Housing Starts ('000 Units),Unnamed: 37,1446.0
+,        U.S Housing Starts ('000 Units),Unnamed: 38,1291.583333
+,        U.S Housing Starts ('000 Units),Unnamed: 39,1201.416667
+,        U.S Housing Starts ('000 Units),Unnamed: 40,1008.75
+,        U.S Housing Starts ('000 Units),Unnamed: 41,1203.166667
+,        U.S Housing Starts ('000 Units),Unnamed: 42,1382.083333
+,        U.S Housing Starts ('000 Units),Unnamed: 43,1487.833333
+,        U.S Housing Starts ('000 Units),Unnamed: 44,1630.5
+,        U.S Housing Starts ('000 Units),Unnamed: 6,1352.8
+,        U.S Housing Starts ('000 Units),Unnamed: 7,1370.583333
+,        U.S Housing Starts ('000 Units),Unnamed: 8,1420.583333
+,        U.S Housing Starts ('000 Units),Unnamed: 9,1551.5
+,        U.S. Architecture Billing Index SA,Unnamed: 14,50.9
+,        U.S. Architecture Billing Index SA,Unnamed: 15,55.5804051
+,        U.S. Architecture Billing Index SA,Unnamed: 16,51.15582544
+,        U.S. Architecture Billing Index SA,Unnamed: 17,52.98676578
+,        U.S. Architecture Billing Index SA,Unnamed: 18,49.06933661
+,        U.S. Architecture Billing Index SA,Unnamed: 19,51.56701829
+,        U.S. Architecture Billing Index SA,Unnamed: 20,50.50575451
+,        U.S. Architecture Billing Index SA,Unnamed: 21,52.45526524
+,        U.S. Architecture Billing Index SA,Unnamed: 22,44.00092566
+,        U.S. Architecture Billing Index SA,Unnamed: 23,34.6997489
+,        U.S. Architecture Billing Index SA,Unnamed: 24,52.88247
+,        U.S. Architecture Billing Index SA,Unnamed: 25,55.43557641
+,        U.S. Architecture Billing Index SA,Unnamed: 26,50.33008572
+,        U.S. Architecture Billing Index SA,Unnamed: 27,48.10085703
+,        U.S. Architecture Billing Index SA,Unnamed: 28,50.324633
+,        U.S. Architecture Billing Index SA,Unnamed: 29,47.77477035
+,        U.S. Architecture Billing Index SA,Unnamed: 30,45.5980669
+,        U.S. Architecture Billing Index SA,Unnamed: 31,53.17886621
+,        U.S. Architecture Billing Index SA,Unnamed: 32,57.73676793
+,        U.S. Architecture Billing Index SA,Unnamed: 33,55.22759601
+,        U.S. Architecture Billing Index SA,Unnamed: 34,51.28729616
+,        U.S. Architecture Billing Index SA,Unnamed: 35,44.64082819
+,        U.S. Architecture Billing Index SA,Unnamed: 36,53.43487098
+,        U.S. Housing Permits,Unnamed: 10,1735.416667
+,        U.S. Housing Permits,Unnamed: 11,1478.25
+,        U.S. Housing Permits,Unnamed: 12,1386.166667
+,        U.S. Housing Permits,Unnamed: 13,1327.833333
+,        U.S. Housing Permits,Unnamed: 14,1286.25
+,        U.S. Housing Permits,Unnamed: 15,1205.666667
+,        U.S. Housing Permits,Unnamed: 16,1177.416667
+,        U.S. Housing Permits,Unnamed: 17,1052.083333
+,        U.S. Housing Permits,Unnamed: 18,988.0
+,        U.S. Housing Permits,Unnamed: 19,828.5
+,        U.S. Housing Permits,Unnamed: 20,624.0
+,        U.S. Housing Permits,Unnamed: 21,603.6666667
+,        U.S. Housing Permits,Unnamed: 22,582.0
+,        U.S. Housing Permits,Unnamed: 23,895.8333333
+,        U.S. Housing Permits,Unnamed: 24,1391.5
+,        U.S. Housing Permits,Unnamed: 25,1843.666667
+,        U.S. Housing Permits,Unnamed: 26,2160.083333
+,        U.S. Housing Permits,Unnamed: 27,2057.583333
+,        U.S. Housing Permits,Unnamed: 28,1888.416667
+,        U.S. Housing Permits,Unnamed: 29,1749.0
+,        U.S. Housing Permits,Unnamed: 30,1637.166667
+,        U.S. Housing Permits,Unnamed: 31,1598.333333
+,        U.S. Housing Permits,Unnamed: 32,1663.916667
+,        U.S. Housing Permits,Unnamed: 33,1619.416667
+,        U.S. Housing Permits,Unnamed: 34,1442.25
+,        U.S. Housing Permits,Unnamed: 35,1419.083333
+,        U.S. Housing Permits,Unnamed: 36,1335.833333
+,        U.S. Housing Permits,Unnamed: 37,1366.916667
+,        U.S. Housing Permits,Unnamed: 38,1207.25
+,        U.S. Housing Permits,Unnamed: 39,1098.0
+,        U.S. Housing Permits,Unnamed: 40,945.6666667
+,        U.S. Housing Permits,Unnamed: 41,1123.666667
+,        U.S. Housing Permits,Unnamed: 42,1350.333333
+,        U.S. Housing Permits,Unnamed: 43,1452.083333
+,        U.S. Housing Permits,Unnamed: 44,1541.333333
+,        U.S. Housing Permits,Unnamed: 6,1412.2
+,        U.S. Housing Permits,Unnamed: 7,1473.916667
+,        U.S. Housing Permits,Unnamed: 8,1515.916667
+,        U.S. Housing Permits,Unnamed: 9,1684.166667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 10,5.425
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 11,5.056666667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 12,4.745833333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 13,4.735833333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 14,4.904166667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 15,4.821666667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 16,4.623333333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 17,4.3325
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 18,4.475
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 19,4.125
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 20,3.791666667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 21,3.705
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 22,3.868333333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 23,3.655
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 24,4.418333333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 25,5.711666667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 26,6.180833333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 27,5.914166667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 28,5.443333333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 29,4.9975
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 30,4.726666667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 31,4.614166667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 32,4.635833333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 33,4.491666667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 34,3.9725
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 35,3.7825
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 36,3.514166667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 37,3.554166667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 38,3.420833333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 39,3.143333333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 40,2.866666667
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 41,2.920833333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 42,3.0325
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 43,3.51
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 44,3.435
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 6,3.705833333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 7,3.673333333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 8,3.675833333
+,        U.S.Exist. Home Sales ('000 Units),Unnamed: 9,4.531666667
+,        United States - Industrial Production Yoy % SA,Unnamed: 10,99.2876
+,        United States - Industrial Production Yoy % SA,Unnamed: 11,95.0885
+,        United States - Industrial Production Yoy % SA,Unnamed: 12,102.3463
+,        United States - Industrial Production Yoy % SA,Unnamed: 13,103.163
+,        United States - Industrial Production Yoy % SA,Unnamed: 14,100.0
+,        United States - Industrial Production Yoy % SA,Unnamed: 15,98.7988
+,        United States - Industrial Production Yoy % SA,Unnamed: 16,100.972
+,        United States - Industrial Production Yoy % SA,Unnamed: 17,102.4476
+,        United States - Industrial Production Yoy % SA,Unnamed: 18,99.4844
+,        United States - Industrial Production Yoy % SA,Unnamed: 19,97.5409
+,        United States - Industrial Production Yoy % SA,Unnamed: 20,94.6396
+,        United States - Industrial Production Yoy % SA,Unnamed: 21,91.737
+,        United States - Industrial Production Yoy % SA,Unnamed: 22,86.8996
+,        United States - Industrial Production Yoy % SA,Unnamed: 23,98.1173
+,        United States - Industrial Production Yoy % SA,Unnamed: 24,101.572
+,        United States - Industrial Production Yoy % SA,Unnamed: 25,98.9953
+,        United States - Industrial Production Yoy % SA,Unnamed: 26,96.7388
+,        United States - Industrial Production Yoy % SA,Unnamed: 27,93.5959
+,        United States - Industrial Production Yoy % SA,Unnamed: 28,91.2577
+,        United States - Industrial Production Yoy % SA,Unnamed: 29,90.0246
+,        United States - Industrial Production Yoy % SA,Unnamed: 30,89.7503
+,        United States - Industrial Production Yoy % SA,Unnamed: 31,92.5072
+,        United States - Industrial Production Yoy % SA,Unnamed: 32,89.3241
+,        United States - Industrial Production Yoy % SA,Unnamed: 33,85.4826
+,        United States - Industrial Production Yoy % SA,Unnamed: 34,80.7444
+,        United States - Industrial Production Yoy % SA,Unnamed: 35,75.2524
+,        United States - Industrial Production Yoy % SA,Unnamed: 36,71.9404
+,        United States - Industrial Production Yoy % SA,Unnamed: 37,68.7036
+,        United States - Industrial Production Yoy % SA,Unnamed: 38,65.2627
+,        United States - Industrial Production Yoy % SA,Unnamed: 39,63.1799
+,        United States - Industrial Production Yoy % SA,Unnamed: 40,61.4172
+,        United States - Industrial Production Yoy % SA,Unnamed: 41,62.4046
+,        United States - Industrial Production Yoy % SA,Unnamed: 42,61.8182
+,        United States - Industrial Production Yoy % SA,Unnamed: 43,61.2685
+,        United States - Industrial Production Yoy % SA,Unnamed: 44,58.2505
+,        United States - Industrial Production Yoy % SA,Unnamed: 6,101.4145
+,        United States - Industrial Production Yoy % SA,Unnamed: 7,100.1058
+,        United States - Industrial Production Yoy % SA,Unnamed: 8,100.7643
+,        United States - Industrial Production Yoy % SA,Unnamed: 9,100.98
+,        United States - PMI SA,Unnamed: 10,58.3
+,        United States - PMI SA,Unnamed: 11,60.2
+,        United States - PMI SA,Unnamed: 12,47.9
+,        United States - PMI SA,Unnamed: 13,54.9
+,        United States - PMI SA,Unnamed: 14,59.7
+,        United States - PMI SA,Unnamed: 15,54.4
+,        United States - PMI SA,Unnamed: 16,48.7
+,        United States - PMI SA,Unnamed: 17,55.7
+,        United States - PMI SA,Unnamed: 18,56.5
+,        United States - PMI SA,Unnamed: 19,50.1
+,        United States - PMI SA,Unnamed: 20,53.0
+,        United States - PMI SA,Unnamed: 21,56.6
+,        United States - PMI SA,Unnamed: 22,55.8
+,        United States - PMI SA,Unnamed: 23,34.5
+,        United States - PMI SA,Unnamed: 24,50.1
+,        United States - PMI SA,Unnamed: 25,51.4
+,        United States - PMI SA,Unnamed: 26,55.1
+,        United States - PMI SA,Unnamed: 27,57.2
+,        United States - PMI SA,Unnamed: 28,60.1
+,        United States - PMI SA,Unnamed: 29,51.6
+,        United States - PMI SA,Unnamed: 30,45.3
+,        United States - PMI SA,Unnamed: 31,43.9
+,        United States - PMI SA,Unnamed: 32,57.8
+,        United States - PMI SA,Unnamed: 33,46.8
+,        United States - PMI SA,Unnamed: 34,54.5
+,        United States - PMI SA,Unnamed: 35,55.2
+,        United States - PMI SA,Unnamed: 36,46.2
+,        United States - PMI SA,Unnamed: 37,56.1
+,        United States - PMI SA,Unnamed: 38,55.6
+,        United States - PMI SA,Unnamed: 39,54.2
+,        United States - PMI SA,Unnamed: 40,46.8
+,        United States - PMI SA,Unnamed: 41,40.8
+,        United States - PMI SA,Unnamed: 42,47.4
+,        United States - PMI SA,Unnamed: 43,56.0
+,        United States - PMI SA,Unnamed: 44,61.0
+,        United States - PMI SA,Unnamed: 5,52.6
+,        United States - PMI SA,Unnamed: 6,47.9
+,        United States - PMI SA,Unnamed: 7,49.2
+,        United States - PMI SA,Unnamed: 8,46.9
+,        United States - PMI SA,Unnamed: 9,48.0

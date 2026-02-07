@@ -1,0 +1,268 @@
+{
+    "_description": "Configuration mapping Bloomberg data files to model fields",
+    "_data_directory": "../exports/processed",
+    "bloomberg_enabled": true,
+
+    "analysis_year": 2023,
+    "_analysis_note": "Model uses 2023 annual average prices as baseline (not year-end point-in-time)",
+    "analysis_effective_date": "2023-12-29",
+    "_analysis_date_note": "Legacy: year-end 2023 date kept for rate lookups",
+
+    "staleness_thresholds_days": {
+        "prices": 7,
+        "rates": 7,
+        "macro": 30,
+        "forecasts": 90
+    },
+
+    "price_data": {
+        "hrc_us": {
+            "file": "hrc_us_spot.csv",
+            "description": "US HRC Midwest spot price",
+            "unit": "$/ton",
+            "model_field": "hrc_us",
+            "fallback_value": 680
+        },
+        "crc_us": {
+            "file": "crc_us_spot.csv",
+            "description": "US CRC spot price",
+            "unit": "$/ton",
+            "model_field": "crc_us",
+            "fallback_value": 850
+        },
+        "hrc_eu": {
+            "file": "hrc_eu_spot.csv",
+            "description": "EU HRC spot price",
+            "unit": "$/ton",
+            "model_field": "hrc_eu",
+            "fallback_value": 620
+        },
+        "octg_us": {
+            "file": "octg_us_spot.csv",
+            "description": "US OCTG spot price",
+            "unit": "$/ton",
+            "model_field": "octg",
+            "fallback_value": 2800
+        },
+        "hrc_us_futures": {
+            "file": "hrc_us_futures.csv",
+            "description": "US HRC futures curve",
+            "unit": "$/ton",
+            "model_field": null
+        },
+        "scrap": {
+            "file": "scrap_us_ppi.csv",
+            "description": "US Scrap steel PPI index",
+            "unit": "index",
+            "model_field": null
+        }
+    },
+
+    "rate_data": {
+        "ust_10y": {
+            "file": "ust_10y.csv",
+            "description": "10-Year US Treasury yield",
+            "unit": "percent",
+            "model_field": "risk_free_rate",
+            "fallback_value": 4.25
+        },
+        "ust_30y": {
+            "file": "ust_30y.csv",
+            "description": "30-Year US Treasury yield",
+            "unit": "percent",
+            "model_field": null,
+            "fallback_value": 4.50
+        },
+        "spread_bbb": {
+            "file": "spread_bbb.csv",
+            "description": "BBB corporate credit spread",
+            "unit": "percent",
+            "model_field": "investment_grade_spread",
+            "fallback_value": 1.50
+        },
+        "spread_hy": {
+            "file": "spread_hy.csv",
+            "description": "High yield credit spread",
+            "unit": "percent",
+            "model_field": "high_yield_spread",
+            "fallback_value": 4.00
+        },
+        "sofr": {
+            "file": "sofr.csv",
+            "description": "SOFR overnight rate",
+            "unit": "percent",
+            "model_field": null,
+            "fallback_value": 4.30
+        }
+    },
+
+    "macro_data": {
+        "auto_production": {
+            "file": "auto_production.csv",
+            "description": "US auto production",
+            "unit": "million units",
+            "correlation_with": ["hrc_us", "crc_us", "coated_us"]
+        },
+        "auto_sales": {
+            "file": "auto_sales.csv",
+            "description": "US auto sales",
+            "unit": "million units",
+            "correlation_with": ["flat_rolled_volume"]
+        },
+        "housing_starts": {
+            "file": "housing_starts.csv",
+            "description": "US housing starts",
+            "unit": "thousand units",
+            "correlation_with": ["hrc_us", "flat_rolled_volume"]
+        },
+        "ism_pmi": {
+            "file": "ism_pmi.csv",
+            "description": "ISM Manufacturing PMI",
+            "unit": "index",
+            "correlation_with": ["hrc_us", "volume"]
+        },
+        "wti_crude": {
+            "file": "wti_crude.csv",
+            "description": "WTI Crude Oil price",
+            "unit": "$/barrel",
+            "correlation_with": ["octg_us", "tubular_volume"]
+        },
+        "rig_count": {
+            "file": "rig_count.csv",
+            "description": "US oil rig count",
+            "unit": "count",
+            "correlation_with": ["octg_us", "tubular_volume"]
+        },
+        "capacity_us": {
+            "file": "capacity_us.csv",
+            "description": "US steel capacity utilization",
+            "unit": "percent",
+            "correlation_with": ["hrc_us", "margins"]
+        }
+    },
+
+    "stock_data": {
+        "uss": {
+            "file": "stock_uss.csv",
+            "description": "USS stock price",
+            "unit": "$/share",
+            "model_field": "uss_stock_price"
+        },
+        "nippon": {
+            "file": "stock_nippon.csv",
+            "description": "Nippon Steel stock price (ADR)",
+            "unit": "$/share",
+            "model_field": "nippon_stock_price"
+        }
+    },
+
+    "derived_data": {
+        "correlation_matrix": {
+            "file": "correlation_matrix.csv",
+            "description": "Pre-computed correlation matrix for Monte Carlo",
+            "use_for": "monte_carlo_calibration"
+        },
+        "ev_forecast": {
+            "file": "ev_forecast.csv",
+            "description": "EV forecast data for synergy validation",
+            "use_for": "synergy_validation"
+        },
+        "steel_demand": {
+            "file": "steel_demand.csv",
+            "description": "Steel demand forecasts",
+            "use_for": "volume_scenarios"
+        },
+        "steel_costs": {
+            "file": "steel_costs.csv",
+            "description": "Steel production cost indices",
+            "use_for": "margin_analysis"
+        },
+        "macro_aggregate": {
+            "file": "macro_aggregate.csv",
+            "description": "Aggregated macro indicators",
+            "use_for": "scenario_mapping"
+        }
+    },
+
+    "scenario_price_mapping": {
+        "severe_downturn": {
+            "description": "10th percentile of historical prices",
+            "percentile": 10
+        },
+        "downside": {
+            "description": "25th percentile of historical prices",
+            "percentile": 25
+        },
+        "base_case": {
+            "description": "Median historical prices",
+            "percentile": 50
+        },
+        "above_average": {
+            "description": "65th percentile of historical prices",
+            "percentile": 65
+        },
+        "optimistic": {
+            "description": "75th percentile of historical prices",
+            "percentile": 75
+        }
+    },
+
+    "monte_carlo_defaults": {
+        "hrc_volatility": 0.18,
+        "crc_volatility": 0.16,
+        "coated_volatility": 0.15,
+        "octg_volatility": 0.22,
+        "volume_volatility": 0.08,
+        "wacc_volatility": 0.008
+    },
+
+    "scenario_calibration": {
+        "_description": "Controls which calibration mode is used for price scenario factors",
+        "default_mode": "bloomberg",
+        "available_modes": ["fixed", "bloomberg", "hybrid"],
+        "mode_descriptions": {
+            "fixed": "Hardcoded ±15% symmetric factors (simple, stable)",
+            "bloomberg": "Full Bloomberg percentiles (data-driven, volatile)",
+            "hybrid": "Bloomberg downside, capped upside (conservative)"
+        },
+        "percentile_mapping": {
+            "severe_downturn": 10,
+            "downside": 25,
+            "modest_decline": 50,
+            "upside": 75,
+            "boom": 90
+        },
+        "_notes": [
+            "FIXED mode uses symmetric factors for simple scenario analysis",
+            "BLOOMBERG mode uses historical percentiles for data-driven scenarios",
+            "HYBRID mode is recommended for board presentations (conservative upside)",
+            "OCTG upside in HYBRID is capped at 1.05x because 2023 was already elevated"
+        ]
+    },
+
+    "realization_factors": {
+        "_description": "Maps Bloomberg benchmarks to USS segment realized prices",
+        "_source": "2023 10-K realized prices vs Bloomberg annual averages",
+        "flat_rolled": {
+            "method": "weighted_avg",
+            "weights": {"hrc_us": 0.50, "crc_us": 0.30, "coated_us": 0.20},
+            "adjustment": 1.01,
+            "_10k_realized": 1030
+        },
+        "mini_mill": {
+            "benchmark": "hrc_us",
+            "factor": 0.96,
+            "_10k_realized": 875
+        },
+        "usse": {
+            "benchmark": "hrc_eu",
+            "factor": 1.22,
+            "_10k_realized": 873
+        },
+        "tubular": {
+            "benchmark": "octg",
+            "factor": 1.14,
+            "_10k_realized": 3137
+        }
+    }
+}

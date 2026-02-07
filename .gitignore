@@ -51,6 +51,18 @@ documentation/
 bloomberg_data/
 market-data/
 
+# Exception: track processed CSVs (public data) and bloomberg module (code + config)
+!market-data/
+market-data/*
+!market-data/exports/
+market-data/exports/*
+!market-data/exports/processed/
+!market-data/exports/processed/*.csv
+!market-data/bloomberg/
+market-data/bloomberg/*
+!market-data/bloomberg/*.py
+!market-data/bloomberg/config.json
+
 # Other proprietary market data
 *.bloomberg
 *.factset

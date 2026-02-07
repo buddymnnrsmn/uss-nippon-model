@@ -1,0 +1,10 @@
+Ticker,Company,Capacity_Mtons,Shipments_Mtons,Utilization_Pct,Revenue_USD_M,EBITDA_USD_M,Source,Notes
+X,United States Steel,22.4,14.8,66.0,18025,2189,USS 10-K FY2023,Flat-rolled + Mini Mill + Tubular segments
+NUE,Nucor Corporation,31.4,23.3,78.0,,,NUE 10-K FY2023,"Stated 78% avg utilization across steel mills; capacity = bar 9.6 + sheet 14.6 + structural 3.3 + plate 4.0"
+STLD,Steel Dynamics,14.0,12.8,82.0,,,STLD 10-K FY2023,"82% incl Sinton ramp-up (91% excl Sinton); capacity = flat roll 9.4 + long products 4.6"
+CLF,Cleveland-Cliffs,20.5,16.4,80.0,,,CLF 10-K FY2023,"7 blast furnaces + 5 EAFs; utilization derived from shipments/capacity (not explicitly stated)"
+CMC,Commercial Metals,7.7,4.6,60.0,,,CMC 10-K FY2023,"FY ends Aug 31; capacity = NA 6.1 + Europe 1.6; shipments = NA 2.91 + EU 1.73; utilization derived"
+MT,ArcelorMittal,81.0,55.6,72.0,68275,7600,MT 20-F FY2023,"EBITDA $7.6B per earnings release; revenue $68.275B from income statement"
+GGB,Gerdau,16.0,10.5,72.0,13870,2716,GGB 20-F FY2023,"EBITDA = EBIT R$10,453M + D&A R$3,047M = R$13,500M / 4.97 = $2,716M"
+PKX,POSCO Holdings,40.7,28.8,88.0,59030,5040,PKX 20-F FY2023,"EBITDA = Op profit KRW 2,738B + D&A KRW 3,845B = KRW 6,583B / 1305.4 = $5,040M"
+TX,Ternium,15.4,14.2,92.0,,,TX 20-F FY2023,"Crude steel capacity; shipments stated at 14.213Mt; utilization derived (supplements with purchased slabs)"
