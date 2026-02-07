@@ -1064,15 +1064,16 @@ A: 80% of outcomes fall between P10 and P90. P10 is the 10th worst percentile (r
 
 ### Current Version
 
-**Dashboard Version:** 2.1 (February 2026)
+**Dashboard Version:** 2.2 (February 2026)
 **Model Version:** 10.2
 **Python:** 3.9+
-**Last Updated:** 2026-02-06
+**Last Updated:** 2026-02-07
 
 ### Recent Updates
 
 | Date | Change |
 |------|--------|
+| 2026-02-07 | Replaced Steel Price Correlation section with Monte Carlo results |
 | 2026-02-06 | Added covenant analysis, tariff model, FX controls |
 | 2026-02-05 | Scenario calibration modes, probability distributions |
 | 2026-02-03 | SCENARIO_RATIONALE documentation, WACC audit trails |
