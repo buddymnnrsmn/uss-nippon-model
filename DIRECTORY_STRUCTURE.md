@@ -2,7 +2,7 @@
 
 This document explains the organization of the USS Financial Model project.
 
-**Last Updated:** 2026-02-01
+**Last Updated:** 2026-02-07
 
 ## Root Directory - Core Files Only
 
@@ -28,6 +28,7 @@ Analysis scripts, utilities, and core modules:
 - `benchmark_data.py` - Benchmark data and industry comparisons
 - `cache_persistence.py` - Caching utilities for performance
 - `export_model.py` - Model export and serialization
+- `price_correlation_analysis.py` - Steel price correlation analysis (used by dashboard)
 
 **Analysis Scripts:**
 - `benchmark_sensitivity.py` - Benchmark sensitivity analysis
@@ -53,6 +54,8 @@ Test files and test utilities:
 tests/
 ├── test_division_errors.py      # Division error tests
 ├── test_dashboard_features.py   # Dashboard feature tests
+├── test_dashboard_reorganization.py  # Phase 1-3 reorganization tests (20 tests)
+├── test_price_correlation.py    # Price correlation module tests
 └── __pycache__/                 # Python cache (auto-generated)
 ```
 
@@ -208,7 +211,7 @@ company-financials/
 ---
 
 ### `/market-data/`
-Bloomberg market data and integration:
+Market data, Bloomberg integration module, and processed time series:
 
 ```
 market-data/
@@ -216,9 +219,26 @@ market-data/
 ├── BLOOMBERG_DATA_GUIDE.md      # Bloomberg data documentation
 ├── bloomberg_loader.py          # Data loading utilities
 ├── integrate_with_model.py      # Model integration script
-├── /raw/                        # Raw Bloomberg exports
-└── /exports/                    # Processed exports
+├── /bloomberg/                  # Bloomberg integration module (tracked in git)
+│   ├── __init__.py              # Package exports
+│   ├── bloomberg_data_service.py # Data service layer
+│   ├── config.json              # Benchmark-to-file mapping
+│   ├── scenario_calibrator.py   # Scenario factor calibration
+│   ├── monte_carlo_calibrator.py # MC distribution calibration
+│   ├── price_calibrator.py      # Price benchmark calibration
+│   ├── price_realization_mapper.py # Price realization mapping
+│   └── wacc_updater.py          # WACC parameter updates
+├── /exports/
+│   └── /processed/              # Processed CSVs (tracked in git)
+│       ├── stock_uss.csv        # USS daily stock prices
+│       ├── hrc_us_spot.csv      # HRC US spot prices
+│       ├── crc_us_spot.csv      # CRC US spot prices
+│       ├── housing_starts.csv   # FRED housing starts
+│       └── ... (25 CSVs total)  # Rates, credit, demand, energy
+└── /raw/                        # Raw Bloomberg exports (git-ignored)
 ```
+
+**Note:** `exports/processed/` CSVs and `bloomberg/` module are tracked in git (public data needed by Streamlit Cloud). Raw terminal exports remain git-ignored.
 
 ---
 

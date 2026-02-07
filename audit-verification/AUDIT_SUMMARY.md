@@ -1,9 +1,10 @@
 # Model Audit Summary
 ## USS / Nippon Steel DCF Model - Audit Results
 
-**Date:** February 6, 2026 (updated from January 21, 2026)
+**Date:** February 7, 2026 (updated from February 6, 2026)
 **Auditor:** Automated Test Suite + Manual Review + Source Document Verification
 **Model Version:** Price x Volume DCF with Section 232 Tariffs, Monte Carlo, Dynamic Capital Projects
+**Dashboard Version:** 3.0 (5-tab layout with lazy loading)
 
 ---
 
@@ -12,13 +13,33 @@
 **Overall Assessment:** ✓ **PASS WITH COMMENTS**
 
 - **Automated Tests:** 128 passed, 5 failed (pre-existing Bloomberg calibration issue)
-- **Input Audit (run_audit.py):** 82.6% pass rate
+- **Input Audit (run_audit.py):** 82.6% pass rate → improved with inline documentation
+- **Monte Carlo Variables:** 26 (added EUR/USD FX factor)
 - **Comprehensive Audit:** CIQ vs 10-K reconciliation complete
 - **Source Documents:** 7/8 acquired (only S&P Capital IQ definitions export requires paid terminal)
 - **Critical Issues:** 0
 - **Recommendation:** Model approved for use
 
-The USS/Nippon Steel DCF model demonstrates strong integrity across all major categories. Since the January audit, significant enhancements have been added: Section 232 tariff modeling, Monte Carlo simulation (25 variables), Bloomberg-calibrated distributions, through-cycle benchmark rebasing, and dynamic capital project EBITDA.
+The USS/Nippon Steel DCF model demonstrates strong integrity across all major categories. Since the January audit, significant enhancements have been added: Section 232 tariff modeling, Monte Carlo simulation (26 variables), Bloomberg-calibrated distributions, through-cycle benchmark rebasing, and dynamic capital project EBITDA. The February 7 update restructured the dashboard into a 5-tab layout with lazy loading for expensive computations, added market data files to git for Streamlit Cloud deployment, and removed a spurious correlation analysis.
+
+### Audit Recommendations — Implementation Status (2026-02-06)
+
+| Recommendation | Status | Notes |
+|----------------|--------|-------|
+| Rename "Management" scenario | ✓ DONE | Now "Management Dec 2023 Guidance" |
+| Rename "Base Case" display | ✓ DONE | Now "Mid-Cycle Base Case" in dashboard |
+| Document shares outstanding (225M vs 255M) | ✓ DONE | Code comments added: basic vs diluted |
+| Balance sheet reconciliation comments | ✓ DONE | CIQ vs model documented inline |
+| Segment revenue verification | ✓ DONE | `data_collection/segment_revenue_verification.csv` |
+| Add stress test scenarios | ✓ DONE | Extreme Downside/Upside + Project Failure |
+| Add FX exposure model (USSE) | ✓ DONE | EUR/USD rate in SteelPriceScenario + MC |
+| Add covenant analysis | ✓ DONE | Debt/EBITDA + interest coverage tracking |
+| Dashboard user guide | ✓ DONE | `docs/DASHBOARD_USER_GUIDE.md` (v3.0) |
+| Wall Street scenario calibration | ✓ DONE | Recalibrated to DEFM14A fairness opinions ($38-$52 range) |
+| Dashboard Phase 3 (perf & polish) | ✓ DONE | 5-tab layout, lazy loading, deduped helpers, mini TOC |
+| Market data in git for cloud deploy | ✓ DONE | 25 CSVs + Bloomberg module tracked via .gitignore negation |
+| Remove spurious correlation matrix | ✓ DONE | CRC↔FCF -0.86 was spurious (3 data points); replaced with MC redirect |
+| Golden Share impact model | DEFERRED | Future iteration |
 
 ### Source Document Status (Updated 2026-02-06)
 
@@ -48,6 +69,35 @@ The USS/Nippon Steel DCF model demonstrates strong integrity across all major ca
 |-------------|-------------|-------------------|----------------|
 | USS Standalone | $37.59 | -3.6% | -31.7% |
 | Nippon (IRP-adjusted) | $53.20 | +36.3% | -3.3% |
+
+### Wall Street Scenario — DEFM14A Fairness Opinion Reconciliation (2026-02-06)
+
+The Wall Street scenario was recalibrated to match the Barclays and Goldman Sachs fairness opinions disclosed in the DEFM14A (filed March 2024).
+
+**Before Recalibration:**
+- HRC factor: 1.20x (~$886/ton)
+- WACC: 10.7% (verified WACC override)
+- USS share price: **$74.48** (well above fairness opinion range)
+
+**After Recalibration (matches DEFM14A):**
+- HRC factor: 1.02x (~$753/ton, blending near-term $750 / long-term $700 from mgmt projections)
+- EU HRC factor: 0.87x (carbon tax headwinds per mgmt projections)
+- WACC: 12.5% (analyst midpoint; `use_verified_wacc=False` to honor scenario)
+- Terminal growth: 0% (midpoint of Barclays (1.0)%–1.0% range)
+- Exit multiple: 4.75x (midpoint of Goldman 3.5x–6.0x)
+- USS share price: **$43.41** (within $38–$52 range)
+
+**Fairness Opinion Comparison:**
+- Barclays DCF: WACC 11.5%–13.5%, perp growth (1.0)%–1.0% → **$39–$50**
+- Goldman DCF: WACC 10.75%–12.5%, exit mult 3.5x–6.0x → **$38–$52**
+- Our midpoint: **$43.41** ✓ (within both ranges)
+- Offer price: **$55.00** (27% premium to midpoint)
+
+**Key Insights:**
+- Banks used conservative steel price assumptions ($700/ton long-term vs our $738 through-cycle benchmark)
+- Banks used higher discount rates (12.5% midpoint vs our verified 10.7%)
+- The $55 offer was **above** all DCF ranges from both banks, supporting fairness conclusion
+- Precedent transaction analysis ($50–$58) was the only methodology where $55 fell within range
 
 ---
 
@@ -107,9 +157,9 @@ The "Management" scenario reflects **actual December 2023 management guidance**,
 
 Management was being cautious in late 2023, whereas our "Base Case" uses mid-cycle assumptions. The scenario naming is confusing but the math is correct.
 
-**Recommendation:** Rename scenarios for clarity:
-- "Management" → "Management Dec 2023 Guidance (Conservative)"
-- "Base Case" → "Mid-Cycle Base Case"
+**Recommendation:** ~~Rename scenarios for clarity~~ **IMPLEMENTED (2026-02-06)**
+- ~~"Management" → "Management Dec 2023 Guidance"~~ ✓ Done
+- ~~"Base Case" → "Mid-Cycle Base Case"~~ ✓ Done in dashboard dropdown
 
 ---
 
@@ -234,22 +284,19 @@ While the model passes all automated tests, the following stress tests are recom
 
 ## Model Limitations & Caveats
 
-1. **Steel Price Volatility Not Modeled**
-   - Model uses deterministic price paths
-   - Real steel prices are highly volatile (±30-40% annually)
-   - Consider Monte Carlo simulation for risk assessment
+1. ~~**Steel Price Volatility Not Modeled**~~ ✓ ADDRESSED
+   - ~~Model uses deterministic price paths~~ Monte Carlo simulation (26 variables, 10K sims) now models price volatility
+   - ~~Consider Monte Carlo simulation~~ Done: lognormal distributions with return-based correlations
 
-2. **No Cyclicality in Demand**
-   - Steel demand is cyclical; model uses smooth growth rates
-   - Consider explicit recession scenarios
+2. ~~**No Cyclicality in Demand**~~ ✓ ADDRESSED
+   - ~~Steel demand is cyclical~~ Severe Downturn and Extreme Downside scenarios now included
 
 3. **Project Timing Risk**
    - All projects assumed on schedule
    - Construction delays can significantly impact value
 
-4. **Foreign Exchange Risk**
-   - USSE generates EUR cash flows
-   - No FX hedging or volatility modeled
+4. ~~**Foreign Exchange Risk**~~ ✓ ADDRESSED
+   - ~~No FX hedging or volatility modeled~~ EUR/USD rate added to SteelPriceScenario + MC (σ=0.08)
 
 5. **Regulatory Risk**
    - Golden Share constraints not quantified
@@ -272,14 +319,14 @@ While the model passes all automated tests, the following stress tests are recom
 ### Enhancements for Future Versions
 1. ~~Add Monte Carlo simulation for price/volume uncertainty~~ ✓ DONE (25 variables, 10K sims)
 2. ~~Add explicit recession scenario (2025-2026 downturn)~~ ✓ DONE (Severe Downturn scenario)
-3. Model FX exposure for USSE segment
+3. ~~Model FX exposure for USSE segment~~ ✓ DONE (EUR/USD in scenario + MC)
 4. ~~Add scenario for blast furnace closure (Granite City, Gary)~~ Partially addressed via project enable/disable
 5. Quantify Golden Share value destruction
-6. Add covenant analysis (debt/EBITDA triggers)
+6. ~~Add covenant analysis (debt/EBITDA triggers)~~ ✓ DONE (base case max 2.4x, well under 4.0x)
 7. ~~Add Section 232 tariff modeling~~ ✓ DONE
 
 ### Documentation
-1. Create user guide for dashboard
+1. ~~Create user guide for dashboard~~ ✓ DONE (`docs/DASHBOARD_USER_GUIDE.md` v3.0)
 2. ~~Document all scenario assumptions with sources~~ ✓ DONE (CAPITAL_PROJECTS_EBITDA_IMPACT_ANALYSIS.md)
 3. ~~Add sensitivity tables to executive summary~~ ✓ DONE (tornado charts, MC sensitivity)
 4. ~~Create "audit trail" sheet showing all calculations~~ ✓ DONE (comprehensive_audit.py)

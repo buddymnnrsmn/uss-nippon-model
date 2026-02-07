@@ -1,6 +1,6 @@
 # USS / Nippon Steel DCF Dashboard: User Guide
 
-**Version:** 2.2
+**Version:** 3.0
 **Last Updated:** February 7, 2026
 **Purpose:** Interactive tool for analyzing the proposed USS/Nippon Steel merger using scenario analysis, valuation, and stress testing
 
@@ -986,18 +986,44 @@ If synergies are modeled (future feature), they typically include:
 | Problem | Cause | Solution |
 |---------|-------|----------|
 | Dashboard won't load | Dependencies missing | `pip install -r requirements.txt` |
+| `ModuleNotFoundError: scripts.price_correlation_analysis` | File not committed to git | Ensure `scripts/price_correlation_analysis.py` is tracked |
+| `stock_uss.csv not found` | Market data not in git | Ensure `market-data/exports/processed/` CSVs are tracked (check `.gitignore` exceptions) |
+| `ScenarioType has no attribute EXTREME_DOWNSIDE` | Outdated `price_volume_model.py` | Pull latest — stress test enums were added 2026-02-07 |
 | Scenario dropdown empty | Data load failure | Check market-data/ directory exists |
+| Football Field blank | Not yet generated | Click "Generate Football Field" button (lazy-loaded) |
+| Price Sensitivity blank | Not yet generated | Click "Calculate Price Sensitivity" button (lazy-loaded) |
 | Calculations take > 10s | Large Monte Carlo size | Reduce simulations or disable MC |
 | Share price shows $0 | Severe downside (negative equity) | Check model is flooring at $0; expected in stress tests |
 | Covenant table empty | WACC module not available | Optional feature; can calculate manually |
 | FX rate doesn't affect USSE | EUR/USD control missing | Ensure interactive_dashboard.py is latest version |
 
+### Dashboard Tab Layout (Phase 3)
+
+The dashboard is organized into **5 tabs** for faster navigation:
+
+| Tab | Contents | Load Time |
+|-----|----------|-----------|
+| **Executive Decision** | Deal verdict boxes, risk matrix, fiduciary checklist | Instant |
+| **Valuation Analysis** | DCF details, scenario comparison, football field, capital projects, synergies, alternative buyers | Instant (football field lazy-loaded) |
+| **Risk & Sensitivity** | Sensitivity thresholds, Monte Carlo results, steel price sensitivity, WACC sensitivity, covenant analysis | Instant (price sensitivity lazy-loaded) |
+| **Strategic Context** | USS predicament, NSA commitments, peer benchmarking | Instant |
+| **Financial Projections** | FCF projection, segment analysis, stock price history, WACC verification, 10-year model | Instant |
+
+**Lazy-Loaded Sections:**
+- **Valuation Football Field:** Click "Generate Football Field" to compute (runs 18 DCF models, ~10-15 seconds). Results are cached per scenario.
+- **Steel Price Sensitivity:** Click "Calculate Price Sensitivity" to compute (runs 9 DCF models, ~5-10 seconds). Results are cached per scenario.
+
+**Within-Tab Navigation:** The Valuation and Financial Projections tabs include a mini table of contents with clickable anchor links at the top.
+
 ### Performance Tips
 
-1. **Disable Monte Carlo** if you just need quick scenario analysis
-2. **Use fewer simulations** (1,000) for interactive exploration
-3. **Close other browser tabs** to free up RAM
-4. **Run on laptop/desktop** (Streamlit Cloud is slower for large computations)
+1. **Tab switching is instant** — expensive computations are lazy-loaded behind buttons
+2. **Cached results persist** — switching away from a tab and back preserves computed charts
+3. **Scenario changes invalidate caches** — changing sidebar parameters clears cached results
+4. **Disable Monte Carlo** if you just need quick scenario analysis
+5. **Use fewer simulations** (1,000) for interactive exploration
+6. **Close other browser tabs** to free up RAM
+7. **Run on laptop/desktop** (Streamlit Cloud is slower for large computations)
 
 ---
 
@@ -1064,8 +1090,8 @@ A: 80% of outcomes fall between P10 and P90. P10 is the 10th worst percentile (r
 
 ### Current Version
 
-**Dashboard Version:** 2.2 (February 2026)
-**Model Version:** 10.2
+**Dashboard Version:** 3.0 (February 2026)
+**Model Version:** 10.3
 **Python:** 3.9+
 **Last Updated:** 2026-02-07
 
@@ -1073,6 +1099,8 @@ A: 80% of outcomes fall between P10 and P90. P10 is the 10th worst percentile (r
 
 | Date | Change |
 |------|--------|
+| 2026-02-07 | **Phase 3: Performance & Polish** — 5-tab layout, lazy-loaded Football Field and Price Sensitivity (behind buttons), cached scenario comparison, mini TOC navigation in Valuation/Projections tabs, deduplicated helper functions |
+| 2026-02-07 | Tracked market-data files for Streamlit Cloud (stock prices, steel prices, Bloomberg module) |
 | 2026-02-07 | Replaced Steel Price Correlation section with Monte Carlo results |
 | 2026-02-06 | Added covenant analysis, tariff model, FX controls |
 | 2026-02-05 | Scenario calibration modes, probability distributions |
