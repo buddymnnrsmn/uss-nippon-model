@@ -39,7 +39,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 from price_volume_model import (
     PriceVolumeModel, ModelScenario, ScenarioType,
     SteelPriceScenario, VolumeScenario, get_scenario_presets,
-    BENCHMARK_PRICES_2023, calculate_tariff_adjustment
+    BENCHMARK_PRICES_2023, calculate_tariff_adjustment,
+    apply_macro_adjustments,
 )
 
 
@@ -139,10 +140,16 @@ def _simulate_batch(args):
         hrc_eu_factor = sample.get('hrc_eu_factor', sample['hrc_price_factor'])
         usse_volume = sample.get('usse_volume', 1.0)
 
-        # Tariff blending: continuous expected tariff rate
+        # EUR/USD FX factor (1.0 = base rate 1.08)
+        eur_usd_factor = sample.get('eur_usd_factor', 1.0)
+        eur_usd_rate = 1.08 * eur_usd_factor
+
+        # Tariff discrete sampling: each iteration either maintains 25% or switches
+        # to the sampled alternative rate. This produces discrete outcomes (some iterations
+        # at 25%, others at 0-50%) consistent with the dashboard's 0%/25%/50% choices.
         tariff_prob = sample.get('tariff_probability', 0.80)
         tariff_alt = sample.get('tariff_rate_if_changed', 0.10)
-        effective_tariff = tariff_prob * 0.25 + (1 - tariff_prob) * tariff_alt
+        effective_tariff = 0.25 if np.random.random() < tariff_prob else tariff_alt
 
         price_scenario = SteelPriceScenario(
             name="MC Sample", description="Sampled",
@@ -153,6 +160,7 @@ def _simulate_batch(args):
             octg_factor=sample['octg_price_factor'],
             annual_price_growth=annual_price_growth,
             tariff_rate=effective_tariff,
+            eur_usd_rate=eur_usd_rate,
         )
         volume_scenario = VolumeScenario(
             name="MC Sample", description="Sampled",
@@ -163,6 +171,15 @@ def _simulate_batch(args):
             flat_rolled_growth_adj=0.0, mini_mill_growth_adj=0.0,
             usse_growth_adj=0.0, tubular_growth_adj=0.0,
         )
+
+        # Apply macro-conditioned volume adjustments
+        wti_f = sample.get('wti_factor', 1.0)
+        gdp_f = sample.get('gdp_growth_factor', 1.0)
+        dur_f = sample.get('durable_goods_factor', 1.0)
+        if not (wti_f == 1.0 and gdp_f == 1.0 and dur_f == 1.0):
+            volume_scenario = apply_macro_adjustments(
+                volume_scenario, wti_factor=wti_f, gdp_factor=gdp_f, durable_factor=dur_f,
+            )
 
         # Rate parameters
         base_us_10yr = base_scenario.us_10yr if base_scenario else 0.0425
@@ -708,6 +725,25 @@ class MonteCarloEngine:
             })
         )
 
+        # EUR/USD FX Factor (affects USSE segment pricing)
+        eur_usd_type, eur_usd_params = get_config_or_default(
+            'eur_usd_factor', 'lognormal', {'mean': -0.0032, 'std': 0.08}
+        )
+        variables['eur_usd_factor'] = InputVariable(
+            name='eur_usd_factor',
+            description='EUR/USD FX Factor (1.0 = base rate 1.08)',
+            distribution=Distribution(
+                name='EUR/USD FX',
+                dist_type=eur_usd_type,
+                params=eur_usd_params
+            ),
+            base_value=1.0,
+            correlations=get_correlations('eur_usd_factor', {
+                'hrc_eu_factor': 0.30,
+                'usse_volume': 0.15,
+            })
+        )
+
         # =====================================================================
         # DISCOUNT RATE - High impact
         # =====================================================================
@@ -955,17 +991,79 @@ class MonteCarloEngine:
         )
 
         tr_type, tr_params = get_config_or_default(
-            'tariff_rate_if_changed', 'triangular', {'min': 0.0, 'mode': 0.10, 'max': 0.25}
+            'tariff_rate_if_changed', 'triangular', {'min': 0.0, 'mode': 0.10, 'max': 0.50}
         )
         variables['tariff_rate_if_changed'] = InputVariable(
             name='tariff_rate_if_changed',
-            description='Tariff rate if policy changes (0-25%)',
+            description='Tariff rate if policy changes (0-50%, covers removal through escalation)',
             distribution=Distribution(
                 name='Alt Tariff Rate',
                 dist_type=tr_type,
                 params=tr_params
             ),
             base_value=0.10,
+        )
+
+        # =====================================================================
+        # MACRO DEMAND DRIVERS - Volume conditioning variables
+        # =====================================================================
+
+        wti_type, wti_params = get_config_or_default(
+            'wti_factor', 'lognormal', {'mean': -0.03125, 'std': 0.25}
+        )
+        variables['wti_factor'] = InputVariable(
+            name='wti_factor',
+            description='WTI Crude Oil Factor (drives OCTG demand via energy capex)',
+            distribution=Distribution(
+                name='WTI Factor',
+                dist_type=wti_type,
+                params=wti_params
+            ),
+            base_value=1.0,
+            correlations=get_correlations('wti_factor', {
+                'octg_price_factor': 0.45,
+                'tubular_volume': 0.35,
+                'hrc_price_factor': 0.25,
+            })
+        )
+
+        gdp_type, gdp_params = get_config_or_default(
+            'gdp_growth_factor', 'normal', {'mean': 1.0, 'std': 0.015}
+        )
+        variables['gdp_growth_factor'] = InputVariable(
+            name='gdp_growth_factor',
+            description='Real GDP Growth Factor (broad demand backdrop)',
+            distribution=Distribution(
+                name='GDP Growth',
+                dist_type=gdp_type,
+                params=gdp_params
+            ),
+            base_value=1.0,
+            correlations=get_correlations('gdp_growth_factor', {
+                'flat_rolled_volume': 0.30,
+                'mini_mill_volume': 0.25,
+                'usse_volume': 0.20,
+                'hrc_price_factor': 0.20,
+            })
+        )
+
+        dg_type, dg_params = get_config_or_default(
+            'durable_goods_factor', 'normal', {'mean': 1.0, 'std': 0.10}
+        )
+        variables['durable_goods_factor'] = InputVariable(
+            name='durable_goods_factor',
+            description='Durable Goods Orders Factor (forward mfg demand)',
+            distribution=Distribution(
+                name='Durable Goods',
+                dist_type=dg_type,
+                params=dg_params
+            ),
+            base_value=1.0,
+            correlations=get_correlations('durable_goods_factor', {
+                'flat_rolled_volume': 0.35,
+                'mini_mill_volume': 0.30,
+                'hrc_price_factor': 0.25,
+            })
         )
 
         return variables
@@ -1353,10 +1451,15 @@ class MonteCarloEngine:
         # Get HRC EU factor from sample or default to US price
         hrc_eu_factor = sample.get('hrc_eu_factor', sample['hrc_price_factor'])
 
-        # Tariff blending: continuous expected tariff rate
+        # EUR/USD FX factor (1.0 = base rate 1.08)
+        eur_usd_factor = sample.get('eur_usd_factor', 1.0)
+        eur_usd_rate = 1.08 * eur_usd_factor
+
+        # Tariff discrete sampling: each iteration either maintains 25% or switches
+        # to the sampled alternative rate (consistent with dashboard 0%/25%/50% choices)
         tariff_prob = sample.get('tariff_probability', 0.80)
         tariff_alt = sample.get('tariff_rate_if_changed', 0.10)
-        effective_tariff = tariff_prob * 0.25 + (1 - tariff_prob) * tariff_alt
+        effective_tariff = 0.25 if np.random.random() < tariff_prob else tariff_alt
 
         # Price scenario
         price_scenario = SteelPriceScenario(
@@ -1369,12 +1472,13 @@ class MonteCarloEngine:
             octg_factor=sample['octg_price_factor'],
             annual_price_growth=annual_price_growth,
             tariff_rate=effective_tariff,
+            eur_usd_rate=eur_usd_rate,
         )
 
         # Get USSE volume from sample or use default
         usse_volume = sample.get('usse_volume', 1.0)
 
-        # Volume scenario
+        # Volume scenario (base)
         volume_scenario = VolumeScenario(
             name="Monte Carlo Sample",
             description="Sampled from distributions",
@@ -1387,6 +1491,18 @@ class MonteCarloEngine:
             usse_growth_adj=0.0,
             tubular_growth_adj=0.0,
         )
+
+        # Apply macro-conditioned volume adjustments (if macro variables present)
+        wti_factor = sample.get('wti_factor', 1.0)
+        gdp_factor = sample.get('gdp_growth_factor', 1.0)
+        durable_factor = sample.get('durable_goods_factor', 1.0)
+        if not (wti_factor == 1.0 and gdp_factor == 1.0 and durable_factor == 1.0):
+            volume_scenario = apply_macro_adjustments(
+                volume_scenario,
+                wti_factor=wti_factor,
+                gdp_factor=gdp_factor,
+                durable_factor=durable_factor,
+            )
 
         # Execution factor
         if execution_factor_override is not None:

@@ -541,6 +541,124 @@ class VolumeScenario:
 
 
 @dataclass
+class MacroScenario:
+    """Macroeconomic scenario for demand-side volume adjustments.
+
+    Translates macro indicators into segment-level volume adjustments using
+    empirically-calibrated beta coefficients from demand_driver_analysis.py.
+
+    Macro adjustments are additive on top of existing price-driven volume logic.
+    """
+    name: str
+    description: str
+
+    # Macro indicator levels (1.0 = neutral/base)
+    gdp_growth_factor: float = 1.0      # Real GDP growth factor (1.0 = +2.5% trend)
+    wti_factor: float = 1.0             # WTI crude factor (1.0 = $75/bbl)
+    durable_goods_factor: float = 1.0   # Durable goods orders factor (1.0 = +3% trend)
+    ism_pmi: float = 52.0               # ISM PMI level (50 = neutral)
+
+    # Empirical beta coefficients: translate macro deviations into volume adjustments
+    # Formula: volume_adj = sum(beta * (macro_factor - 1.0)) for each macro driver
+    # Calibrated from partial correlations in demand_driver_analysis.py
+    MACRO_VOLUME_BETAS = {
+        'flat_rolled': {'gdp': 0.8, 'durable_goods': 0.5, 'wti': 0.1},
+        'mini_mill':   {'gdp': 0.6, 'durable_goods': 0.4, 'wti': 0.1},
+        'usse':        {'gdp': 0.5, 'durable_goods': 0.2, 'wti': 0.05},
+        'tubular':     {'gdp': 0.3, 'durable_goods': 0.1, 'wti': 0.8},
+    }
+
+
+def apply_macro_adjustments(
+    volume_scenario: 'VolumeScenario',
+    macro: Optional['MacroScenario'] = None,
+    wti_factor: float = 1.0,
+    gdp_factor: float = 1.0,
+    durable_factor: float = 1.0,
+    max_adjustment: float = 0.15,
+) -> 'VolumeScenario':
+    """Apply macro-conditioned volume adjustments to a VolumeScenario.
+
+    Can accept either a MacroScenario object or individual factors
+    (for MC engine compatibility where factors come from sample dict).
+
+    Args:
+        volume_scenario: Base volume scenario to adjust
+        macro: Optional MacroScenario (takes precedence over individual factors)
+        wti_factor: WTI crude factor (used if macro is None)
+        gdp_factor: GDP growth factor (used if macro is None)
+        durable_factor: Durable goods factor (used if macro is None)
+        max_adjustment: Maximum volume adjustment cap (default ±15%)
+
+    Returns:
+        New VolumeScenario with macro-adjusted volume factors
+    """
+    if macro is not None:
+        wti_factor = macro.wti_factor
+        gdp_factor = macro.gdp_growth_factor
+        durable_factor = macro.durable_goods_factor
+
+    betas = MacroScenario.MACRO_VOLUME_BETAS
+
+    adjustments = {}
+    for segment in ['flat_rolled', 'mini_mill', 'usse', 'tubular']:
+        b = betas[segment]
+        adj = (b['gdp'] * (gdp_factor - 1.0)
+               + b['durable_goods'] * (durable_factor - 1.0)
+               + b['wti'] * (wti_factor - 1.0))
+        adjustments[segment] = float(np.clip(adj, -max_adjustment, max_adjustment))
+
+    return VolumeScenario(
+        name=volume_scenario.name,
+        description=volume_scenario.description,
+        flat_rolled_volume_factor=volume_scenario.flat_rolled_volume_factor * (1 + adjustments['flat_rolled']),
+        mini_mill_volume_factor=volume_scenario.mini_mill_volume_factor * (1 + adjustments['mini_mill']),
+        usse_volume_factor=volume_scenario.usse_volume_factor * (1 + adjustments['usse']),
+        tubular_volume_factor=volume_scenario.tubular_volume_factor * (1 + adjustments['tubular']),
+        flat_rolled_growth_adj=volume_scenario.flat_rolled_growth_adj,
+        mini_mill_growth_adj=volume_scenario.mini_mill_growth_adj,
+        usse_growth_adj=volume_scenario.usse_growth_adj,
+        tubular_growth_adj=volume_scenario.tubular_growth_adj,
+    )
+
+
+def get_macro_scenario_presets() -> Dict[str, MacroScenario]:
+    """Return pre-built macro-conditioned scenario definitions.
+
+    These translate macroeconomic conditions into volume adjustments:
+    - Recession: GDP -2%, WTI $45, Durables -15%, PMI 45
+    - Base Macro: GDP +2.5%, WTI $75, Durables +3%, PMI 52
+    - Energy Boom: GDP +3%, WTI $95, Durables +5%, PMI 55
+    """
+    return {
+        'recession': MacroScenario(
+            name="Recession",
+            description="GDP contraction, low oil, weak manufacturing",
+            gdp_growth_factor=0.955,     # -2% GDP vs +2.5% trend → factor ~0.955
+            wti_factor=0.60,             # $45 vs $75 base
+            durable_goods_factor=0.85,   # -15% durable goods
+            ism_pmi=45.0,
+        ),
+        'base_macro': MacroScenario(
+            name="Base Macro",
+            description="Trend GDP, moderate oil, steady manufacturing",
+            gdp_growth_factor=1.0,
+            wti_factor=1.0,
+            durable_goods_factor=1.0,
+            ism_pmi=52.0,
+        ),
+        'energy_boom': MacroScenario(
+            name="Energy Boom",
+            description="Strong GDP, high oil, robust manufacturing",
+            gdp_growth_factor=1.005,     # +3% GDP vs +2.5% trend → factor ~1.005
+            wti_factor=1.267,            # $95 vs $75 base
+            durable_goods_factor=1.05,   # +5% durable goods
+            ism_pmi=55.0,
+        ),
+    }
+
+
+@dataclass
 class CapitalProject:
     """Capital project with segment allocation and dynamic EBITDA calculation.
 

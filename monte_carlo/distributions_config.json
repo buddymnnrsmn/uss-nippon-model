@@ -350,6 +350,20 @@
       },
       "rationale": "Mean-reverting to through-cycle baseline (E[X]=1.0). EU HRC is less volatile than US (σ=0.15 vs 0.18) due to different market structure and import competition."
     },
+    "eur_usd_factor": {
+      "distribution_type": "lognormal",
+      "parameters": {
+        "mean": -0.0032,
+        "std": 0.08
+      },
+      "data_source": "ECB EUR/USD reference rate (through-cycle volatility)",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true,
+        "calibration_note": "σ=0.08 reflects ~8% annual EUR/USD volatility (10yr average)"
+      },
+      "rationale": "Mean-reverting to 1.0 (no directional FX view). EUR/USD annual volatility ~8% historically. Lognormal with μ=-σ²/2 for E[X]=1.0. Factor multiplied by base rate 1.08 to get EUR/USD spot."
+    },
     "tariff_probability": {
       "distribution_type": "beta",
       "parameters": {
@@ -370,14 +384,56 @@
       "parameters": {
         "min": 0.0,
         "mode": 0.10,
-        "max": 0.25
+        "max": 0.50
       },
       "data_source": "expert judgment - trade policy scenarios",
       "n_observations": 0,
       "goodness_of_fit": {
         "expert": true
       },
-      "rationale": "If tariff policy changes, most likely outcome is reduction to ~10% (compromise rate). Full removal (0%) is tail risk. Max at current 25% (no increase modeled here since tariff_probability handles that)."
+      "rationale": "If tariff policy changes, most likely outcome is reduction to ~10% (compromise). Full removal (0%) and escalation to 50% are tail risks. Triangular(0, 10%, 50%) is right-skewed toward reduction but allows escalation. Consistent with dashboard 0/25/50% discrete choices."
+    },
+    "wti_factor": {
+      "distribution_type": "lognormal",
+      "parameters": {
+        "mean": -0.03125,
+        "std": 0.25
+      },
+      "data_source": "WTI crude oil historical volatility (2015-2023)",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true,
+        "calibration_note": "σ=0.25 from historical 25% annual WTI volatility"
+      },
+      "rationale": "WTI crude oil factor. σ=0.25 from historical 25% annual vol. Lognormal μ=-σ²/2 for E[X]=1.0. Drives OCTG demand via energy capex (partial r=0.69 with USS revenue)."
+    },
+    "gdp_growth_factor": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 1.0,
+        "std": 0.015
+      },
+      "data_source": "US real GDP growth forecast uncertainty",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true,
+        "calibration_note": "σ=0.015 reflects ~1.5pp GDP forecast uncertainty"
+      },
+      "rationale": "Real GDP growth factor centered on 1.0. σ=0.015 (~1.5pp range). Broad demand backdrop for all segments. Partial r=0.54 with revenue."
+    },
+    "durable_goods_factor": {
+      "distribution_type": "normal",
+      "parameters": {
+        "mean": 1.0,
+        "std": 0.10
+      },
+      "data_source": "Durable goods orders quarterly variation",
+      "n_observations": 0,
+      "goodness_of_fit": {
+        "expert": true,
+        "calibration_note": "σ=0.10 reflects 10% quarterly variation in durable goods orders"
+      },
+      "rationale": "Durable goods orders factor. σ=0.10 reflects 10% quarterly variation. Forward manufacturing demand signal. Partial r=0.65 with revenue."
     }
   },
   "correlations": {
@@ -419,7 +475,12 @@
     "hrc_eu_factor": {
       "hrc_price_factor": 0.60,
       "usse_volume": 0.40,
-      "tariff_probability": -0.10
+      "tariff_probability": -0.10,
+      "eur_usd_factor": 0.30
+    },
+    "eur_usd_factor": {
+      "hrc_eu_factor": 0.30,
+      "usse_volume": 0.15
     },
     "tariff_probability": {
       "hrc_price_factor": -0.35,
@@ -429,10 +490,26 @@
       "flat_rolled_volume": -0.25,
       "mini_mill_volume": -0.15,
       "hrc_eu_factor": -0.10
+    },
+    "wti_factor": {
+      "octg_price_factor": 0.45,
+      "tubular_volume": 0.35,
+      "hrc_price_factor": 0.25
+    },
+    "gdp_growth_factor": {
+      "flat_rolled_volume": 0.30,
+      "mini_mill_volume": 0.25,
+      "usse_volume": 0.20,
+      "hrc_price_factor": 0.20
+    },
+    "durable_goods_factor": {
+      "flat_rolled_volume": 0.35,
+      "mini_mill_volume": 0.30,
+      "hrc_price_factor": 0.25
     }
   },
   "metadata": {
-    "n_variables": 25,
+    "n_variables": 29,
     "distribution_types_used": [
       "triangular",
       "lognormal",

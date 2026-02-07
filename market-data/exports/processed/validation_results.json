@@ -1,0 +1,127 @@
+{
+  "hrc_us_spot": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "hrc_us_futures": {
+    "status": "WARNING",
+    "issues": [
+      "902 large date gaps"
+    ]
+  },
+  "crc_us_spot": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "hrc_eu_spot": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "octg_us_spot": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "scrap_us_ppi": {
+    "status": "WARNING",
+    "issues": [
+      "2 large date gaps"
+    ]
+  },
+  "capacity_us": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "ust_10y": {
+    "status": "WARNING",
+    "issues": [
+      "1884 large date gaps"
+    ]
+  },
+  "ust_30y": {
+    "status": "WARNING",
+    "issues": [
+      "1884 large date gaps"
+    ]
+  },
+  "spread_bbb": {
+    "status": "WARNING",
+    "issues": [
+      "1457 large date gaps",
+      "75 extreme outliers"
+    ]
+  },
+  "spread_hy": {
+    "status": "WARNING",
+    "issues": [
+      "1408 large date gaps",
+      "28 extreme outliers"
+    ]
+  },
+  "sofr": {
+    "status": "WARNING",
+    "issues": [
+      "409 large date gaps"
+    ]
+  },
+  "auto_production": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "auto_sales": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "housing_starts": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "ism_pmi": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "wti_crude": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "rig_count": {
+    "status": "PASSED",
+    "issues": []
+  },
+  "stock_uss": {
+    "status": "WARNING",
+    "issues": [
+      "1332 large date gaps",
+      "39 extreme outliers"
+    ]
+  },
+  "stock_nippon": {
+    "status": "WARNING",
+    "issues": [
+      "1335 large date gaps"
+    ]
+  },
+  "ev_forecast": {
+    "status": "EMPTY",
+    "issues": [
+      "No data"
+    ]
+  },
+  "steel_demand": {
+    "status": "EMPTY",
+    "issues": [
+      "No data"
+    ]
+  },
+  "steel_costs": {
+    "status": "EMPTY",
+    "issues": [
+      "No data"
+    ]
+  },
+  "macro_aggregate": {
+    "status": "EMPTY",
+    "issues": [
+      "No data"
+    ]
+  }
+}

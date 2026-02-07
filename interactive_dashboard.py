@@ -4006,6 +4006,213 @@ def render_tab_risk(ctx):
     except Exception as e:
         st.info(f"Covenant analysis unavailable: {e}")
 
+    # =========================================================================
+    # DEMAND DRIVER ANALYSIS
+    # =========================================================================
+
+    st.markdown("---")
+    st.header("Demand Driver Analysis", anchor="demand-drivers")
+
+    st.markdown("""
+    Macroeconomic indicators that predict USS revenue **beyond steel prices**.
+    Based on Granger causality testing and partial correlation analysis of 16 indicators
+    vs USS quarterly revenue (N=40, FY2015-2024).
+    """)
+
+    # Granger Causality Summary
+    st.subheader("Granger Causality: Which Indicators Predict Revenue?")
+
+    granger_cache_key = "demand_granger_loaded"
+    if granger_cache_key not in st.session_state:
+        try:
+            from pathlib import Path as P
+            gc_path = P('audit-verification/granger_causality_summary.csv')
+            if gc_path.exists():
+                gc_df = pd.read_csv(gc_path)
+                st.session_state[granger_cache_key] = gc_df
+            else:
+                st.session_state[granger_cache_key] = None
+        except Exception:
+            st.session_state[granger_cache_key] = None
+
+    gc_df = st.session_state.get(granger_cache_key)
+    if gc_df is not None and len(gc_df) > 0:
+        # Show table of significant results
+        display_gc = gc_df[['indicator', 'lag', 'f_stat', 'f_pvalue', 'n']].copy()
+        display_gc.columns = ['Indicator', 'Best Lag (Q)', 'F-Statistic', 'p-value', 'n']
+        display_gc['Significant'] = display_gc['p-value'].apply(
+            lambda p: 'Yes (p<0.05)' if p < 0.05 else 'Marginal' if p < 0.10 else 'No'
+        )
+        display_gc['p-value'] = display_gc['p-value'].apply(lambda p: f"{p:.4f}")
+        display_gc['F-Statistic'] = display_gc['F-Statistic'].apply(lambda f: f"{f:.2f}")
+
+        st.dataframe(display_gc.head(10).set_index('Indicator'), use_container_width=True)
+
+        sig_count = (gc_df['f_pvalue'] < 0.05).sum()
+        st.markdown(f"""
+        **{sig_count} of {len(gc_df)} indicators** Granger-cause revenue (p<0.05) after removing HRC price effect.
+        Top predictors: Scrap PPI (cost channel), WTI Crude (energy/OCTG), Durable Goods (mfg demand).
+
+        *Granger causality establishes temporal precedence, not true causal mechanism.*
+        """)
+    else:
+        st.info("Run `python scripts/advanced_demand_analysis.py` to generate Granger causality results.")
+
+    # Subperiod Stability
+    st.subheader("Subperiod Stability: Pre-COVID vs Post-COVID")
+
+    stab_cache_key = "demand_stability_loaded"
+    if stab_cache_key not in st.session_state:
+        try:
+            from pathlib import Path as P
+            stab_path = P('audit-verification/subperiod_stability.csv')
+            if stab_path.exists():
+                stab_df = pd.read_csv(stab_path)
+                st.session_state[stab_cache_key] = stab_df
+            else:
+                st.session_state[stab_cache_key] = None
+        except Exception:
+            st.session_state[stab_cache_key] = None
+
+    stab_df = st.session_state.get(stab_cache_key)
+    if stab_df is not None and len(stab_df) > 0:
+        col_pre, col_post = st.columns(2)
+        with col_pre:
+            stable_count = stab_df['stable'].sum()
+            st.metric("Stable Indicators", f"{stable_count}/{len(stab_df)}")
+        with col_post:
+            flip_count = stab_df['sign_flip'].sum()
+            st.metric("Sign Flips", f"{flip_count}", delta_color="inverse" if flip_count > 0 else "normal")
+
+        # Show chart if available
+        chart_path = Path('charts/subperiod_stability.png')
+        if chart_path.exists():
+            st.image(str(chart_path), use_container_width=True)
+        else:
+            display_stab = stab_df[['indicator', 'pre_covid_r', 'post_covid_r', 'sign_flip', 'stable']].copy()
+            display_stab.columns = ['Indicator', 'Pre-COVID r', 'Post-COVID r', 'Sign Flip', 'Stable']
+            st.dataframe(display_stab.set_index('Indicator'), use_container_width=True)
+    else:
+        st.info("Run `python scripts/advanced_demand_analysis.py` for subperiod stability data.")
+
+    # VAR Impulse Response (lazy-loaded)
+    st.subheader("VAR Impulse Response Functions")
+
+    irf_cache_key = "demand_irf_loaded"
+    if st.button("Load IRF Analysis", key="btn_load_irf"):
+        try:
+            import json
+            from pathlib import Path as P
+            var_path = P('audit-verification/var_model_results.json')
+            if var_path.exists():
+                with open(var_path) as f:
+                    var_results = json.load(f)
+                st.session_state[irf_cache_key] = var_results
+            else:
+                st.session_state[irf_cache_key] = None
+        except Exception:
+            st.session_state[irf_cache_key] = None
+
+    var_results = st.session_state.get(irf_cache_key)
+    if var_results is not None:
+        irf_col1, irf_col2 = st.columns(2)
+
+        # Show IRF chart if available
+        irf_chart = Path('charts/var_impulse_response.png')
+        fevd_chart = Path('charts/var_fevd.png')
+
+        if irf_chart.exists():
+            with irf_col1:
+                st.image(str(irf_chart), use_container_width=True)
+        if fevd_chart.exists():
+            with irf_col2:
+                st.image(str(fevd_chart), use_container_width=True)
+
+        # Model diagnostics
+        for model_key, model_name in [('model1', 'Bivariate [HRC, Revenue]'), ('model2', 'Trivariate [HRC, WTI, Revenue]')]:
+            if model_key in var_results and 'error' not in var_results[model_key]:
+                m = var_results[model_key]
+                st.markdown(f"""
+                **{model_name}:** Lag={m['lag']}, AIC={m['aic']:.1f},
+                Stable={'Yes' if m['stable'] else 'NO'},
+                Max eigenvalue={m['max_eigenvalue']:.3f}
+                """)
+
+        # FEVD summary
+        if 'model1_fevd' in var_results:
+            fevd = var_results['model1_fevd']
+            final_hrc_pct = fevd['revenue_explained_by_hrc'][-1] * 100
+            st.markdown(f"""
+            **Variance Decomposition (8Q horizon):** HRC price explains **{final_hrc_pct:.0f}%** of revenue forecast error.
+            Consistent with the finding that steel prices are the dominant revenue driver.
+            """)
+    else:
+        st.info("Click 'Load IRF Analysis' to view impulse response functions from the VAR model.")
+
+    # Macro Scenario Selector
+    st.subheader("Macro-Conditioned Volume Scenarios")
+
+    try:
+        from price_volume_model import get_macro_scenario_presets, apply_macro_adjustments as _ama
+
+        macro_presets = get_macro_scenario_presets()
+        selected_macro = st.selectbox(
+            "Select macro scenario:",
+            options=['base_macro', 'recession', 'energy_boom'],
+            format_func=lambda x: macro_presets[x].name + f" — {macro_presets[x].description}",
+            key="macro_scenario_select"
+        )
+
+        macro = macro_presets[selected_macro]
+
+        # Show macro parameters
+        macro_col1, macro_col2, macro_col3, macro_col4 = st.columns(4)
+        with macro_col1:
+            st.metric("GDP Growth Factor", f"{macro.gdp_growth_factor:.3f}")
+        with macro_col2:
+            st.metric("WTI Factor", f"{macro.wti_factor:.2f}")
+        with macro_col3:
+            st.metric("Durable Goods Factor", f"{macro.durable_goods_factor:.2f}")
+        with macro_col4:
+            st.metric("ISM PMI", f"{macro.ism_pmi:.0f}")
+
+        # Calculate volume adjustments
+        base_vol = VolumeScenario(
+            name="Base", description="Base",
+            flat_rolled_volume_factor=1.0, mini_mill_volume_factor=1.0,
+            usse_volume_factor=1.0, tubular_volume_factor=1.0,
+            flat_rolled_growth_adj=0, mini_mill_growth_adj=0,
+            usse_growth_adj=0, tubular_growth_adj=0,
+        )
+        adjusted = _ama(base_vol, macro=macro)
+
+        adj_data = {
+            'Segment': ['Flat-Rolled', 'Mini Mill', 'USSE', 'Tubular'],
+            'Base Volume': [1.0, 1.0, 1.0, 1.0],
+            'Adjusted Volume': [
+                adjusted.flat_rolled_volume_factor,
+                adjusted.mini_mill_volume_factor,
+                adjusted.usse_volume_factor,
+                adjusted.tubular_volume_factor,
+            ],
+        }
+        adj_df = pd.DataFrame(adj_data)
+        adj_df['Change'] = adj_df['Adjusted Volume'] - adj_df['Base Volume']
+        adj_df['Change (%)'] = adj_df['Change'].apply(lambda x: f"{x*100:+.1f}%")
+        adj_df['Adjusted Volume'] = adj_df['Adjusted Volume'].apply(lambda x: f"{x:.4f}")
+
+        st.dataframe(adj_df.set_index('Segment'), use_container_width=True)
+
+        st.markdown("""
+        Volume adjustments are calibrated from partial correlations (demand_driver_analysis.py).
+        Tubular is most sensitive to WTI (energy capex → OCTG demand).
+        Flat-Rolled responds to GDP and durable goods orders.
+        All adjustments capped at ±15%.
+        """)
+
+    except Exception as e:
+        st.info(f"Macro scenario analysis unavailable: {e}")
+
 
 def render_tab_strategic(ctx):
     """Tab 4: Strategic Context - USS predicament, NSA, peer benchmarking."""
