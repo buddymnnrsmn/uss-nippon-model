@@ -133,7 +133,7 @@ class ScenarioType(Enum):
     CUSTOM = "Custom"
     # Legacy names for backward compatibility
     CONSERVATIVE = "Downside"  # Alias for DOWNSIDE
-    MANAGEMENT = "Optimistic"  # Alias for OPTIMISTIC
+    MANAGEMENT = "Optimistic"  # Alias for OPTIMISTIC — display as "Management Dec 2023 Guidance"
     # Futures Model scenarios (post-COVID, 50% tariff regime)
     FUTURES_DOWNSIDE = "Futures: Downside"
     FUTURES_BASE_CASE = "Futures: Base Case"
@@ -144,6 +144,10 @@ class ScenarioType(Enum):
     TARIFF_REMOVAL = "Tariff Removal"
     TARIFF_REDUCED = "Tariff Reduced"
     TARIFF_ESCALATION = "Tariff Escalation"
+    # Stress test scenarios (informational, 0% probability weight)
+    EXTREME_DOWNSIDE = "Extreme Downside"
+    EXTREME_UPSIDE = "Extreme Upside"
+    PROJECT_FAILURE = "Project Execution Failure"
 
 
 # Steel price benchmarks ($/ton) - hardcoded fallbacks (used only if Bloomberg unavailable)
@@ -511,6 +515,11 @@ class SteelPriceScenario:
     # Adjustment only applies when tariff_rate != 0.25
     tariff_rate: float = 0.25
 
+    # EUR/USD exchange rate (base ~1.08 as of 2024). Affects USSE segment via hrc_eu benchmark.
+    # USSE revenues are EUR-denominated; hrc_eu benchmark is already in USD terms.
+    # FX factor adjusts USSE realized prices: realized_price *= (eur_usd_rate / 1.08)
+    eur_usd_rate: float = 1.08
+
 
 @dataclass
 class VolumeScenario:
@@ -679,9 +688,16 @@ class SynergyAssumptions:
 @dataclass
 class FinancingAssumptions:
     """Assumptions for how USS would finance large capital programs standalone"""
-    # Current balance sheet
-    current_debt: float = 3913.0  # $M - Total financial debt (WACC inputs.json, USS 10-K)
-    current_shares: float = 225.0  # M shares outstanding
+    # Current balance sheet (Source: USS 10-K FY2023, CIQ reconciliation ±$25M net debt)
+    # Debt: $3,913M excl. operating leases (CIQ $4,339M incl. $297M leases + $129M other)
+    # Cash: $2,547M excl. restricted cash (CIQ $2,948M uses broader definition)
+    # Net Debt: $1,366M (CIQ $1,391M — 1.8% variance validates equity bridge)
+    current_debt: float = 3913.0  # $M - Total financial debt excl. leases (USS 10-K p.F-29)
+    # Shares: 225M basic (USS 10-K p.F-2). CIQ shows 223.7M basic, 255.36M diluted.
+    # Using ~225M basic shares (not diluted) for per-share equity value — standard for DCF.
+    current_shares: float = 225.0  # M basic shares outstanding (not diluted 255M)
+
+    # Pension & OPEB: $126M on balance sheet, unfunded PBO ~-$103M (overfunded, not modeled as debt equiv.)
 
     # Financing mix for incremental CapEx beyond FCF
     debt_financing_pct: float = 0.50  # 50% debt, 50% equity
@@ -862,16 +878,24 @@ def get_conservative_price_scenario() -> SteelPriceScenario:
 
 
 def get_wall_street_price_scenario() -> SteelPriceScenario:
-    """Wall Street Consensus: ~20% above through-cycle (2023 elevated), flat growth"""
+    """Wall Street Consensus: calibrated to DEFM14A fairness opinion range ($38-$52/share).
+
+    Source: USS DEFM14A (filed 2024-03-12), Barclays and Goldman Sachs fairness opinions.
+    Banks used management December 2023 projections with HRC $700/ton (2025+).
+    Our through-cycle benchmark is $738 → factor ~0.95-1.02x depending on near-term pricing.
+    Using 1.02x to approximate blended near-term ($750) / long-term ($700) pricing.
+    Flat growth matches banks' through-cycle normalization (no real price appreciation assumed).
+    EU factor lower (0.87x) reflecting carbon tax headwinds flagged in management projections.
+    """
     return SteelPriceScenario(
         name="Wall Street Consensus",
-        description="Analyst consensus - calibrated to $39-52 fairness opinion range",
-        hrc_us_factor=1.20,   # ~$886 HRC (analysts anchored to 2023 levels)
-        crc_us_factor=1.10,
-        coated_us_factor=1.10,
-        hrc_eu_factor=1.15,
-        octg_factor=1.10,
-        annual_price_growth=0.00
+        description="Barclays/Goldman DCF calibrated to DEFM14A fairness opinion ($38-52/share)",
+        hrc_us_factor=1.02,   # ~$753 HRC (blended near-term $750 / long-term $700)
+        crc_us_factor=1.02,   # Source: DEFM14A p.94-108
+        coated_us_factor=1.02,
+        hrc_eu_factor=0.87,   # EU lower: carbon tax headwinds per mgmt projections
+        octg_factor=1.02,
+        annual_price_growth=0.00  # Flat — banks assumed no real price growth
     )
 
 
@@ -1400,15 +1424,20 @@ def get_scenario_presets(
             probability_weight=0.30
         ),
 
+        # Wall Street Consensus: calibrated to DEFM14A fairness opinions
+        # Barclays: WACC 11.5-13.5%, perp growth (1)%-1% → $39-$50/share
+        # Goldman:  WACC 10.75-12.5%, exit mult 3.5-6.0x → $38-$52/share
+        # Midpoint: WACC 12.5%, g=0%, exit 4.75x → ~$43/share
+        # Must use use_verified_wacc=False to honor analyst WACC (not model's 10.7%)
         ScenarioType.WALL_STREET: ModelScenario(
-            name="Wall Street Consensus",
+            name="Wall Street Consensus (DEFM14A)",
             scenario_type=ScenarioType.WALL_STREET,
-            description="Barclays/Goldman DCF: 11.5-13.5% WACC, $39-52/share range",
+            description="Barclays/Goldman DCF midpoint: 12.5% WACC, 0% growth, ~$43/share. Range: $38-$52.",
             price_scenario=get_wall_street_price_scenario(),
             volume_scenario=get_base_volume_scenario(),
-            uss_wacc=0.125,
-            terminal_growth=0.01,
-            exit_multiple=4.75,
+            uss_wacc=0.125,           # Midpoint of Barclays 11.5-13.5% and Goldman 10.75-12.5%
+            terminal_growth=0.0,      # Midpoint of Barclays (1)%-1% range
+            exit_multiple=4.75,       # Midpoint of Goldman 3.5x-6.0x
             us_10yr=0.0425,
             japan_10yr=0.0075,
             nippon_equity_risk_premium=0.0475,
@@ -1416,7 +1445,8 @@ def get_scenario_presets(
             nippon_debt_ratio=0.35,
             nippon_tax_rate=0.30,
             include_projects=['BR2 Mini Mill'],
-            probability_weight=0.0  # Reference only, no probability weight
+            probability_weight=0.0,   # Reference only, no probability weight
+            use_verified_wacc=False,  # Use analyst WACC, not model's verified 10.7%
         ),
 
         ScenarioType.OPTIMISTIC: ModelScenario(
@@ -1451,9 +1481,9 @@ def get_scenario_presets(
 
         # Keep MANAGEMENT as alias for backward compatibility
         ScenarioType.MANAGEMENT: ModelScenario(
-            name="Optimistic (Sustained Growth)",
+            name="Management Dec 2023 Guidance",
             scenario_type=ScenarioType.OPTIMISTIC,
-            description="Sustained favorable markets: benchmark pricing with 2% growth",
+            description="Management guidance (Dec 2023): sustained favorable markets with 2% growth. Maps to Optimistic scenario.",
             price_scenario=get_optimistic_price_scenario(),
             volume_scenario=VolumeScenario(
                 name="Strong Market Volumes",
@@ -1687,6 +1717,82 @@ def get_scenario_presets(
             nippon_equity_risk_premium=0.0475, nippon_credit_spread=0.0075,
             nippon_debt_ratio=0.35, nippon_tax_rate=0.30,
             include_projects=['BR2 Mini Mill'],
+            probability_weight=0.0,
+        ),
+
+        # --- Stress Test Scenarios (informational, 0% probability weight) ---
+
+        ScenarioType.EXTREME_DOWNSIDE: ModelScenario(
+            name="Extreme Downside (2008-style)",
+            scenario_type=ScenarioType.EXTREME_DOWNSIDE,
+            description="GFC-level crisis: -40% prices, -20% volumes, distressed WACC. Historical analog: 2008-2009.",
+            price_scenario=SteelPriceScenario(
+                name="GFC-level Crisis",
+                description="Steel prices collapse 40% from through-cycle baseline",
+                hrc_us_factor=0.60, crc_us_factor=0.60, coated_us_factor=0.60,
+                hrc_eu_factor=0.55, octg_factor=0.50,
+                annual_price_growth=-0.02,
+            ),
+            volume_scenario=VolumeScenario(
+                name="Demand Collapse",
+                description="20% volume decline across all segments",
+                flat_rolled_volume_factor=0.80,
+                mini_mill_volume_factor=0.80,
+                usse_volume_factor=0.75,
+                tubular_volume_factor=0.70,
+                flat_rolled_growth_adj=-0.03, mini_mill_growth_adj=-0.02,
+                usse_growth_adj=-0.03, tubular_growth_adj=-0.04
+            ),
+            uss_wacc=0.139, terminal_growth=0.0, exit_multiple=3.0,
+            us_10yr=0.035, japan_10yr=0.005,
+            nippon_equity_risk_premium=0.065, nippon_credit_spread=0.02,
+            nippon_debt_ratio=0.35, nippon_tax_rate=0.30,
+            include_projects=[],
+            probability_weight=0.0,
+        ),
+
+        ScenarioType.EXTREME_UPSIDE: ModelScenario(
+            name="Extreme Upside (Infrastructure Boom)",
+            scenario_type=ScenarioType.EXTREME_UPSIDE,
+            description="Infrastructure supercycle: +30% prices, +15% volumes. Historical analog: 2021 post-COVID boom.",
+            price_scenario=SteelPriceScenario(
+                name="Infrastructure Boom",
+                description="Sustained steel price boom +30% above through-cycle",
+                hrc_us_factor=1.30, crc_us_factor=1.30, coated_us_factor=1.30,
+                hrc_eu_factor=1.25, octg_factor=1.35,
+                annual_price_growth=0.025,
+            ),
+            volume_scenario=VolumeScenario(
+                name="Strong Demand",
+                description="15% volume uplift from infrastructure spending",
+                flat_rolled_volume_factor=1.15,
+                mini_mill_volume_factor=1.15,
+                usse_volume_factor=1.10,
+                tubular_volume_factor=1.20,
+                flat_rolled_growth_adj=0.02, mini_mill_growth_adj=0.03,
+                usse_growth_adj=0.01, tubular_growth_adj=0.03
+            ),
+            uss_wacc=0.089, terminal_growth=0.02, exit_multiple=6.0,
+            us_10yr=0.045, japan_10yr=0.01,
+            nippon_equity_risk_premium=0.04, nippon_credit_spread=0.005,
+            nippon_debt_ratio=0.35, nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill', 'Gary Works BF', 'Mon Valley HSM',
+                              'Greenfield Mini Mill', 'Mining Improvements', 'Fairfield EAF'],
+            probability_weight=0.0,
+        ),
+
+        ScenarioType.PROJECT_FAILURE: ModelScenario(
+            name="Project Execution Failure",
+            scenario_type=ScenarioType.PROJECT_FAILURE,
+            description="All NSA capital projects deliver 50% of expected EBITDA; capex on budget. Tests execution risk.",
+            price_scenario=get_true_base_case_price_scenario(),
+            volume_scenario=get_true_base_case_volume_scenario(),
+            uss_wacc=0.109, terminal_growth=0.01, exit_multiple=4.5,
+            us_10yr=0.0425, japan_10yr=0.0075,
+            nippon_equity_risk_premium=0.0475, nippon_credit_spread=0.0075,
+            nippon_debt_ratio=0.35, nippon_tax_rate=0.30,
+            include_projects=['BR2 Mini Mill', 'Gary Works BF', 'Mon Valley HSM',
+                              'Greenfield Mini Mill', 'Mining Improvements', 'Fairfield EAF'],
             probability_weight=0.0,
         ),
     }
@@ -2224,6 +2330,13 @@ class PriceVolumeModel:
 
         # Apply segment premium and specific growth
         realized_price = benchmark_price * (1 + seg.price_premium_to_benchmark)
+
+        # Apply EUR/USD FX adjustment for USSE segment
+        # USSE revenues are EUR-denominated; benchmark is in USD at base rate 1.08
+        if segment == Segment.USSE:
+            base_eur_usd = 1.08
+            eur_usd = getattr(self.scenario.price_scenario, 'eur_usd_rate', base_eur_usd)
+            realized_price *= (eur_usd / base_eur_usd)
 
         return realized_price
 
@@ -2835,6 +2948,64 @@ class PriceVolumeModel:
             'debt_to_ebitda': debt_to_ebitda
         }
 
+    def calculate_covenant_ratios(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Calculate key credit covenant ratios by year.
+
+        Tracks Debt/EBITDA, Net Debt/EBITDA, and Interest Coverage.
+        Flags years where typical covenants would be breached.
+
+        Args:
+            df: Consolidated financial projection DataFrame (from build_consolidated)
+
+        Returns:
+            DataFrame with columns: Year, EBITDA, Debt, Net_Debt, Interest_Expense,
+            Debt_to_EBITDA, Net_Debt_to_EBITDA, Interest_Coverage, Leverage_Breach, Coverage_Breach
+        """
+        financing = FinancingAssumptions()
+        debt = financing.current_debt  # Starting debt $M
+        cash = 3913.0 - 1366.0  # Starting cash from net debt identity ($2,547M)
+
+        # Covenant thresholds (typical USS credit facility)
+        max_leverage = 4.0  # Debt/EBITDA
+        min_coverage = 2.5  # EBITDA/Interest
+
+        interest_rate = financing.incremental_cost_of_debt  # ~7.5%
+        rows = []
+        for _, row in df.iterrows():
+            year = int(row['Year'])
+            ebitda = row['Total_EBITDA']
+            fcf = row.get('UFCF', row.get('Total_FCF', 0))
+
+            # Simple debt evolution: debt reduced by excess FCF (simplified)
+            interest_expense = debt * interest_rate
+            debt_to_ebitda = debt / ebitda if ebitda > 0 else float('inf')
+            net_debt = debt - cash
+            net_debt_to_ebitda = net_debt / ebitda if ebitda > 0 else float('inf')
+            coverage = ebitda / interest_expense if interest_expense > 0 else float('inf')
+
+            rows.append({
+                'Year': year,
+                'EBITDA': round(ebitda, 1),
+                'Debt': round(debt, 1),
+                'Net_Debt': round(net_debt, 1),
+                'Interest_Expense': round(interest_expense, 1),
+                'Debt_to_EBITDA': round(debt_to_ebitda, 2),
+                'Net_Debt_to_EBITDA': round(net_debt_to_ebitda, 2),
+                'Interest_Coverage': round(coverage, 2),
+                'Leverage_Breach': debt_to_ebitda > max_leverage,
+                'Coverage_Breach': coverage < min_coverage,
+            })
+
+            # Evolve balance sheet (simplified: excess FCF after interest reduces debt)
+            net_cf = fcf - interest_expense
+            if net_cf > 0:
+                debt = max(0, debt - net_cf * 0.5)  # 50% of excess to debt paydown
+                cash += net_cf * 0.5
+            else:
+                debt -= net_cf  # Negative FCF increases debt
+
+        return pd.DataFrame(rows)
+
     def calculate_dcf(self, df: pd.DataFrame, wacc: float,
                        financing_impact: Optional[Dict] = None) -> Dict:
         """Calculate DCF valuation
@@ -3102,8 +3273,13 @@ def compare_scenarios(scenario_types: List[ScenarioType] = None,
                 progress_pct = int((i / len(scenario_types)) * 100)
                 progress_bar.progress(progress_pct, text=f"Calculating scenario: {st.name} ({i}/{len(scenario_types)})")
 
-            # Apply execution factor only to Nippon Commitments scenario
-            ef = execution_factor if st == ScenarioType.NIPPON_COMMITMENTS else 1.0
+            # Apply execution factor to Nippon Commitments; Project Failure uses fixed 0.5
+            if st == ScenarioType.PROJECT_FAILURE:
+                ef = 0.5
+            elif st == ScenarioType.NIPPON_COMMITMENTS:
+                ef = execution_factor
+            else:
+                ef = 1.0
             model = PriceVolumeModel(presets[st], execution_factor=ef, custom_benchmarks=custom_benchmarks)
             analysis = model.run_full_analysis()
 
@@ -3165,6 +3341,10 @@ def calculate_probability_weighted_valuation(
             ScenarioType.FUTURES_ABOVE_AVERAGE,
             ScenarioType.FUTURES_OPTIMISTIC,
             ScenarioType.FUTURES_NO_TARIFF,
+            # Exclude stress tests (informational only, 0% weight)
+            ScenarioType.EXTREME_DOWNSIDE,
+            ScenarioType.EXTREME_UPSIDE,
+            ScenarioType.PROJECT_FAILURE,
         ]
 
     # Filter to scenarios with probability weights
