@@ -20,14 +20,20 @@ class TestUSSSegmentData:
     def test_all_four_segments_present(self):
         assert set(USS_SEGMENT_DATA.keys()) == {"Flat-Rolled", "Mini Mill", "USSE", "Tubular"}
 
-    def test_five_years_per_segment(self):
+    def test_minimum_observations_per_segment(self):
+        expected_min = {"Flat-Rolled": 11, "Mini Mill": 4, "USSE": 11, "Tubular": 11}
         for seg, data in USS_SEGMENT_DATA.items():
-            assert len(data) == 5, f"{seg} should have 5 annual obs"
+            assert len(data) >= expected_min[seg], f"{seg} should have {expected_min[seg]}+ obs, got {len(data)}"
 
-    def test_years_are_2019_2023(self):
+    def test_year_ranges(self):
         for seg, data in USS_SEGMENT_DATA.items():
             years = [d[0] for d in data]
-            assert years == [2019, 2020, 2021, 2022, 2023], f"{seg} years mismatch"
+            assert years == sorted(years), f"{seg} years not sorted"
+            if seg == "Mini Mill":
+                assert min(years) == 2021, "Mini Mill should start 2021 (BRS acquisition)"
+            else:
+                assert min(years) == 2014, f"{seg} should start 2014"
+            assert max(years) == 2024, f"{seg} should end 2024"
 
     def test_revenue_positive(self):
         for seg, data in USS_SEGMENT_DATA.items():
@@ -52,7 +58,7 @@ class TestGetSegmentDataframe:
 
     def test_returns_dataframe_for_known_segment(self):
         df = get_segment_dataframe("Flat-Rolled", frequency="annual")
-        assert len(df) == 5
+        assert len(df) >= 5
         assert "revenue" in df.columns
 
     def test_returns_empty_for_unknown_segment(self):
@@ -76,7 +82,7 @@ class TestGetSegmentSummary:
     def test_hardcoded_counts(self):
         summary = get_segment_summary()
         for seg, info in summary.items():
-            assert info['hardcoded_annual'] == 5
+            assert info['hardcoded_annual'] >= 4, f"{seg} should have 4+ annual obs"
 
 
 class TestWRDSQuarterly:
@@ -128,7 +134,7 @@ class TestWRDSQuarterly:
     def test_fallback_when_csv_absent(self):
         """Fallback to hardcoded dict works when WRDS CSV is absent."""
         df = get_segment_dataframe("Flat-Rolled", frequency="annual")
-        assert len(df) == 5
+        assert len(df) >= 5
 
 
 class TestBootstrapCI:

@@ -1,0 +1,104 @@
+{
+  "domestic_product_mix": [
+    {
+      "year": 2020,
+      "dom_hrc_kt": 7865.799339272728,
+      "dom_crc_kt": 7799.082812999999,
+      "dom_coat_kt": 17750.23451284125,
+      "dom_tube_kt": 7916.098402802571,
+      "dom_flat_kt": 33415.11666511398,
+      "flat_hrc_pct": 23.539643503578645,
+      "flat_crc_pct": 23.33998378985877,
+      "flat_coat_pct": 53.12037270656258
+    },
+    {
+      "year": 2021,
+      "dom_hrc_kt": 12799.771030285714,
+      "dom_crc_kt": 9261.140086,
+      "dom_coat_kt": 18081.517604088,
+      "dom_tube_kt": 9523.897804477,
+      "dom_flat_kt": 40142.42872037372,
+      "flat_hrc_pct": 31.88589090970814,
+      "flat_crc_pct": 23.070701951074625,
+      "flat_coat_pct": 45.04340713921722
+    },
+    {
+      "year": 2022,
+      "dom_hrc_kt": 10018.012990252999,
+      "dom_crc_kt": 8724.029961714286,
+      "dom_coat_kt": 16165.75585418182,
+      "dom_tube_kt": 10351.011717083145,
+      "dom_flat_kt": 34907.798806149105,
+      "flat_hrc_pct": 28.698495272890987,
+      "flat_crc_pct": 24.99163585238014,
+      "flat_coat_pct": 46.30986887472886
+    },
+    {
+      "year": 2023,
+      "dom_hrc_kt": 9760.236698505,
+      "dom_crc_kt": 7909.340878636363,
+      "dom_coat_kt": 15898.410101225447,
+      "dom_tube_kt": 9695.124150448286,
+      "dom_flat_kt": 33567.98767836681,
+      "flat_hrc_pct": 29.07602562305238,
+      "flat_crc_pct": 23.562153783003232,
+      "flat_coat_pct": 47.361820593944394
+    }
+  ],
+  "import_data_years": [
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "recommendations": {
+    "Flat-Rolled": {
+      "current": {
+        "HRC US": 0.21,
+        "CRC US": 0.4,
+        "Coated (CRC proxy)": 0.39
+      },
+      "recommended": {
+        "HRC US": 0.2,
+        "CRC US": 0.35,
+        "Coated (CRC proxy)": 0.45
+      },
+      "confidence": "MEDIUM \u2014 CRC/Coated split unresolvable from price data"
+    },
+    "Mini Mill": {
+      "current": {
+        "HRC US": 0.55,
+        "CRC US": 0.16,
+        "Coated (CRC proxy)": 0.29
+      },
+      "recommended": {
+        "HRC US": 0.45,
+        "CRC US": 0.2,
+        "Coated (CRC proxy)": 0.35
+      },
+      "confidence": "LOW \u2014 only 5 observations, new facility"
+    },
+    "USSE": {
+      "current": {
+        "HRC EU": 0.51,
+        "CRC US": 0.08,
+        "Coated (CRC proxy)": 0.4
+      },
+      "recommended": {
+        "HRC EU": 0.51,
+        "CRC US": 0.08,
+        "Coated (CRC proxy)": 0.4
+      },
+      "confidence": "MEDIUM \u2014 EU import data not analyzed"
+    },
+    "Tubular": {
+      "current": {
+        "OCTG US": 1.0
+      },
+      "recommended": {
+        "OCTG US": 1.0
+      },
+      "confidence": "HIGH \u2014 single benchmark, clean mapping"
+    }
+  }
+}
